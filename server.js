@@ -4,8 +4,16 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import dns from 'dns';
 
 dotenv.config();
+
+// Ensure reliable DNS resolution for MongoDB Atlas SRV records across public networks
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+} catch (dnsErr) {
+  console.warn('DNS server configuration warning:', dnsErr.message);
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -1073,7 +1081,7 @@ const distPath = path.join(__dirname, 'dist');
 
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get('*', (req, res, next) => {
+  app.use((req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     res.sendFile(path.join(distPath, 'index.html'));
   });
