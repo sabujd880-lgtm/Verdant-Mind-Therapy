@@ -386,10 +386,13 @@ function App() {
           
           {/* Brand Info */}
           <div className="footer-brand">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <Brain size={20} fill="var(--color-terracotta)" color="var(--color-terracotta)" />
-              <h3 style={{ margin: 0 }}>Sabuj Das</h3>
+              <h3 style={{ margin: 0 }}>Verdant Mind</h3>
             </div>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-terracotta)', fontWeight: 600, marginBottom: '0.75rem' }}>
+              Sabuj Das | Psychologist
+            </p>
             <p>
               Dedicated to offering evidence-based, compassionate cognitive counseling and dialectical therapy to heal, support, and transform lives.
             </p>
@@ -446,7 +449,7 @@ function App() {
 
         {/* Copyright banner */}
         <div className="footer-copyright">
-          <p>&copy; {new Date().getFullYear()} Sabuj Das. All Rights Reserved. Designed for premium psychological care.</p>
+          <p>&copy; {new Date().getFullYear()} Verdant Mind by Sabuj Das. All Rights Reserved. Designed for premium psychological care.</p>
         </div>
       </footer>
 

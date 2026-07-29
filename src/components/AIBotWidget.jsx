@@ -7,7 +7,7 @@ export default function AIBotWidget() {
     {
       id: 'welcome',
       sender: 'bot',
-      text: "Hello! I'm Aura, Dr. Sabuj Das's virtual support assistant. How can I help you today? I can answer questions about session fees, booking guidelines, or guide you through a box breathing exercise for stress relief!",
+      text: "Hello! I'm Aura, virtual support assistant for Verdant Mind by Mr. Sabuj Das. How can I help you today? I can answer questions about session fees, booking guidelines, or guide you through a box breathing exercise for stress relief!",
       timestamp: new Date().toISOString()
     }
   ]);
@@ -102,17 +102,17 @@ export default function AIBotWidget() {
       // Offline fallback rules
       const query = textToSend.toLowerCase();
       if (query.includes('fee') || query.includes('cost') || query.includes('charge') || query.includes('price') || query.includes('pay')) {
-        addBotMessage("Dr. Sabuj Das charges INR 1,500 per counseling session. Sessions last approximately 60 minutes and can be conducted online via Video, Audio, or Chat formats.");
+        addBotMessage("Mr. Sabuj Das charges INR 1,500 per counseling session. Sessions last approximately 60 minutes and can be conducted online via Video, Audio, or Chat formats.");
       } else if (query.includes('book') || query.includes('schedule') || query.includes('appointment') || query.includes('slot')) {
-        addBotMessage("You can book a session directly by navigating to the 'Schedule a Consultation' calendar picker in our portfolio. You can select your session format, find a date that matches Dr. Das's working shift, and submit details.");
+        addBotMessage("You can book a session directly by navigating to the 'Schedule a Consultation' calendar picker in our portfolio. You can select your session format, find a date that matches Mr. Das's working shift, and submit details.");
       } else if (query.includes('breathe') || query.includes('breathing') || query.includes('stressed') || query.includes('stress') || query.includes('anxious') || query.includes('anxiety') || query.includes('panic')) {
         addBotMessage("I understand you might be feeling anxious or stressed right now. Let's do a guided 4-second Box Breathing cycle together to help calm your autonomic nervous system. Click 'Start Breathing' below to begin.");
       } else if (query.includes('language') || query.includes('speak') || query.includes('bengali') || query.includes('hindi')) {
-        addBotMessage("Dr. Sabuj Das conducts therapy sessions in English, Hindi, and Bengali to ensure clients can express themselves in their preferred tongue.");
+        addBotMessage("Mr. Sabuj Das conducts therapy sessions in English, Hindi, and Bengali to ensure clients can express themselves in their preferred tongue.");
       } else if (query.includes('dbt') || query.includes('cbt') || query.includes('therapy') || query.includes('modality') || query.includes('special')) {
-        addBotMessage("Dr. Das specializes in Cognitive Behavioral Therapy (CBT) and Dialectical Behavior Therapy (DBT), addressing conditions such as ADHD, Addiction Treatment, Anxiety, Depression, and anger regulation.");
+        addBotMessage("Mr. Das specializes in Cognitive Behavioral Therapy (CBT) and Dialectical Behavior Therapy (DBT), addressing conditions such as ADHD, Addiction Treatment, Anxiety, Depression, and anger regulation.");
       } else {
-        addBotMessage("I'm having difficulty connecting with my server. Please reach out to Dr. Sabuj Das directly or schedule an appointment using the portal scheduler.");
+        addBotMessage("I'm having difficulty connecting with my server. Please reach out to Mr. Sabuj Das directly or schedule an appointment using the portal scheduler.");
       }
     }
   };

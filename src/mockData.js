@@ -1,6 +1,6 @@
 export const INITIAL_PROFILE = {
   name: "Sabuj Das",
-  title: "Therapist & Psychologist",
+  title: "Psychologist",
   location: "Kolkata, India",
   experience: "1+ Years",
   languages: ["English", "Hindi", "Bengali"],
@@ -96,7 +96,7 @@ export const INITIAL_MESSAGES = [
     senderName: "Kabir Mehta",
     senderEmail: "kabir.mehta@example.com",
     subject: "Inquiring about DBT group therapy sessions",
-    message: "Hello Dr. Das, do you offer group therapy sessions for Dialectical Behavior Therapy (DBT) or is it strictly one-on-one? I'm highly interested in joining a group structure.",
+    message: "Hello Mr. Das, do you offer group therapy sessions for Dialectical Behavior Therapy (DBT) or is it strictly one-on-one? I'm highly interested in joining a group structure.",
     timestamp: "2026-07-12T14:30:00Z",
     status: "replied",
     replies: [

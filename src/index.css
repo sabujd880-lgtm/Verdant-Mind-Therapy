@@ -1,47 +1,47 @@
 /* Premium CSS Design System for Psychology Portfolio */
 
 :root {
-  /* Curated Palette */
-  --color-sage: #D6E4F0;
-  --color-cream: #FAF6F0;
-  --color-slate: #1F3C5C;
-  --color-slate-light: #4A6D8C;
-  --color-slate-dark: #0E1E33;
-  --color-terracotta: #E59866;
-  --color-terracotta-light: #F5CBA7;
+  /* Deep Teal & Eucalyptus Calm Palette */
+  --color-sage: #CBE6E3;             /* Soft Mint Ice / Light Eucalyptus Tint */
+  --color-cream: #F4FAF8;            /* Soft Alabaster / Calm Ice White */
+  --color-slate: #0F383D;            /* Deep Oceanic Teal */
+  --color-slate-light: #2E6863;      /* Eucalyptus Teal */
+  --color-slate-dark: #072226;       /* Midnight Deep Teal */
+  --color-terracotta: #D97736;       /* Copper Warmth Accent */
+  --color-terracotta-light: #F4BE9B; /* Soft Coral Warmth */
   --color-white: #FFFFFF;
   
   /* Opacity Variants */
-  --color-slate-05: rgba(31, 60, 92, 0.05);
-  --color-slate-10: rgba(31, 60, 92, 0.1);
-  --color-slate-20: rgba(31, 60, 92, 0.2);
-  --color-slate-80: rgba(31, 60, 92, 0.8);
-  --color-terracotta-10: rgba(229, 152, 102, 0.1);
+  --color-slate-05: rgba(15, 56, 61, 0.05);
+  --color-slate-10: rgba(15, 56, 61, 0.1);
+  --color-slate-20: rgba(15, 56, 61, 0.2);
+  --color-slate-80: rgba(15, 56, 61, 0.8);
+  --color-terracotta-10: rgba(217, 119, 54, 0.1);
   --color-white-80: rgba(255, 255, 255, 0.8);
   
   /* Premium Linear Gradients */
   --gradient-primary: linear-gradient(135deg, var(--color-slate-dark) 0%, var(--color-slate) 100%);
   --gradient-accent: linear-gradient(135deg, var(--color-terracotta) 0%, var(--color-terracotta-light) 100%);
-  --gradient-background: linear-gradient(180deg, var(--color-cream) 0%, #E8EFF7 50%, var(--color-sage) 100%);
-  --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.55) 100%);
+  --gradient-background: linear-gradient(180deg, #F4FAF8 0%, #E2F2EE 50%, #CBE6E3 100%);
+  --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(244, 250, 248, 0.65) 100%);
   
   /* Status Colors */
-  --color-pending: #DF9B34;
-  --color-pending-bg: #FCF4E6;
-  --color-confirmed: #4A8C70;
-  --color-confirmed-bg: #EAF4EF;
-  --color-cancelled: #C95D5D;
-  --color-cancelled-bg: #FAEAEA;
+  --color-pending: #D9822B;
+  --color-pending-bg: #FDF4E7;
+  --color-confirmed: #1D8A68;
+  --color-confirmed-bg: #E3F6EE;
+  --color-cancelled: #C94C4C;
+  --color-cancelled-bg: #FCEAEA;
 
   /* Typography */
   --font-heading: 'Outfit', sans-serif;
   --font-body: 'Inter', sans-serif;
 
   /* Shadows */
-  --shadow-sm: 0 4px 12px rgba(42, 71, 62, 0.03);
-  --shadow-md: 0 12px 32px rgba(42, 71, 62, 0.08);
-  --shadow-lg: 0 20px 48px rgba(42, 71, 62, 0.12);
-  --shadow-glass: 0 8px 32px 0 rgba(42, 71, 62, 0.06);
+  --shadow-sm: 0 4px 12px rgba(15, 56, 61, 0.04);
+  --shadow-md: 0 12px 32px rgba(15, 56, 61, 0.09);
+  --shadow-lg: 0 20px 48px rgba(15, 56, 61, 0.14);
+  --shadow-glass: 0 8px 32px 0 rgba(15, 56, 61, 0.08);
 
   /* Radius */
   --radius-sm: 8px;

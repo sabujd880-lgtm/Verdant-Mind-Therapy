@@ -10,10 +10,10 @@ export default defineConfig({
       registerType: 'prompt', // Prompt user to reload on updates
       includeAssets: ['favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'icons.svg'],
       manifest: {
-        name: 'Sabuj Das | Therapist & Psychologist',
-        short_name: 'Sabuj Das',
-        description: 'Personal psychological therapy practice of Sabuj Das, Therapist & Psychologist. Specialized in ADHD, Anxiety, Depression, and DBT based in India.',
-        theme_color: '#863bff',
+        name: 'Verdant Mind',
+        short_name: 'Verdant Mind',
+        description: 'Verdant Mind - Clinical practice by Sabuj Das, Psychologist. Specialized in ADHD, Anxiety, Depression, and DBT based in Kolkata, India.',
+        theme_color: '#0F383D',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',

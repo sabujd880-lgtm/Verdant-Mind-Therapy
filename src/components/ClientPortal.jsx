@@ -196,7 +196,7 @@ export default function ClientPortal({
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--color-slate-light)' }}>
               <FileText size={40} style={{ marginBottom: '0.75rem', opacity: 0.5 }} />
               <p>No documents generated or shared for your profile yet.</p>
-              <p style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>Payment receipts and clinical therapeutic plans will appear here after Dr. Das sends them.</p>
+              <p style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>Payment receipts and clinical therapeutic plans will appear here after Mr. Das sends them.</p>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
@@ -269,7 +269,7 @@ export default function ClientPortal({
               {clientMessages.length === 0 ? (
                 <div style={{ textAlign: 'center', margin: 'auto 0', color: 'var(--color-slate-light)' }}>
                   <MessageSquare size={36} style={{ marginBottom: '0.5rem', opacity: 0.5 }} />
-                  <p>No message logs with Dr. Das.</p>
+                  <p>No message logs with Mr. Das.</p>
                   <p style={{ fontSize: '0.78rem' }}>Draft your first message in the panel on the right.</p>
                 </div>
               ) : (
@@ -289,7 +289,7 @@ export default function ClientPortal({
                     {msg.replies && msg.replies.map(reply => (
                       <div key={reply.id} style={{ alignSelf: 'flex-start', background: '#FFF', color: 'var(--color-slate-dark)', padding: '0.85rem 1rem', borderRadius: '12px', borderTopLeftRadius: '2px', maxWidth: '85%', border: '1px solid var(--color-slate-10)', boxShadow: 'var(--shadow-sm)' }}>
                         <div style={{ fontSize: '0.72rem', borderBottom: '1px solid var(--color-slate-05)', paddingBottom: '0.25rem', marginBottom: '0.4rem', color: 'var(--color-confirmed)', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Reply from Dr. Sabuj Das:</span>
+                          <span>Reply from Mr. Sabuj Das:</span>
                           <span>{new Date(reply.timestamp).toLocaleDateString()}</span>
                         </div>
                         <p style={{ fontSize: '0.88rem', margin: 0, whiteSpace: 'pre-wrap' }}>{reply.message}</p>
@@ -348,7 +348,7 @@ export default function ClientPortal({
               >
                 {isSendingMsg ? 'Sending Message...' : (
                   <>
-                    <Send size={14} /> Send Message to Dr. Das
+                    <Send size={14} /> Send Message to Mr. Das
                   </>
                 )}
               </button>
@@ -393,27 +393,27 @@ export default function ClientPortal({
                 className="printable-doc-container"
                 style={{
                   background: '#FFFFFF',
-                  color: '#2A473E',
+                  color: '#0F383D',
                   fontFamily: 'Inter, sans-serif',
                   padding: '2.5rem',
-                  border: '1px solid rgba(42, 71, 62, 0.1)',
+                  border: '1px solid rgba(15, 56, 61, 0.1)',
                   position: 'relative'
                 }}
               >
                 {/* Print Title Watermark */}
-                <div style={{ position: 'absolute', top: '15px', right: '15px', border: '1px solid rgba(42, 71, 62, 0.2)', padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '4px', textTransform: 'uppercase', color: 'var(--color-slate-light)', fontWeight: 600 }}>
+                <div style={{ position: 'absolute', top: '15px', right: '15px', border: '1px solid rgba(15, 56, 61, 0.2)', padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '4px', textTransform: 'uppercase', color: 'var(--color-slate-light)', fontWeight: 600 }}>
                   Client Copy
                 </div>
 
                 {/* CLINIC HEADER */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #2A473E', paddingBottom: '1.25rem', marginBottom: '1.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #0F383D', paddingBottom: '1.25rem', marginBottom: '1.75rem' }}>
                   <div>
-                    <h2 style={{ fontFamily: 'Outfit, sans-serif', color: '#1A2E28', fontSize: '1.45rem', fontWeight: 700, margin: 0 }}>Sabuj Das</h2>
-                    <p style={{ color: 'var(--color-slate-light)', fontSize: '0.8rem', fontWeight: 500, margin: '0.1rem 0 0 0' }}>Therapist & Clinical Counselor</p>
+                    <h2 style={{ fontFamily: 'Outfit, sans-serif', color: '#1A2E28', fontSize: '1.45rem', fontWeight: 700, margin: 0 }}>Verdant Mind</h2>
+                    <p style={{ color: 'var(--color-slate-light)', fontSize: '0.8rem', fontWeight: 500, margin: '0.1rem 0 0 0' }}>Sabuj Das | Psychologist</p>
                     <p style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', margin: '0.2rem 0 0 0' }}>Specialization: ADHD, Anxiety, Depression & DBT</p>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.74rem', color: 'var(--color-slate-light)', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                    <strong>Sabuj Counseling Center</strong>
+                    <strong>Verdant Mind Practice</strong>
                     <span>Kolkata, India</span>
                     <span>sabuj.das@example.com</span>
                     <span>+91 98765 43210</span>
@@ -564,11 +564,11 @@ export default function ClientPortal({
                 <div style={{ borderTop: '1px solid rgba(42, 71, 62, 0.1)', paddingTop: '1.25rem', marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                   <div style={{ fontSize: '0.7rem', color: 'var(--color-slate-light)' }}>
                     <div>This document is private and confidential clinical material.</div>
-                    <div>Sabuj Das Psychological Services &copy; 2026.</div>
+                    <div>Verdant Mind &copy; 2026.</div>
                   </div>
                   
                   <div style={{ textAlign: 'center', width: '180px' }}>
-                    <div style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: '1.1rem', color: 'var(--color-slate-dark)', borderBottom: '1px solid #2A473E', paddingBottom: '0.1rem', marginBottom: '0.3rem', display: 'inline-block' }}>
+                    <div style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: '1.1rem', color: 'var(--color-slate-dark)', borderBottom: '1px solid #0F383D', paddingBottom: '0.1rem', marginBottom: '0.3rem', display: 'inline-block' }}>
                       Sabuj Das
                     </div>
                     <div style={{ fontSize: '0.68rem', color: 'var(--color-slate-light)', fontWeight: 600 }}>Sabuj Das, Counsel Lic. #990231</div>

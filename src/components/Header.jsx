@@ -30,8 +30,8 @@ export default function Header({
             <Brain size={20} />
           </div>
           <div className="logo-text">
-            <h1>Sabuj Das</h1>
-            <p>Therapist & Psychologist</p>
+            <h1>Verdant Mind</h1>
+            <p>Sabuj Das | Psychologist</p>
           </div>
         </div>
 

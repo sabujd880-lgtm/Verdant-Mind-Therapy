@@ -263,12 +263,12 @@ Breakdown:
             {isSentToTherapist ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-confirmed)', background: 'var(--color-confirmed-bg)', padding: '0.75rem', borderRadius: '6px', fontSize: '0.88rem' }}>
                 <CheckCircle2 size={16} />
-                <span>Results successfully synchronized with Dr. Sabuj Das's secure portal! He will review this.</span>
+                <span>Results successfully synchronized with Mr. Sabuj Das's secure portal! He will review this.</span>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
-                  Would you like to securely submit these results to Dr. Das so he can prepare recommendations before your first consultation?
+                  Would you like to securely submit these results to Mr. Das so he can prepare recommendations before your first consultation?
                 </p>
                 <button
                   type="button"

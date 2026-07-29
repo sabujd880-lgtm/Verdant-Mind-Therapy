@@ -1081,12 +1081,12 @@ export default function TherapistDashboard({
                 {/* CLINIC HEADER */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #2C3E50', paddingBottom: '1.5rem', marginBottom: '2rem' }}>
                   <div>
-                    <h2 style={{ fontFamily: 'Outfit, sans-serif', color: '#1A252C', fontSize: '1.6rem', fontWeight: 700, margin: 0 }}>Sabuj Das</h2>
-                    <p style={{ color: '#5A738E', fontSize: '0.85rem', fontWeight: 500, margin: '0.1rem 0 0 0' }}>Therapist & Clinical Counselor</p>
+                    <h2 style={{ fontFamily: 'Outfit, sans-serif', color: '#1A252C', fontSize: '1.6rem', fontWeight: 700, margin: 0 }}>Verdant Mind</h2>
+                    <p style={{ color: '#5A738E', fontSize: '0.85rem', fontWeight: 500, margin: '0.1rem 0 0 0' }}>Sabuj Das | Psychologist</p>
                     <p style={{ color: '#5A738E', fontSize: '0.78rem', margin: '0.2rem 0 0 0' }}>Specialization: ADHD, Anxiety, Depression & DBT</p>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.78rem', color: '#5A738E', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                    <strong>Sabuj Counseling Center</strong>
+                    <strong>Verdant Mind Practice</strong>
                     <span>Kolkata, India</span>
                     <span>sabuj.das@example.com</span>
                     <span>+91 98765 43210</span>
@@ -1256,7 +1256,7 @@ export default function TherapistDashboard({
                 <div style={{ borderTop: '1px solid rgba(44, 62, 80, 0.1)', paddingTop: '1.5rem', marginTop: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                   <div style={{ fontSize: '0.75rem', color: '#5A738E' }}>
                     <div>This document is private and confidential clinical material.</div>
-                    <div>Sabuj Das Psychological Services &copy; 2026.</div>
+                    <div>Verdant Mind &copy; 2026.</div>
                   </div>
                   
                   <div style={{ textAlign: 'center', width: '200px' }}>

@@ -147,7 +147,7 @@ class MockModel {
     const db = readData();
     const list = db[this._collection];
     const index = list.findIndex(item => (item._id === this._id || item.id === this._id));
-    
+
     const plain = { ...this };
     delete plain._collection;
 
@@ -276,13 +276,13 @@ const sendEmail = async ({ toEmail, toName, subject, htmlContent }) => {
         htmlContent: htmlContent
       })
     });
-    
+
     if (!response.ok) {
       const errorResponse = await response.text();
       console.error('Brevo API request failed:', errorResponse);
       return { success: false, error: errorResponse };
     }
-    
+
     const data = await response.json();
     return { success: true, data };
   } catch (error) {
@@ -300,7 +300,7 @@ app.post('/api/auth/register', async (req, res) => {
   const { email, password, name, phone, ageGroup } = req.body;
   try {
     const existing = await Client.findOne({ email });
-    
+
     // Generate 6-digit numeric OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiration
@@ -327,16 +327,16 @@ app.post('/api/auth/register', async (req, res) => {
 
     // Send OTP Verification Email via Brevo
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
         <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Verification Code Required</h2>
         <p>Dear ${name},</p>
-        <p>Thank you for registering at Sabuj Counseling Services. Please use the following 6-digit verification code to complete registration:</p>
+        <p>Thank you for registering at Verdant Mind. Please use the following 6-digit verification code to complete registration:</p>
         <div style="font-size: 2.25rem; font-weight: bold; background: #FFF; padding: 1rem 2rem; border-radius: 6px; border: 1px solid #DF9B34; color: #1A2E28; display: inline-block; letter-spacing: 0.1em; margin: 1rem 0;">
           ${otp}
         </div>
         <p style="font-size: 0.85rem; color: #666;">This verification code is valid for 1 hour. If you did not request this, please disregard this email.</p>
         <hr style="border: 0; border-top: 1px solid #E2ECE9; margin-top: 2rem;"/>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Sabuj Counseling Support | Kolkata, India</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Verdant Mind Support | Kolkata, India</p>
       </div>
     `;
 
@@ -345,12 +345,12 @@ app.post('/api/auth/register', async (req, res) => {
     await sendEmail({
       toEmail: email,
       toName: name,
-      subject: 'Verification OTP Code - Sabuj Counseling Services',
+      subject: 'Verification OTP Code - Verdant Mind',
       htmlContent: emailHtml
     });
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Verification OTP code dispatched to client email.',
       devOtp: process.env.MONGODB_URI ? undefined : otp
     });
@@ -408,7 +408,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     // Send reset OTP email via Brevo
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
         <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Password Reset Request</h2>
         <p>Dear ${client.name},</p>
         <p>We received a request to reset your password. Use the following security recovery OTP to set a new password:</p>
@@ -417,7 +417,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         </div>
         <p style="font-size: 0.85rem; color: #666;">This recovery OTP is valid for 30 minutes. If you did not request this, please change your password immediately.</p>
         <hr style="border: 0; border-top: 1px solid #E2ECE9; margin-top: 2rem;"/>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Sabuj Counseling Support | Kolkata, India</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Verdant Mind Support | Kolkata, India</p>
       </div>
     `;
 
@@ -426,12 +426,12 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     await sendEmail({
       toEmail: email,
       toName: client.name,
-      subject: 'Password Recovery OTP - Sabuj Counseling Services',
+      subject: 'Password Recovery OTP - Verdant Mind',
       htmlContent: emailHtml
     });
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Recovery reset OTP code sent to your email.',
       devOtp: process.env.MONGODB_URI ? undefined : resetOtp
     });
@@ -499,9 +499,9 @@ app.post('/api/auth/login', async (req, res) => {
 
     // If client is registered but not verified, reject and return unverified payload
     if (!client.verified) {
-      return res.status(400).json({ 
-        unverified: true, 
-        error: 'This account email is not verified yet. Please complete verification.' 
+      return res.status(400).json({
+        unverified: true,
+        error: 'This account email is not verified yet. Please complete verification.'
       });
     }
 
@@ -543,7 +543,7 @@ app.post('/api/appointments', async (req, res) => {
 
     // Notify Client via Brevo
     const clientHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
         <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Appointment Request Pending</h2>
         <p>Dear ${clientName},</p>
         <p>We have successfully received your session request. Your inquiry is currently pending therapist approval.</p>
@@ -553,9 +553,9 @@ app.post('/api/appointments', async (req, res) => {
           - <strong>Time Slot</strong>: ${time}<br/>
           - <strong>Session Format</strong>: ${sessionMode}<br/>
         </div>
-        <p>Dr. Das will review your slot request and you will receive an confirmation email shortly.</p>
+        <p>Mr. Das will review your slot request and you will receive an confirmation email shortly.</p>
         <hr style="border: 0; border-top: 1px solid #E2ECE9; margin-top: 2rem;"/>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Sabuj Counseling Support | Kolkata, India</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Verdant Mind Support | Kolkata, India</p>
       </div>
     `;
     await sendEmail({
@@ -565,11 +565,11 @@ app.post('/api/appointments', async (req, res) => {
       htmlContent: clientHtml
     });
 
-    // Notify Therapist (Dr. Das) via Brevo
+    // Notify Therapist (Mr. Das) via Brevo
     const therapistHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
         <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">New Appointment Request</h2>
-        <p>Dr. Das,</p>
+        <p>Mr. Das,</p>
         <p>A new consultation inquiry has been submitted by a client:</p>
         <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
           <strong>Inquiry Overview:</strong><br/>
@@ -582,12 +582,12 @@ app.post('/api/appointments', async (req, res) => {
         </div>
         <p>Open your Therapist Control Panel Dashboard to confirm or reschedule this request.</p>
         <hr style="border: 0; border-top: 1px solid #E2ECE9; margin-top: 2rem;"/>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Sabuj Counseling Automated System</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Verdant Mind Automated System</p>
       </div>
     `;
     await sendEmail({
       toEmail: 'sabujd880@gmail.com',
-      toName: 'Dr. Sabuj Das',
+      toName: 'Mr. Sabuj Das',
       subject: 'Alert: New Counseling Request - ' + clientName,
       htmlContent: therapistHtml
     });
@@ -612,21 +612,21 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
     await apt.save();
 
     // Send confirmation/cancellation email alerts to client
-    const emailSubject = status === 'Confirmed' 
-      ? 'Booking Confirmation - Sabuj Counseling Services'
+    const emailSubject = status === 'Confirmed'
+      ? 'Booking Confirmation - Verdant Mind'
       : 'Appointment Status Notice - Session Cancelled';
 
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
         <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">
           ${status === 'Confirmed' ? 'Session Booking Confirmed' : 'Appointment Cancelled'}
         </h2>
         <p>Dear ${apt.clientName},</p>
         <p>
-          ${status === 'Confirmed' 
-            ? 'We are pleased to inform you that Dr. Sabuj Das has confirmed your consultation inquiry slot.'
-            : 'We regret to inform you that your upcoming consultation slot has been cancelled.'
-          }
+          ${status === 'Confirmed'
+        ? 'We are pleased to inform you that Mr. Sabuj Das has confirmed your consultation inquiry slot.'
+        : 'We regret to inform you that your upcoming consultation slot has been cancelled.'
+      }
         </p>
         <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
           <strong>Session Details:</strong><br/>
@@ -636,13 +636,13 @@ app.patch('/api/appointments/:id/status', async (req, res) => {
           - <strong>Status</strong>: <strong style="color: ${status === 'Confirmed' ? '#4A8C70' : '#C95D5D'}">${status.toUpperCase()}</strong>
         </div>
         <p>
-          ${status === 'Confirmed' 
-            ? 'Please log in to your Client Portal dashboard at the scheduled time to initiate contact.' 
-            : 'Please visit the portal to schedule another booking date.'
-          }
+          ${status === 'Confirmed'
+        ? 'Please log in to your Client Portal dashboard at the scheduled time to initiate contact.'
+        : 'Please visit the portal to schedule another booking date.'
+      }
         </p>
         <hr style="border: 0; border-top: 1px solid #E2ECE9; margin-top: 2rem;"/>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Sabuj Counseling Support | Kolkata, India</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Verdant Mind Support | Kolkata, India</p>
       </div>
     `;
 
@@ -696,11 +696,11 @@ app.post('/api/messages', async (req, res) => {
       senderName, senderEmail, subject, message
     });
 
-    // Send Alert to Dr. Das
+    // Send Alert to Mr. Das
     const alertHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
         <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">New Inbox Inquiry Message</h2>
-        <p>Dr. Das,</p>
+        <p>Mr. Das,</p>
         <p>A new client message inquiry has been sent to your portal dashboard:</p>
         <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
           - <strong>From Name</strong>: ${senderName}<br/>
@@ -713,7 +713,7 @@ app.post('/api/messages', async (req, res) => {
     `;
     await sendEmail({
       toEmail: 'sabujd880@gmail.com',
-      toName: 'Dr. Sabuj Das',
+      toName: 'Mr. Sabuj Das',
       subject: 'Alert: New Client Portal Message - ' + subject,
       htmlContent: alertHtml
     });
@@ -746,23 +746,23 @@ app.patch('/api/messages/:id/reply', async (req, res) => {
 
     // Send email alert to client with the message reply text
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
-        <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Reply from Dr. Sabuj Das</h2>
+      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+        <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Reply from Mr. Sabuj Das</h2>
         <p>Dear ${msg.senderName},</p>
-        <p>Dr. Sabuj Das has submitted a secure reply regarding your message thread: <strong>"${msg.subject}"</strong></p>
+        <p>Mr. Sabuj Das has submitted a secure reply regarding your message thread: <strong>"${msg.subject}"</strong></p>
         <div style="background: #FFF; padding: 1.25rem; border-radius: 6px; border-left: 3px solid #DF9B34; font-size: 0.9rem; margin: 1rem 0; font-style: italic;">
           "${replyText}"
         </div>
         <p>You can view your complete thread history by signing in to your Client Account Portal.</p>
         <hr style="border: 0; border-top: 1px solid #E2ECE9; margin-top: 2rem;"/>
-        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Sabuj Counseling Services</p>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 0;">Verdant Mind</p>
       </div>
     `;
 
     await sendEmail({
       toEmail: msg.senderEmail,
       toName: msg.senderName,
-      subject: 'New Message Reply - Dr. Sabuj Das',
+      subject: 'New Message Reply - Mr. Sabuj Das',
       htmlContent: emailHtml
     });
 
@@ -811,9 +811,9 @@ app.post('/api/documents', async (req, res) => {
     let docHtml = '';
 
     if (type === 'receipt') {
-      emailSubject = `Official Payment Invoice Receipt (${data.invoiceNo}) - Sabuj Counseling`;
+      emailSubject = `Official Payment Invoice Receipt (${data.invoiceNo}) - Verdant Mind`;
       docHtml = `
-        <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+        <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
           <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Official Payment Receipt</h2>
           <p>Dear ${clientName},</p>
           <p>Thank you for your payment. Please find the transaction details summary below:</p>
@@ -829,8 +829,8 @@ app.post('/api/documents', async (req, res) => {
         </div>
       `;
     } else if (type === 'prescription') {
-      emailSubject = 'Clinical Therapeutic Guidance & Interventions Plan - Sabuj Counseling';
-      
+      emailSubject = 'Clinical Therapeutic Guidance & Interventions Plan - Verdant Mind';
+
       let exercisesRows = '';
       if (data.prescItems && data.prescItems.length > 0) {
         exercisesRows = data.prescItems.map(item => `
@@ -844,10 +844,10 @@ app.post('/api/documents', async (req, res) => {
       }
 
       docHtml = `
-        <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+        <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
           <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Clinical Consultation Plan & Interventions</h2>
           <p>Dear ${clientName},</p>
-          <p>Dr. Sabuj Das has assigned a new therapeutic exercise plan recommendations list for your recovery:</p>
+          <p>Mr. Sabuj Das has assigned a new therapeutic exercise plan recommendations list for your recovery:</p>
           
           <p><strong>Clinical Indications:</strong> <em>${data.prescDiagnosis}</em></p>
           
@@ -873,12 +873,12 @@ app.post('/api/documents', async (req, res) => {
         </div>
       `;
     } else {
-      emailSubject = 'Clinical Progress & Observation Report - Sabuj Counseling';
+      emailSubject = 'Clinical Progress & Observation Report - Verdant Mind';
       docHtml = `
-        <div style="font-family: Arial, sans-serif; padding: 2rem; color: #2A473E; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+        <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
           <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Clinical Summary & Progress Report</h2>
           <p>Dear ${clientName},</p>
-          <p>Dr. Das has generated a clinical progress summary update for your records:</p>
+          <p>Mr. Das has generated a clinical progress summary update for your records:</p>
           <div style="background: #FFF; padding: 1.25rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1.5rem 0; font-size: 0.9rem; line-height: 1.6;">
             <strong>1. Diagnostic Assessment</strong>:<br/>
             ${data.reportSummary}<br/><br/>
@@ -940,7 +940,7 @@ const callGeminiAPI = async (prompt, systemInstruction = '') => {
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-  
+
   const body = {
     contents: [{
       parts: [{ text: prompt }]
@@ -1004,39 +1004,39 @@ app.post('/api/ai/polish', async (req, res) => {
 // Local fallback response generator for offline or timeout situations
 const getLocalFallbackResponse = (message) => {
   const msg = message.toLowerCase();
-  
+
   if (msg.includes('fee') || msg.includes('cost') || msg.includes('price') || msg.includes('charge') || msg.includes('rate') || msg.includes('pay')) {
-    return "Dr. Sabuj Das's fee is INR 1,500 per session. Each therapy session lasts for 60 minutes.";
+    return "Mr. Sabuj Das's fee is INR 1,500 per session. Each therapy session lasts for 60 minutes.";
   }
   if (msg.includes('book') || msg.includes('schedule') || msg.includes('appointment') || msg.includes('calendar') || msg.includes('slot') || msg.includes('meet')) {
-    return "You can schedule a consultation with Dr. Das directly using the 'Schedule a Consultation' calendar picker in the web portal.";
+    return "You can schedule a consultation with Mr. Das directly using the 'Schedule a Consultation' calendar picker in the web portal.";
   }
   if (msg.includes('language') || msg.includes('speak') || msg.includes('bengali') || msg.includes('hindi') || msg.includes('english') || msg.includes('talk')) {
-    return "Dr. Das conducts therapy sessions in English, Hindi, and Bengali, tailoring the communication to your comfort.";
+    return "Mr. Das conducts therapy sessions in English, Hindi, and Bengali, tailoring the communication to your comfort.";
   }
   if (msg.includes('breath') || msg.includes('panic') || msg.includes('anxious') || msg.includes('stress') || msg.includes('calm') || msg.includes('worry')) {
     return "If you're feeling overwhelmed, try taking a slow breath. I can guide you through a 4-second box breathing exercise (inhale for 4s, hold for 4s, exhale for 4s, hold for 4s) right here in this chat!";
   }
   if (msg.includes('adhd') || msg.includes('attention') || msg.includes('focus') || msg.includes('hyper')) {
-    return "Dr. Das specializes in supporting clients with ADHD, focusing on executive function, focus training, and emotional regulation techniques.";
+    return "Mr. Das specializes in supporting clients with ADHD, focusing on executive function, focus training, and emotional regulation techniques.";
   }
   if (msg.includes('addict') || msg.includes('sober') || msg.includes('alcohol') || msg.includes('drug')) {
-    return "Dr. Das provides addiction treatment and recovery support to help break behavioral dependencies and build healthy coping mechanisms.";
+    return "Mr. Das provides addiction treatment and recovery support to help break behavioral dependencies and build healthy coping mechanisms.";
   }
   if (msg.includes('anxiety') || msg.includes('fear') || msg.includes('panic attack')) {
-    return "For anxiety and panic, Dr. Das utilizes evidence-based Cognitive Behavioral Therapy (CBT) and calming mindfulness practices.";
+    return "For anxiety and panic, Mr. Das utilizes evidence-based Cognitive Behavioral Therapy (CBT) and calming mindfulness practices.";
   }
   if (msg.includes('depress') || msg.includes('sad') || msg.includes('hopeless') || msg.includes('mood')) {
-    return "Dr. Das offers supportive DBT and CBT pathways for managing depression, helping you rebuild daily structures and positive coping strategies.";
+    return "Mr. Das offers supportive DBT and CBT pathways for managing depression, helping you rebuild daily structures and positive coping strategies.";
   }
   if (msg.includes('hello') || msg.includes('hi ') || msg.startsWith('hi') || msg.includes('hey') || msg.includes('greetings')) {
-    return "Hello! I'm Aura, Dr. Sabuj Das's virtual support assistant. How can I help you today?";
+    return "Hello! I'm Aura, virtual support assistant for Verdant Mind by Mr. Sabuj Das. How can I help you today?";
   }
   if (msg.includes('contact') || msg.includes('email') || msg.includes('phone') || msg.includes('number') || msg.includes('reach') || msg.includes('address') || msg.includes('location') || msg.includes('kolkata')) {
-    return "You can reach Dr. Das at sabuj.das@example.com or +91 98765 43210. His clinic is located in Kolkata, India.";
+    return "You can reach Mr. Das at sabuj.das@example.com or +91 98765 43210. His practice, Verdant Mind, is located in Kolkata, India.";
   }
-  
-  return "I'm Aura, Dr. Das's virtual assistant. For clinical questions or personalized therapy advice, I highly recommend scheduling a session with Dr. Das via the portal booking calendar, or contacting him at sabuj.das@example.com.";
+
+  return "I'm Aura, virtual assistant for Verdant Mind. For clinical questions or personalized therapy advice, I highly recommend scheduling a session with Mr. Das via the portal booking calendar, or contacting him at sabuj.das@example.com.";
 };
 
 // 16. AI Chat Assistant (Aura) Endpoint
@@ -1047,16 +1047,16 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 
   try {
-    const systemInstruction = `You are Aura, Dr. Sabuj Das's virtual support assistant for his counseling services website. 
-Dr. Sabuj Das is a licensed therapist and psychologist specializing in CBT and DBT for ADHD, addiction treatment, anxiety, depression, and anger regulation. 
+    const systemInstruction = `You are Aura, virtual support assistant for Verdant Mind by Mr. Sabuj Das. 
+Sabuj Das is a psychologist specializing in CBT and DBT for ADHD, addiction treatment, anxiety, depression, and anger regulation at Verdant Mind. 
 Session Cost: INR 1,500 per session.
 Session Duration: 60 minutes.
 Booking: Clients can book directly via the 'Schedule a Consultation' calendar picker in the web portal.
-Languages: Dr. Das speaks English, Hindi, and Bengali.
+Languages: Mr. Das speaks English, Hindi, and Bengali.
 Your Behavior:
 - Keep your answers brief, empathetic, warm, and highly supportive (ideally under 3 sentences).
 - If the user shows signs of acute stress, anxiety, or panic, kindly guide them to try a 4-second box breathing exercise (inhale 4s, hold 4s, exhale 4s, hold 4s) to calm their nervous system.
-- Never prescribe medications or diagnose conditions. Always recommend scheduling a direct consultation with Dr. Das for clinical advice.`;
+- Never prescribe medications or diagnose conditions. Always recommend scheduling a direct consultation with Mr. Das for clinical advice.`;
 
     let conversationText = '';
     const recentHistory = history.slice(-6);
@@ -1087,8 +1087,8 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-// Start listening
-app.listen(PORT, () => {
-  console.log(`Express Gateway Server listening on port ${PORT}`);
+// Start listening on all network interfaces (0.0.0.0) for Wi-Fi/LAN access
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Express Gateway Server listening on port ${PORT} (LAN accessible)`);
 });
 

@@ -310,8 +310,8 @@ export default function AuthPortal({ onLogin, onRegister, onClose }) {
           </h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)', marginTop: '0.25rem' }}>
             {authMode === 'client-login' && 'Access your therapeutic plans, payments, and messaging.'}
-            {authMode === 'provider-login' && 'Secure administrative access for Dr. Sabuj Das.'}
-            {authMode === 'client-register' && 'Join Sabuj counseling management program.'}
+            {authMode === 'provider-login' && 'Secure administrative access for Mr. Sabuj Das.'}
+            {authMode === 'client-register' && 'Join Verdant Mind care management program.'}
             {authMode === 'client-verify-otp' && `Enter the code sent to: ${targetEmail}`}
             {authMode === 'client-forgot-password' && 'Enter your email to receive recovery instructions.'}
             {authMode === 'client-reset-password' && 'Input recovery OTP code and your new password.'}
