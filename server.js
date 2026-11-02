@@ -33,11 +33,29 @@ const PORT = process.env.PORT || 5000;
 const isProd = process.env.NODE_ENV === 'production';
 
 // Trust proxy configuration:
-// In production behind AWS ALB / App Runner / CloudFront, trust configured hop count or CIDR.
-// When unset, in production defaults to 1 hop; in non-production defaults to false (preventing IP spoofing).
-const trustProxyConfig = process.env.TRUST_PROXY !== undefined 
-  ? (process.env.TRUST_PROXY === 'false' ? false : (isNaN(Number(process.env.TRUST_PROXY)) ? process.env.TRUST_PROXY : Number(process.env.TRUST_PROXY)))
-  : (isProd ? 1 : false);
+// In production behind AWS ALB / App Runner / CloudFront, trust only configured hop count or CIDRs.
+// Wildcard boolean `true` is strictly prohibited in production to prevent IP spoofing attacks via X-Forwarded-For headers.
+// When unset, in production defaults to 1 hop (the immediate upstream ALB/reverse-proxy); in development defaults to false.
+let trustProxyConfig = false;
+if (process.env.TRUST_PROXY !== undefined) {
+  const tp = process.env.TRUST_PROXY.trim();
+  if (tp === 'false') {
+    trustProxyConfig = false;
+  } else if (tp === 'true') {
+    if (isProd) {
+      console.warn('[SECURITY WARNING] TRUST_PROXY=true (wildcard trust) is insecure in production. Defaulting to 1 hop.');
+      trustProxyConfig = 1;
+    } else {
+      trustProxyConfig = true;
+    }
+  } else if (!isNaN(Number(tp))) {
+    trustProxyConfig = Number(tp);
+  } else {
+    trustProxyConfig = tp; // CIDR string, comma-separated IPs, or predefined express presets
+  }
+} else {
+  trustProxyConfig = isProd ? 1 : false;
+}
 app.set('trust proxy', trustProxyConfig);
 
 /**
@@ -77,7 +95,11 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(null, true);
+      if (isProd) {
+        callback(new Error(`CORS policy blocked request from unauthorized origin: ${origin}`));
+      } else {
+        callback(null, true);
+      }
     }
   },
   credentials: true,
@@ -896,8 +918,8 @@ app.get('/api/auth/google/callback', async (req, res) => {
   try {
     let googleUser;
 
-    // Handle dev mock flow if Google credentials not configured
-    if (code === 'dev_mock_code' && (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)) {
+    // Handle dev mock flow ONLY in development if Google credentials are not configured
+    if (!isProd && code === 'dev_mock_code' && (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)) {
       const devEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || 'sabujd880@gmail.com').toLowerCase();
       googleUser = {
         email: devEmail,
@@ -2721,7 +2743,7 @@ const callGeminiAPI = async (prompt, systemInstruction = '') => {
     throw new Error('Gemini API key is not configured in .env file.');
   }
 
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   const body = {

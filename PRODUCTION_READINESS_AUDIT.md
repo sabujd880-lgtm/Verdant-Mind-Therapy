@@ -106,7 +106,7 @@ pie title 24 Production Readiness Audit Areas
 - **Relevant API Endpoints:** All data persistence endpoints.
 - **Relevant Database Models:** All Mongoose models.
 - **Security Weaknesses:**
-  - **CRITICAL:** Real credentials for MongoDB Atlas cluster are saved in plaintext within `.env` (`sabujd880_db_user:uTa2UxhTHfjUDDGq`).
+  - **CRITICAL:** Real credentials for MongoDB Atlas cluster were previously present in plaintext within `.env` (`sabujd880_db_user:<password-redacted>`).
   - No Mongoose connection pool limits configured (e.g. `maxPoolSize`, `minPoolSize`, `socketTimeoutMS`).
   - Fallback to `local_db.json` writes to local ephemeral container disk if MongoDB is unreachable, leading to data loss on container redeployment.
 - **Missing Functionality:** Connection retry backoff policies; structured database health pinging.

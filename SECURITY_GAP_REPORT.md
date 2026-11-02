@@ -37,7 +37,7 @@ This security gap report assesses the technical threat posture of the Counsellin
 - **CVSS Score:** 9.8 (Critical) | `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`
 - **Location:** [`.env`](file:///c:/Users/CUAPDC03/Downloads/Sabujdas880/psychology-portfolio/.env) line 1:
   ```
-  MONGODB_URI=mongodb+srv://sabujd880_db_user:uTa2UxhTHfjUDDGq@sabuj.d5m6xqy.mongodb.net/?appName=sabuj
+  MONGODB_URI=mongodb+srv://sabujd880_db_user:<password-redacted>@sabuj.d5m6xqy.mongodb.net/?appName=sabuj
   ```
 - **Exploit Scenario:** Anyone with read access to the local folder, repository, or unencrypted backup can extract the production credentials and directly query, alter, or drop the live MongoDB Atlas cluster, exposing all client records and clinical notes.
 - **Required Remediation:**
