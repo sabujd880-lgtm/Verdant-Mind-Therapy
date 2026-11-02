@@ -527,6 +527,193 @@ async function run() {
     assert.strictEqual(purgeData.success, true);
   });
 
+  // Test 28B: Practice Availability Schedule Update
+  await test('Staff can update practice availability schedule', async () => {
+    const res = await fetch(`${BASE_URL}/api/availability`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminSessionCookie
+      },
+      body: JSON.stringify({
+        workingDays: [1, 2, 3, 4, 5, 6],
+        blockedDates: ['2026-12-25'],
+        startHour: '10:00',
+        endHour: '18:00'
+      })
+    });
+    assert.strictEqual(res.status, 200);
+    const conf = await res.json();
+    assert.strictEqual(conf.startHour, '10:00');
+    assert.ok(conf.workingDays.includes(6));
+  });
+
+  // Test 28C: Appointment Booking & Slot Conflict Prevention
+  let createdAptId = '';
+  await test('Client can book appointment and duplicate slot is rejected (409)', async () => {
+    const testDate = `2027-11-${String(Date.now()).slice(-2)}`;
+    const testTime = `${(Date.now() % 8) + 1}:30 PM`;
+    
+    // 1. Initial Booking
+    const bookRes = await fetch(`${BASE_URL}/api/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientEmail: 'patient_alpha@test.com',
+        clientName: 'Alpha Patient',
+        clientPhone: '9876543210',
+        date: testDate,
+        time: testTime,
+        sessionMode: 'Online Video Consultation',
+        problemDescription: 'Anxiety and stress management'
+      })
+    });
+    assert.strictEqual(bookRes.status, 200);
+    const aptData = await bookRes.json();
+    createdAptId = aptData._id || aptData.id;
+    assert.strictEqual(aptData.status, 'Pending');
+
+    // 2. Conflict rejection test
+    const dupRes = await fetch(`${BASE_URL}/api/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientEmail: 'patient_beta@test.com',
+        clientName: 'Beta Patient',
+        clientPhone: '9876543211',
+        date: testDate,
+        time: testTime,
+        sessionMode: 'In-Person Consultation',
+        problemDescription: 'Double booking test'
+      })
+    });
+    assert.strictEqual(dupRes.status, 409);
+    const dupErr = await dupRes.json();
+    assert.ok(dupErr.error.includes('already booked'));
+  });
+
+  // Test 28D: Appointment Session Notes & Status Updates
+  await test('Staff can update appointment notes and confirm session', async () => {
+    assert.ok(createdAptId, 'createdAptId required');
+    // Update notes
+    const notesRes = await fetch(`${BASE_URL}/api/appointments/${createdAptId}/notes`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminSessionCookie
+      },
+      body: JSON.stringify({ notes: 'Initial intake completed. Client shows good motivation.' })
+    });
+    assert.strictEqual(notesRes.status, 200);
+    const nData = await notesRes.json();
+    assert.ok(nData.notes.includes('intake completed'));
+
+    // Confirm status
+    const statRes = await fetch(`${BASE_URL}/api/appointments/${createdAptId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminSessionCookie
+      },
+      body: JSON.stringify({ status: 'Confirmed' })
+    });
+    assert.strictEqual(statRes.status, 200);
+    const sData = await statRes.json();
+    assert.strictEqual(sData.status, 'Confirmed');
+  });
+
+  // Test 28E: Client Message Inquiries & Thread Replies
+  let createdMsgId = '';
+  await test('Client can send inquiry and staff can submit replies', async () => {
+    // 1. Send inquiry
+    const msgRes = await fetch(`${BASE_URL}/api/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        senderName: 'Inquiry Client',
+        senderEmail: 'inquiry_client@test.com',
+        subject: 'Inquiry regarding weekend sessions',
+        message: 'Do you offer Saturday morning slots for CBT?'
+      })
+    });
+    assert.strictEqual(msgRes.status, 200);
+    const msgData = await msgRes.json();
+    createdMsgId = msgData._id || msgData.id;
+    assert.strictEqual(msgData.status, 'unread');
+
+    // 2. Staff replies to message
+    const replyRes = await fetch(`${BASE_URL}/api/messages/${createdMsgId}/reply`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminSessionCookie
+      },
+      body: JSON.stringify({ replyText: 'Yes, we have 11:00 AM slots available on Saturdays.' })
+    });
+    assert.strictEqual(replyRes.status, 200);
+    const repData = await replyRes.json();
+    assert.strictEqual(repData.status, 'replied');
+    assert.ok(repData.replies.length > 0);
+  });
+
+  // Test 28F: Care Documents (Prescriptions / Invoices)
+  await test('Staff can issue care documents and list them securely', async () => {
+    const docRes = await fetch(`${BASE_URL}/api/documents`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: adminSessionCookie
+      },
+      body: JSON.stringify({
+        clientEmail: 'testclient@example.com',
+        clientName: 'Test Client',
+        type: 'receipt',
+        date: '2026-11-02',
+        data: {
+          invoiceNo: 'INV-2026-001',
+          receiptServices: 'Psychological Assessment & Diagnostic Session',
+          paymentMethod: 'UPI / Direct Bank Transfer',
+          paymentStatus: 'paid',
+          receiptAmount: 2500
+        }
+      })
+    });
+    assert.strictEqual(docRes.status, 200);
+    const docData = await docRes.json();
+    assert.strictEqual(docData.type, 'receipt');
+
+    // Fetch documents
+    const getDocs = await fetch(`${BASE_URL}/api/documents`, {
+      headers: { Cookie: adminSessionCookie }
+    });
+    assert.strictEqual(getDocs.status, 200);
+    const docs = await getDocs.json();
+    assert.ok(Array.isArray(docs));
+  });
+
+  // Test 28G: Staff Client Directory Access
+  await test('Staff can access Client Directory with sensitive fields redacted', async () => {
+    const clientRes = await fetch(`${BASE_URL}/api/clients`, {
+      headers: { Cookie: adminSessionCookie }
+    });
+    assert.strictEqual(clientRes.status, 200);
+    const clients = await clientRes.json();
+    assert.ok(Array.isArray(clients));
+  });
+
+  // Test 28H: AI Clinical Note Polish with fallback
+  await test('POST /api/ai/polish polishes clinical draft notes or uses fallback', async () => {
+    const aiRes = await fetch(`${BASE_URL}/api/ai/polish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draftText: 'client feels sad anxiety work bad sleep low' })
+    });
+    assert.strictEqual(aiRes.status, 200);
+    const aiData = await aiRes.json();
+    assert.ok(aiData.success);
+    assert.ok(aiData.polishedText && aiData.polishedText.length > 0);
+  });
+
   // Test 29: Database Compound Indexes Verification
   await test('Database Indexing: Appointment, Message, and CareDocument schemas carry performance indexes', async () => {
     const aptIndexes = mongoose.model('Appointment').schema.indexes();

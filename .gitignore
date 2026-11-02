@@ -33,3 +33,4 @@ backups/
 *.njsproj
 *.sln
 *.sw?
+_backup_debug_phase/

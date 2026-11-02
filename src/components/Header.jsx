@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, User, ShieldAlert, LogIn, LogOut, ShieldCheck, Users, FileText } from 'lucide-react';
+import { Brain, User, ShieldAlert, LogIn, LogOut } from 'lucide-react';
 
 export default function Header({ 
   currentUser, 
@@ -21,7 +21,6 @@ export default function Header({
   };
 
   const isStaff = currentUser && ['Super Admin', 'Administrator', 'Counsellor', 'Viewer', 'provider'].includes(currentUser.role);
-  const isAdmin = currentUser && ['Super Admin', 'Administrator'].includes(currentUser.role);
 
   const getRoleBadgeStyle = (role) => {
     switch (role) {
