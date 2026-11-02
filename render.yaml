@@ -1,0 +1,42 @@
+# Render Blueprint Configuration (Infrastructure as Code)
+# Automatically builds React + Vite frontend and serves via Express 5 Gateway
+
+services:
+  - type: web
+    name: verdant-mind
+    runtime: node
+    plan: standard # Or free
+    region: singapore # Closest low-latency Render region to India/Mumbai
+    buildCommand: npm ci && npm run build
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://verdant-mind.onrender.com
+      - key: API_URL
+        value: https://verdant-mind.onrender.com
+      - key: GOOGLE_CALLBACK_URL
+        value: https://verdant-mind.onrender.com/api/auth/google/callback
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        value: sabujd880@gmail.com
+      - key: MONGODB_URI
+        sync: false # Set securely in Render dashboard
+      - key: SESSION_SECRET
+        generateValue: true # Render will generate a cryptographically strong 256-bit random string
+      - key: GOOGLE_CLIENT_ID
+        sync: false # Set securely in Render dashboard
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false # Set securely in Render dashboard
+      - key: BREVO_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MONGODB_MODEL_API_KEY
+        sync: false
+

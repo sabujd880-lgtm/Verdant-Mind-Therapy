@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, User, ShieldAlert, LogIn, LogOut } from 'lucide-react';
+import { Brain, User, ShieldAlert, LogIn, LogOut, ShieldCheck, Users, FileText } from 'lucide-react';
 
 export default function Header({ 
   currentUser, 
@@ -14,10 +14,28 @@ export default function Header({
     setActiveView('client');
     setActiveSection(sectionId);
     
-    // Smooth scroll to element
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const isStaff = currentUser && ['Super Admin', 'Administrator', 'Counsellor', 'Viewer', 'provider'].includes(currentUser.role);
+  const isAdmin = currentUser && ['Super Admin', 'Administrator'].includes(currentUser.role);
+
+  const getRoleBadgeStyle = (role) => {
+    switch (role) {
+      case 'Super Admin':
+        return { background: '#ECEFF1', color: '#263238', border: '1px solid #CFD8DC' };
+      case 'Administrator':
+        return { background: '#E8F5E9', color: '#1B5E20', border: '1px solid #C8E6C9' };
+      case 'Counsellor':
+      case 'provider':
+        return { background: '#E0F2F1', color: '#004D40', border: '1px solid #B2DFDB' };
+      case 'Viewer':
+        return { background: '#FFF3E0', color: '#E65100', border: '1px solid #FFE0B2' };
+      default:
+        return { background: '#E3F2FD', color: '#0D47A1', border: '1px solid #BBDEFB' };
     }
   };
 
@@ -31,15 +49,15 @@ export default function Header({
           </div>
           <div className="logo-text">
             <h1>Verdant Mind</h1>
-            <p>Sabuj Das | Psychologist</p>
+            <p>Clinical Psychology & Counselling Portal</p>
           </div>
         </div>
 
         {/* Navigation & Mode Switcher */}
-        <div className="nav-links" style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+        <div className="nav-links" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
           {/* Public client portfolio navigation (only visible when viewing client portfolio) */}
           {activeView === 'client' && (
-            <nav style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+            <nav style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
               <button 
                 onClick={() => handleNavClick('hero')} 
                 className={`nav-link ${activeSection === 'hero' ? 'active' : ''}`}
@@ -71,7 +89,7 @@ export default function Header({
                 style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
                 onClick={onOpenAuth}
               >
-                <LogIn size={14} /> Client Sign In
+                <LogIn size={14} /> Sign In
               </button>
             ) : (
               /* Authenticated States */
@@ -79,7 +97,7 @@ export default function Header({
                 
                 {/* Switcher tabs */}
                 <div className="mode-switcher" style={{ display: 'flex', background: 'rgba(42,71,62,0.05)', padding: '0.2rem', borderRadius: 'var(--radius-sm)' }}>
-                  {currentUser.role === 'provider' ? (
+                  {isStaff ? (
                     <>
                       <button
                         className={`mode-btn ${activeView === 'client' ? 'active' : ''}`}
@@ -94,7 +112,7 @@ export default function Header({
                         className={`mode-btn ${activeView === 'therapist' ? 'active' : ''}`}
                         onClick={() => setActiveView('therapist')}
                       >
-                        <ShieldAlert size={12} /> Therapist Dashboard
+                        <ShieldAlert size={12} /> Clinic Dashboard
                       </button>
                     </>
                   ) : (
@@ -119,15 +137,35 @@ export default function Header({
                 </div>
 
                 {/* Profile Greeting badge & Log Out */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '1px solid var(--color-slate-10)', paddingLeft: '1rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>
-                    Hi, {currentUser.name.split(' ')[0]}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '1px solid var(--color-slate-10)', paddingLeft: '0.75rem' }}>
+                  {currentUser.picture ? (
+                    <img 
+                      src={currentUser.picture} 
+                      alt={currentUser.name} 
+                      style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #ccc' }}
+                    />
+                  ) : null}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--color-slate-dark)', fontWeight: 600, lineHeight: 1.2 }}>
+                      {currentUser.name ? currentUser.name.split(' ')[0] : 'User'}
+                    </span>
+                    <span style={{
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      marginTop: '2px',
+                      ...getRoleBadgeStyle(currentUser.role)
+                    }}>
+                      {currentUser.role === 'provider' ? 'Super Admin' : currentUser.role}
+                    </span>
+                  </div>
                   
                   <button 
                     type="button" 
                     onClick={onSignOut}
-                    style={{ color: 'var(--color-cancelled)', display: 'flex', padding: '0.25rem' }}
+                    style={{ color: 'var(--color-cancelled)', display: 'flex', padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer' }}
                     title="Sign Out"
                   >
                     <LogOut size={16} />

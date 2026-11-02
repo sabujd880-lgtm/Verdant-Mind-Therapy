@@ -4,6 +4,9 @@ import {
   Video, PhoneCall, MessageSquare, BookOpen, AlertCircle,
   Inbox, FileText, Receipt, Mail, Send, Printer, CheckCircle2, Clipboard
 } from 'lucide-react';
+import ClinicalRecords from './ClinicalRecords';
+import AudioRecordings from './AudioRecordings';
+import AdminManagement from './AdminManagement';
 
 export default function TherapistDashboard({ 
   appointments, 
@@ -14,9 +17,10 @@ export default function TherapistDashboard({
   messages = [],
   onReplyMessage,
   onUpdateMessageStatus,
-  onAddCareDocument
+  onAddCareDocument,
+  currentUser
 }) {
-  const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' | 'messages' | 'documents' | 'availability'
+  const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' | 'messages' | 'documents' | 'availability' | 'clinical-records' | 'recordings' | 'admin'
   const [selectedApt, setSelectedApt] = useState(null); // For detailed inquiry viewer modal
   const [tempNotes, setTempNotes] = useState('');
   const [newBlockedDate, setNewBlockedDate] = useState('');
@@ -316,11 +320,32 @@ export default function TherapistDashboard({
             Document Center
           </button>
           <button 
+            className={`tab-btn ${activeTab === 'clinical-records' ? 'active' : ''}`}
+            onClick={() => setActiveTab('clinical-records')}
+          >
+            Clinical Records & MSE
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'recordings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('recordings')}
+          >
+            Session Recordings
+          </button>
+          <button 
             className={`tab-btn ${activeTab === 'availability' ? 'active' : ''}`}
             onClick={() => setActiveTab('availability')}
           >
             Availability Settings
           </button>
+          {(currentUser?.role === 'Super Admin' || currentUser?.role === 'Administrator' || currentUser?.role === 'provider') && (
+            <button 
+              className={`tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
+              onClick={() => setActiveTab('admin')}
+              style={{ fontWeight: 600, borderLeft: '2px solid var(--color-slate-light)' }}
+            >
+              Admin Governance
+            </button>
+          )}
         </div>
       </div>
 
@@ -1380,6 +1405,21 @@ export default function TherapistDashboard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Clinical Records: Case History & Mental Status Examination */}
+      {activeTab === 'clinical-records' && (
+        <ClinicalRecords appointments={appointments} currentUser={currentUser} />
+      )}
+
+      {/* Session Audio Recordings with Consent & Signed URLs */}
+      {activeTab === 'recordings' && (
+        <AudioRecordings appointments={appointments} currentUser={currentUser} />
+      )}
+
+      {/* Admin Governance Module */}
+      {activeTab === 'admin' && (currentUser?.role === 'Super Admin' || currentUser?.role === 'Administrator' || currentUser?.role === 'provider') && (
+        <AdminManagement currentUser={currentUser} />
       )}
 
       {/* Inquiry Detail Viewer + Consultation Notes Modal */}

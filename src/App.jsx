@@ -14,6 +14,8 @@ function App() {
   const [activeSection, setActiveSection] = useState('hero');
   const [profile] = useState(INITIAL_PROFILE);
   const [authOpen, setAuthOpen] = useState(false);
+  const [initialAuthStatus, setInitialAuthStatus] = useState('');
+  const [initialAuthError, setInitialAuthError] = useState('');
 
   // Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
@@ -32,10 +34,52 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [careDocuments, setCareDocuments] = useState([]);
 
+  // Check URL query parameters for Google OAuth callback results & verify session
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authStatus = params.get('auth_status');
+    const authError = params.get('auth_error');
+
+    if (authStatus === 'success') {
+      fetch('/api/auth/me', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.authenticated && data.user) {
+            setCurrentUser(data.user);
+            if (data.user.role === 'client') {
+              setActiveView('client-portal');
+            } else {
+              setActiveView('therapist');
+            }
+          }
+        })
+        .catch(console.error);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (authStatus) {
+      setInitialAuthStatus(authStatus);
+      setAuthOpen(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (authError) {
+      setInitialAuthError(authError);
+      setAuthOpen(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      // Background session check with server
+      fetch('/api/auth/me', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.authenticated && data.user) {
+            setCurrentUser(data.user);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
   // Database Synchronizer Hook
   const loadDatabaseRecords = async (user) => {
     try {
-      // 1. Fetch availability config (always public)
+      // 1. Fetch availability config (public)
       const availRes = await fetch('/api/availability');
       if (availRes.ok) {
         const availData = await availRes.json();
@@ -43,43 +87,38 @@ function App() {
       }
 
       if (!user) {
-        // If logged out, reset restricted list views
         setAppointments([]);
         setMessages([]);
         setCareDocuments([]);
         return;
       }
 
-      // 2. Fetch based on user roles (Provider gets all, Client gets filtered copy)
-      if (user.role === 'provider') {
-        const aptRes = await fetch('/api/appointments');
-        const aptData = await aptRes.json();
-        setAppointments(aptData);
+      const isStaffRole = ['Super Admin', 'Administrator', 'Counsellor', 'Viewer', 'provider'].includes(user.role);
 
-        const msgRes = await fetch('/api/messages');
-        const msgData = await msgRes.json();
-        setMessages(msgData);
+      // 2. Fetch based on user roles (Staff gets backend-filtered clinical records, Client gets own records)
+      if (isStaffRole) {
+        const aptRes = await fetch('/api/appointments', { credentials: 'include' });
+        if (aptRes.ok) setAppointments(await aptRes.json());
 
-        const docRes = await fetch('/api/documents');
-        const docData = await docRes.json();
-        setCareDocuments(docData);
+        const msgRes = await fetch('/api/messages', { credentials: 'include' });
+        if (msgRes.ok) setMessages(await msgRes.json());
+
+        const docRes = await fetch('/api/documents', { credentials: 'include' });
+        if (docRes.ok) setCareDocuments(await docRes.json());
       } else if (user.role === 'client') {
         const clientEmailQuery = encodeURIComponent(user.email);
 
-        const aptRes = await fetch(`/api/appointments?clientEmail=${clientEmailQuery}`);
-        const aptData = await aptRes.json();
-        setAppointments(aptData);
+        const aptRes = await fetch(`/api/appointments?clientEmail=${clientEmailQuery}`, { credentials: 'include' });
+        if (aptRes.ok) setAppointments(await aptRes.json());
 
-        const msgRes = await fetch(`/api/messages?senderEmail=${clientEmailQuery}`);
-        const msgData = await msgRes.json();
-        setMessages(msgData);
+        const msgRes = await fetch(`/api/messages?senderEmail=${clientEmailQuery}`, { credentials: 'include' });
+        if (msgRes.ok) setMessages(await msgRes.json());
 
-        const docRes = await fetch(`/api/documents?clientEmail=${clientEmailQuery}`);
-        const docData = await docRes.json();
-        setCareDocuments(docData);
+        const docRes = await fetch(`/api/documents?clientEmail=${clientEmailQuery}`, { credentials: 'include' });
+        if (docRes.ok) setCareDocuments(await docRes.json());
       }
     } catch (err) {
-      console.error('Error synchronizing records with MongoDB backend:', err);
+      console.error('Error synchronizing records with backend:', err);
     }
   };
 
@@ -91,6 +130,30 @@ function App() {
     } else {
       localStorage.removeItem('therapist_current_user');
     }
+  }, [currentUser]);
+
+  // 15-Minute Inactivity Idle Auto-Lock (Clinical Records Privacy & HIPAA/DPDP Compliance)
+  useEffect(() => {
+    if (!currentUser) return;
+    const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+    let timeoutId;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        handleSignOut();
+        alert('Your session has timed out due to 15 minutes of inactivity to protect client privacy.');
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    events.forEach(evt => window.addEventListener(evt, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(evt => window.removeEventListener(evt, resetTimer));
+    };
   }, [currentUser]);
 
   // Handle intersection observer to highlight current navigation section
@@ -125,6 +188,7 @@ function App() {
       const response = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(newApt)
       });
       if (response.ok) {
@@ -141,6 +205,7 @@ function App() {
       const response = await fetch(`/api/appointments/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: newStatus })
       });
       if (response.ok) {
@@ -157,6 +222,7 @@ function App() {
       const response = await fetch(`/api/appointments/${id}/notes`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ notes })
       });
       if (response.ok) {
@@ -173,6 +239,7 @@ function App() {
       const response = await fetch('/api/availability', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(newAvailability)
       });
       if (response.ok) {
@@ -189,6 +256,7 @@ function App() {
       const response = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           senderName: newMsg.senderName,
           senderEmail: newMsg.senderEmail,
@@ -210,6 +278,7 @@ function App() {
       const response = await fetch(`/api/messages/${messageId}/reply`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ replyText })
       });
       if (response.ok) {
@@ -226,6 +295,7 @@ function App() {
       const response = await fetch(`/api/messages/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: newStatus })
       });
       if (response.ok) {
@@ -240,21 +310,28 @@ function App() {
   const handleLogin = (user) => {
     setCurrentUser(user);
     setAuthOpen(false);
-    if (user.role === 'provider') {
-      setActiveView('therapist');
-    } else {
+    if (user.role === 'client') {
       setActiveView('client-portal');
+    } else {
+      setActiveView('therapist');
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (e) {
+      console.warn('Logout notification error:', e);
+    }
     setCurrentUser(null);
     setActiveView('client');
     setActiveSection('hero');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Safe callback triggered when an OTP is validated to log client in
   const handleRegisterClient = (newClient) => {
     loadDatabaseRecords(newClient);
   };
@@ -264,6 +341,7 @@ function App() {
       const response = await fetch('/api/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(newDoc)
       });
       if (response.ok) {
@@ -280,6 +358,7 @@ function App() {
       const response = await fetch(`/api/appointments/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: 'Cancelled' })
       });
       if (response.ok) {
@@ -291,16 +370,6 @@ function App() {
     }
   };
 
-  const handleFooterPortalClick = () => {
-    if (currentUser?.role === 'provider') {
-      setActiveView('therapist');
-    } else if (currentUser?.role === 'client') {
-      setActiveView('client-portal');
-    } else {
-      setAuthOpen(true);
-    }
-  };
-
   const handleBookClick = () => {
     setActiveSection('booking');
     const el = document.getElementById('booking');
@@ -309,13 +378,19 @@ function App() {
     }
   };
 
+  const isStaff = currentUser && ['Super Admin', 'Administrator', 'Counsellor', 'Viewer', 'provider'].includes(currentUser.role);
+
   return (
     <div className="app-layout" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       
       {/* Shared Nav Header */}
       <Header 
         currentUser={currentUser}
-        onOpenAuth={() => setAuthOpen(true)}
+        onOpenAuth={() => {
+          setInitialAuthStatus('');
+          setInitialAuthError('');
+          setAuthOpen(true);
+        }}
         onSignOut={handleSignOut}
         activeView={activeView} 
         setActiveView={setActiveView} 
@@ -355,8 +430,8 @@ function App() {
           />
         )}
 
-        {/* PROVIDER CONTROL PANEL */}
-        {activeView === 'therapist' && currentUser?.role === 'provider' && (
+        {/* CLINIC & THERAPIST DASHBOARD */}
+        {activeView === 'therapist' && isStaff && (
           <TherapistDashboard 
             appointments={appointments}
             availability={availability}
@@ -367,16 +442,23 @@ function App() {
             onReplyMessage={handleReplyMessage}
             onUpdateMessageStatus={handleUpdateMessageStatus}
             onAddCareDocument={handleAddCareDocument}
+            currentUser={currentUser}
           />
         )}
       </main>
 
-      {/* Authentification Overlay Modal */}
+      {/* Authentication Overlay Modal */}
       {authOpen && (
         <AuthPortal 
           onLogin={handleLogin}
           onRegister={handleRegisterClient}
-          onClose={() => setAuthOpen(false)}
+          onClose={() => {
+            setAuthOpen(false);
+            setInitialAuthStatus('');
+            setInitialAuthError('');
+          }}
+          initialStatus={initialAuthStatus}
+          initialError={initialAuthError}
         />
       )}
 
@@ -391,7 +473,7 @@ function App() {
               <h3 style={{ margin: 0 }}>Verdant Mind</h3>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-terracotta)', fontWeight: 600, marginBottom: '0.75rem' }}>
-              Sabuj Das | Psychologist
+              Sabuj Das | Clinical Psychologist
             </p>
             <p>
               Dedicated to offering evidence-based, compassionate cognitive counseling and dialectical therapy to heal, support, and transform lives.
@@ -399,61 +481,45 @@ function App() {
           </div>
 
           {/* Quick Links */}
-          <div className="footer-links">
-            <h4>Client Resources</h4>
+          <div className="footer-col">
+            <h4>Quick Navigation</h4>
             <ul>
-              <li>
-                <button onClick={() => { setActiveView('client'); handleBookClick(); }} style={{ color: 'inherit', padding: 0 }}>
-                  Book a Session
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => {
-                    setActiveView('client');
-                    setTimeout(() => {
-                      document.getElementById('specializations')?.scrollIntoView({ behavior: 'smooth' });
-                    }, 50);
-                  }} 
-                  style={{ color: 'inherit', padding: 0 }}
-                >
-                  Specializations
-                </button>
-              </li>
-              <li>
-                <button onClick={handleFooterPortalClick} style={{ color: 'inherit', padding: 0 }}>
-                  Counseling Portal
-                </button>
-              </li>
+              <li><a href="#hero" onClick={(e) => { e.preventDefault(); setActiveView('client'); setActiveSection('hero'); }}>Overview</a></li>
+              <li><a href="#specializations" onClick={(e) => { e.preventDefault(); setActiveView('client'); setActiveSection('specializations'); }}>Specializations</a></li>
+              <li><a href="#booking" onClick={(e) => { e.preventDefault(); setActiveView('client'); setActiveSection('booking'); }}>Book Consultation</a></li>
+              <li><a href="#portal" onClick={(e) => { e.preventDefault(); if (currentUser) { setActiveView(isStaff ? 'therapist' : 'client-portal'); } else { setAuthOpen(true); } }}>Staff & Client Portal</a></li>
             </ul>
           </div>
 
-          {/* Contact Details */}
-          <div className="footer-contact">
-            <h4>Get in Touch</h4>
-            <p>
+          {/* Clinical Contact Details */}
+          <div className="footer-col">
+            <h4>Practice Clinic</h4>
+            <div className="footer-contact-item">
               <MapPin size={16} />
-              Kolkata, India
-            </p>
-            <p>
-              <Mail size={16} />
-              sabujd880@gmail.com
-            </p>
-            <p>
+              <span>Verdant Mind Clinic, Salt Lake Sector V, Kolkata, West Bengal - 700091</span>
+            </div>
+            <div className="footer-contact-item">
               <Phone size={16} />
-              +91 98765 43210
-            </p>
+              <span>+91 95476 91433</span>
+            </div>
+            <div className="footer-contact-item">
+              <Mail size={16} />
+              <span>sabujd880@gmail.com</span>
+            </div>
           </div>
 
         </div>
 
-        {/* Copyright banner */}
-        <div className="footer-copyright">
-          <p>&copy; {new Date().getFullYear()} Verdant Mind by Sabuj Das. All Rights Reserved. Designed for premium psychological care.</p>
+        <div className="container footer-bottom">
+          <p>© {new Date().getFullYear()} Verdant Mind Clinical Psychology. Encrypted Healthcare Portal.</p>
+          <div style={{ display: 'flex', gap: '1.5rem' }}>
+            <span>HIPAA & Healthcare Data Protection Standard</span>
+            <span>AES-256 Cloud Encryption</span>
+          </div>
         </div>
       </footer>
 
-      {/* PWA Update & Offline Notification Toast */}
+      {/* Service Worker PWA Refresh Prompt */}
       <ReloadPrompt />
 
     </div>

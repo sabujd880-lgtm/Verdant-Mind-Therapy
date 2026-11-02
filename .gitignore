@@ -18,6 +18,10 @@ dist-ssr
 .env.*
 *.env
 local_db.json
+_backup_pre_upgrade/
+_backup_phase1_security/
+uploads/
+backups/
 
 # Editor directories and files
 .vscode/*

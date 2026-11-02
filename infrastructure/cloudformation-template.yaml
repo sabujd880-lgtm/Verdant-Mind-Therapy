@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AWS Production CloudFormation Template for Counselling Management Portal (Verdant Mind)
+  Deploys Private Encrypted Audio Storage (S3), AWS Secrets Manager, IAM Roles, and AWS App Runner.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: Environment stage (production, staging)
+
+  DomainName:
+    Type: String
+    Default: yourdomain.com
+    Description: Base custom domain name (e.g. yourdomain.com)
+
+  BootstrapAdminEmail:
+    Type: String
+    Default: sabujd880@gmail.com
+    Description: Email of initial system Super Admin
+
+Resources:
+  # ============================================================================
+  # 1. PRIVATE S3 AUDIO RECORDINGS STORAGE (AWS MUMBAI: ap-south-1)
+  # ============================================================================
+  AudioRecordingsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "counselling-recordings-private-${EnvironmentName}-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: HealthcareSevenYearRetention
+            Status: Enabled
+            ExpirationInDays: 2555 # 7-year medical compliance retention policy
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Application
+          Value: CounsellingPortal
+        - Key: Compliance
+          Value: HIPAA-DPDP
+
+  # ============================================================================
+  # 2. AWS SECRETS MANAGER SECRETS STORE
+  # ============================================================================
+  AppSecretsManager:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "counselling-portal/${EnvironmentName}"
+      Description: Encrypted production configuration for Counselling Management Portal
+      GenerateSecretString:
+        SecretStringTemplate: !Sub |
+          {
+            "NODE_ENV": "production",
+            "PORT": "5000",
+            "FRONTEND_URL": "https://counselling.${DomainName}",
+            "API_URL": "https://api.${DomainName}",
+            "GOOGLE_CALLBACK_URL": "https://api.${DomainName}/api/auth/google/callback",
+            "AWS_REGION": "${AWS::Region}",
+            "BOOTSTRAP_ADMIN_EMAIL": "${BootstrapAdminEmail}",
+            "GOOGLE_CLIENT_ID": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+            "GOOGLE_CLIENT_SECRET": "YOUR_GOOGLE_CLIENT_SECRET",
+            "MONGODB_URI": "mongodb+srv://<username>:<password>@cluster0.mongodb.net/counselling_production?retryWrites=true&w=majority",
+            "BREVO_API_KEY": "xkeysib-YOUR_BREVO_KEY",
+            "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY"
+          }
+        GenerateStringKey: "SESSION_SECRET"
+        PasswordLength: 64
+        ExcludePunctuation: true
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # ============================================================================
+  # 3. IAM ROLES FOR AWS APP RUNNER
+  # ============================================================================
+  AppRunnerInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "CounsellingAppRunnerInstanceRole-${EnvironmentName}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - tasks.apprunner.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: S3AudioAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt AudioRecordingsBucket.Arn
+                  - !Sub "${AudioRecordingsBucket.Arn}/*"
+        - PolicyName: SecretsManagerReadPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource:
+                  - !Ref AppSecretsManager
+
+  # ============================================================================
+  # 4. APP RUNNER AUTO-SCALING CONFIGURATION
+  # ============================================================================
+  AppRunnerAutoScaling:
+    Type: AWS::AppRunner::AutoScalingConfiguration
+    Properties:
+      AutoScalingConfigurationName: !Sub "counselling-autoscaling-${EnvironmentName}"
+      MaxConcurrency: 100
+      MinSize: 1
+      MaxSize: 5
+
+  # ============================================================================
+  # 5. APP RUNNER CONTAINER SERVICE
+  # ============================================================================
+  AppRunnerService:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: !Sub "counselling-portal-${EnvironmentName}"
+      AutoScalingConfigurationArn: !Ref AppRunnerAutoScaling
+      InstanceConfiguration:
+        Cpu: '1024' # 1 vCPU
+        Memory: '2048' # 2 GB RAM
+        InstanceRoleArn: !GetAtt AppRunnerInstanceRole.Arn
+      SourceConfiguration:
+        AuthenticationConfiguration: {}
+        AutoDeploymentsEnabled: true
+        ImageRepository:
+          ImageIdentifier: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/counselling-portal:latest"
+          ImageConfiguration:
+            Port: '5000'
+            RuntimeEnvironmentVariables:
+              - Name: NODE_ENV
+                Value: production
+              - Name: AWS_SECRET_NAME
+                Value: !Ref AppSecretsManager
+              - Name: AWS_REGION
+                Value: !Ref AWS::Region
+              - Name: AWS_S3_BUCKET
+                Value: !Ref AudioRecordingsBucket
+          ImageRepositoryType: ECR
+      HealthCheckConfiguration:
+        Protocol: HTTP
+        Path: /api/health
+        Interval: 10
+        Timeout: 5
+        HealthyThreshold: 1
+        UnhealthyThreshold: 3
+
+Outputs:
+  ServiceUrl:
+    Description: Default AWS App Runner HTTPS URL
+    Value: !GetAtt AppRunnerService.ServiceUrl
+
+  S3AudioBucketName:
+    Description: Name of private encrypted clinical audio recording S3 bucket
+    Value: !Ref AudioRecordingsBucket
+
+  SecretsManagerArn:
+    Description: ARN of the production Secrets Manager secret
+    Value: !Ref AppSecretsManager
+
+  DnsConfigurationGuide:
+    Description: DNS CNAME Mapping Instructions
+    Value: !Sub "Point counselling.${DomainName} and api.${DomainName} via CNAME to ${AppRunnerService.ServiceUrl}"
+
