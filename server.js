@@ -111,30 +111,57 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// Rate Limiting on Authentication endpoints
+// =========================================================================
+// API RATE LIMITING (Per-Endpoint & Anti-Brute-Force Architecture)
+// =========================================================================
+// General Authentication Limiter: 100 requests per 15 mins
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
   message: { error: 'Too many authentication requests from this IP. Please try again after 15 minutes.' }
 });
 app.use('/api/auth/', authLimiter);
 
-// Rate Limiting on AI & Public Submission endpoints (Prevents DoS & API exhaustion)
-const aiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30, // 30 requests per minute
+// Strict Credential & OTP Brute-Force Limiter: 15 attempts per 15 mins
+const loginBruteForceLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
+  message: { error: 'Too many consecutive login attempts. Please wait 15 minutes before trying again.' }
+});
+
+// Password Recovery & OTP Request Limiter: 5 attempts per 15 mins (Protects Brevo SMTP quota)
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
+  message: { error: 'Too many password reset requests. Please wait 15 minutes before requesting another OTP.' }
+});
+
+// AI & Clinical LLM Limiter: 30 requests per minute
+const aiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
   message: { error: 'Too many AI requests from this IP. Please wait a moment before trying again.' }
 });
 
+// Public Appointment & Inquiries Submission Limiter: 30 per hour
 const bookingLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 30, // 30 bookings/messages per hour
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
   message: { error: 'Too many submissions from this IP. Please wait before submitting again.' }
 });
 
@@ -412,6 +439,7 @@ const appointmentSchema = new mongoose.Schema({
 });
 appointmentSchema.index({ clientEmail: 1, date: -1 });
 appointmentSchema.index({ counsellorEmail: 1, status: 1 });
+appointmentSchema.index({ date: 1, time: 1, status: 1 });
 let Appointment = mongoose.model('Appointment', appointmentSchema);
 
 // 8. Message Schema (Preserved)
@@ -744,14 +772,66 @@ if (process.env.MONGODB_URI) {
 }
 
 // =========================================================================
-// RBAC & IDOR PERMISSION MIDDLEWARE
+// RBAC & IDOR PERMISSION MIDDLEWARE (With 15-Min Inactivity & Revocation Checks)
 // =========================================================================
 
-// Middleware: Require active authentication session
-const requireAuth = (req, res, next) => {
+// Middleware: Require active authentication session with inactivity timeout and revocation enforcement
+const requireAuth = async (req, res, next) => {
   if (!req.session || !req.session.user) {
     return res.status(401).json({ error: 'Authentication required. Please sign in.' });
   }
+
+  const now = Date.now();
+  const INACTIVITY_TIMEOUT_MS = parseInt(process.env.SESSION_INACTIVITY_TIMEOUT_MS || String(15 * 60 * 1000), 10);
+  const ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 hours absolute session ceiling
+
+  // 1. Enforce 15-Minute Inactivity Timeout
+  if (req.session.lastActivity && (now - req.session.lastActivity > INACTIVITY_TIMEOUT_MS)) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ 
+      error: 'Session expired due to 15 minutes of inactivity. Please sign in again.',
+      code: 'SESSION_INACTIVITY_TIMEOUT'
+    });
+  }
+
+  // 2. Enforce 8-Hour Absolute Session Lifetime
+  if (req.session.createdAt && (now - req.session.createdAt > ABSOLUTE_TIMEOUT_MS)) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ 
+      error: 'Session maximum 8-hour lifetime reached. Please sign in again.',
+      code: 'SESSION_ABSOLUTE_TIMEOUT'
+    });
+  }
+
+  // Update last activity timestamp on legitimate interaction
+  req.session.lastActivity = now;
+
+  // 3. Server-Side Account Status & Administrative Revocation Check
+  try {
+    const userEmail = (req.session.user.email || '').toLowerCase().trim();
+    if (userEmail) {
+      const userDoc = await User.findOne({ email: userEmail });
+      if (userDoc) {
+        if (userDoc.status === 'suspended' || userDoc.status === 'rejected') {
+          req.session.destroy(() => {});
+          return res.status(401).json({ 
+            error: `Your account status is ${userDoc.status}. Access has been revoked by an administrator.`,
+            code: 'ACCOUNT_SUSPENDED'
+          });
+        }
+        if (userDoc.revokedSessionsBefore && req.session.authTime && new Date(req.session.authTime) < new Date(userDoc.revokedSessionsBefore)) {
+          req.session.destroy(() => {});
+          return res.status(401).json({ 
+            error: 'This session was invalidated by an administrator. Please log in again.',
+            code: 'SESSION_REVOKED'
+          });
+        }
+      }
+    }
+  } catch (authErr) {
+    console.warn('[AUTH] Warning during session status verification:', authErr.message);
+  }
+
   next();
 };
 
@@ -812,6 +892,7 @@ app.get('/api/health', (req, res) => {
   const mem = process.memoryUsage();
   res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? 'UP' : 'DEGRADED',
+    version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
     database: dbStatus,
     uptimeSeconds: Math.floor(process.uptime()),
@@ -1047,6 +1128,8 @@ app.get('/api/auth/google/callback', async (req, res) => {
         picture: user.picture || googleUser.picture,
         assignedClients: user.assignedClients || []
       };
+      req.session.createdAt = Date.now();
+      req.session.lastActivity = Date.now();
       req.session.authTime = Date.now();
 
       user.lastLoginAt = new Date();
@@ -1135,6 +1218,16 @@ app.post('/api/auth/logout', async (req, res) => {
     }
     res.clearCookie('counselling_portal_sid');
     res.json({ success: true, message: 'Logged out successfully.' });
+  });
+});
+
+// 5. Session Keep-Alive & Inactivity Renewal
+app.post('/api/auth/keep-alive', requireAuth, (req, res) => {
+  req.session.lastActivity = Date.now();
+  res.json({
+    success: true,
+    lastActivity: req.session.lastActivity,
+    message: 'Active session renewed successfully.'
   });
 });
 
@@ -2045,7 +2138,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // 2. Verify Registration OTP
-app.post('/api/auth/verify-otp', async (req, res) => {
+app.post('/api/auth/verify-otp', loginBruteForceLimiter, async (req, res) => {
   const { email, otp } = req.body;
   try {
     const client = await Client.findOne({ email });
@@ -2074,7 +2167,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       });
     }
 
-    // Establish session
+    // Establish session with inactivity and lifetime tracking
     req.session.user = {
       email: client.email,
       name: client.name,
@@ -2082,6 +2175,8 @@ app.post('/api/auth/verify-otp', async (req, res) => {
       phone: client.phone,
       ageGroup: client.ageGroup
     };
+    req.session.createdAt = Date.now();
+    req.session.lastActivity = Date.now();
     req.session.authTime = Date.now();
 
     res.json({
@@ -2100,7 +2195,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 });
 
 // 3. Forgot Password
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', passwordResetLimiter, async (req, res) => {
   const { email } = req.body;
   try {
     const client = await Client.findOne({ email });
@@ -2147,7 +2242,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 });
 
 // 4. Reset Password via Recovery OTP
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', passwordResetLimiter, async (req, res) => {
   const { email, otp, newPassword } = req.body;
   try {
     const client = await Client.findOne({ email });
@@ -2171,7 +2266,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
 });
 
 // 5. Account Sign In (Provider vs Client) - Sets session cookie securely
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
     const normalizedEmail = (email || '').toLowerCase().trim();
@@ -2197,13 +2292,15 @@ app.post('/api/auth/login', async (req, res) => {
         });
       }
 
-      // Establish session
+      // Establish session with inactivity and lifetime timestamps
       req.session.user = {
         id: superAdmin._id || superAdmin.id,
         email: providerAltEmail,
         name: 'Sabuj Das',
         role: 'Super Admin'
       };
+      req.session.createdAt = Date.now();
+      req.session.lastActivity = Date.now();
       req.session.authTime = Date.now();
 
       await logAuditEvent({
@@ -2240,7 +2337,7 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Establish session
+    // Establish session with inactivity and lifetime timestamps
     req.session.user = {
       email: client.email,
       name: client.name,
@@ -2248,6 +2345,8 @@ app.post('/api/auth/login', async (req, res) => {
       phone: client.phone,
       ageGroup: client.ageGroup
     };
+    req.session.createdAt = Date.now();
+    req.session.lastActivity = Date.now();
     req.session.authTime = Date.now();
 
     await logAuditEvent({
@@ -2878,6 +2977,50 @@ Your Behavior:
     const chatResponse = getLocalFallbackResponse(message);
     res.json({ success: true, response: chatResponse, fallback: true });
   }
+});
+
+// =========================================================================
+// CENTRALIZED ERROR HANDLING & STRUCTURED CLOUDWATCH/SENTRY MONITORING
+// =========================================================================
+app.use((err, req, res, next) => {
+  // Capture structured audit error without leaking sensitive clinical notes or client records
+  const sanitizedLog = {
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    path: req.path,
+    status: err.status || 500,
+    message: err.message,
+    ip: getClientIp(req)
+  };
+  console.error('[OPERATIONAL ERROR]', JSON.stringify(sanitizedLog));
+
+  // Catch Multer file upload errors gracefully
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'Uploaded audio exceeds maximum permitted limit of 100MB.' });
+    }
+    return res.status(400).json({ error: `File upload error: ${err.message}` });
+  }
+
+  // Catch CORS rejections
+  if (err.message && err.message.includes('CORS policy blocked')) {
+    return res.status(403).json({ error: 'Cross-origin request rejected by security policy.' });
+  }
+
+  res.status(err.status || 500).json({ 
+    error: isProd ? 'An internal server error occurred. Please contact system support.' : err.message 
+  });
+});
+
+// Database Connection Lifecycle Monitoring Listeners
+mongoose.connection.on('disconnected', () => {
+  console.error('[DATABASE ALERT] MongoDB Atlas connection lost! Retrying...');
+});
+mongoose.connection.on('reconnected', () => {
+  console.log('[DATABASE ALERT] MongoDB Atlas connection restored.');
+});
+mongoose.connection.on('error', (err) => {
+  console.error('[DATABASE ERROR]', err.message);
 });
 
 // Serve built frontend assets in production
