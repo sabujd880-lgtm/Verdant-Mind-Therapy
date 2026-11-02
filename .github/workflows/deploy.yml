@@ -1,4 +1,4 @@
-name: Production Build, Test & CI/CD Pipeline
+name: Production CI/CD Pipeline
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main, master ]
 
 jobs:
-  audit-and-test:
-    name: Security Audit, Build & Automated Test Verification
+  audit-build-and-test:
+    name: Security Audit, Build & Automated Tests
     runs-on: ubuntu-latest
 
     services:
@@ -16,11 +16,6 @@ jobs:
         image: mongo:7
         ports:
           - 27017:27017
-        options: >-
-          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout Source Code
@@ -35,13 +30,13 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Verify Zero Production Vulnerabilities
+      - name: Security Vulnerability Scan (Zero High/Critical)
         run: npm audit --omit=dev
 
-      - name: Build Frontend Assets
+      - name: Build Production Frontend Assets
         run: npm run build
 
-      - name: Execute Automated Verification Test Suite
+      - name: Execute In-Process Automated Test Suite (29 Tests)
         env:
           NODE_ENV: test
           PORT: 5099
@@ -51,9 +46,9 @@ jobs:
           BOOTSTRAP_ADMIN_EMAIL: sabujd880@gmail.com
         run: node tests/run_tests.js
 
-  container-build:
-    name: Docker Production Image Build Verification
-    needs: audit-and-test
+  docker-image-verification:
+    name: Production Docker Image Build Verification
+    needs: audit-build-and-test
     runs-on: ubuntu-latest
 
     steps:
@@ -63,64 +58,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Production Docker Image
+      - name: Build Production Container Image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: false
           tags: counselling-portal:ci-test
-
-  deploy-render:
-    name: Render Deployment & Verification
-    needs: [audit-and-test, container-build]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-    steps:
-      - name: Verify Deployment Target
-        run: |
-          echo "Render configuration verified."
-          echo "Target Production URL: https://verdant-mind.onrender.com"
-
-      - name: Optional Render Deploy Webhook Trigger
-        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
-        run: |
-          curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-          echo "Triggered Render deploy hook."
-
-  deploy-aws-apprunner:
-    name: Deploy to AWS App Runner (Optional / Multicloud)
-    needs: [audit-and-test, container-build]
-    runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && secrets.AWS_ACCESS_KEY_ID != ''
-
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
-
-      - name: Log in to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, Tag, and Push Image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: counselling-portal
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      - name: Trigger AWS App Runner Deployment
-        if: ${{ secrets.APP_RUNNER_SERVICE_ARN != '' }}
-        run: |
-          aws apprunner start-deployment --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }}
