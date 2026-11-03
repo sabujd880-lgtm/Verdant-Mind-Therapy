@@ -251,44 +251,6 @@ export function formatCalendarDateToIST(year, monthIndex, day) {
 }
 
 /**
- * Formats a date into the live Indian Standard Time clock string:
- * e.g., "Tuesday, 03 November 2026 | 10:30 AM IST"
- */
-export function formatLiveISTClock(date = new Date(), includeSeconds = false) {
-  const weekdayFormatter = new Intl.DateTimeFormat('en-IN', {
-    timeZone: TIMEZONE,
-    weekday: 'long'
-  });
-  const dayFormatter = new Intl.DateTimeFormat('en-IN', {
-    timeZone: TIMEZONE,
-    day: '2-digit'
-  });
-  const monthFormatter = new Intl.DateTimeFormat('en-IN', {
-    timeZone: TIMEZONE,
-    month: 'long'
-  });
-  const yearFormatter = new Intl.DateTimeFormat('en-IN', {
-    timeZone: TIMEZONE,
-    year: 'numeric'
-  });
-  const timeFormatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: TIMEZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    ...(includeSeconds ? { second: '2-digit' } : {}),
-    hour12: true
-  });
-
-  const weekday = weekdayFormatter.format(date);
-  const day = dayFormatter.format(date);
-  const month = monthFormatter.format(date);
-  const year = yearFormatter.format(date);
-  const time = timeFormatter.format(date);
-
-  return `${weekday}, ${day} ${month} ${year} | ${time} IST`;
-}
-
-/**
  * Checks if two appointment time intervals with buffer periods overlap.
  * Both appointments define:
  *  - startUtc: Date object in UTC

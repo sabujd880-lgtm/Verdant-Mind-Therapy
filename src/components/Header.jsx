@@ -1,6 +1,5 @@
 import React from 'react';
 import { User, ShieldAlert, LogIn, LogOut } from 'lucide-react';
-import LiveISTClock from './LiveISTClock';
 
 export default function Header({ 
   currentUser, 
@@ -42,18 +41,15 @@ export default function Header({
   return (
     <header className="header-wrapper">
       <div className="container header-container">
-        {/* Brand Logo & Live IST Application Clock */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-          <div className="logo-section" style={{ cursor: 'pointer' }} onClick={() => handleNavClick('hero')}>
-            <div className="logo-icon" style={{ overflow: 'hidden', padding: 0, border: '2px solid var(--color-slate-20)' }}>
-              <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-            </div>
-            <div className="logo-text">
-              <h1>Verdant Mind</h1>
-              <p>Mental Health Portal</p>
-            </div>
+        {/* Brand Logo & Portal Identity */}
+        <div className="logo-section" style={{ cursor: 'pointer' }} onClick={() => handleNavClick('hero')}>
+          <div className="logo-icon" style={{ overflow: 'hidden', padding: 0, border: '2px solid var(--color-slate-20)' }}>
+            <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
           </div>
-          <LiveISTClock />
+          <div className="logo-text">
+            <h1>Verdant Mind</h1>
+            <p>Mental Health Portal</p>
+          </div>
         </div>
 
         {/* Navigation & Mode Switcher */}
