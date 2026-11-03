@@ -93,3 +93,4 @@ dist/assets/index-B8EOAUT1.css                    26.77 kB │ gzip:   5.50 kB
 PWA v1.3.0 mode generateSW (14 precache entries)
 ```
 - **Result:** Zero bundle errors, zero broken dynamic imports, and successful service worker generation.
+

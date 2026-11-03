@@ -68,3 +68,4 @@ Verdant Mind utilizes a dual-channel authentication architecture tailored to cli
 - **TTL Duration:** 8 hours (`maxAge: 28800000`)
 - **Idle Auto-Lock:** 15 minutes of user inactivity triggers automatic logout in `App.jsx`
 - **Session Revocation:** Administrator can invalidate all active sessions for any user ID via `POST /api/admin/users/:id/revoke-sessions`
+

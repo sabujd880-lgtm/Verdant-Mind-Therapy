@@ -52,3 +52,4 @@ The query hits the `{ clientEmail: 1, date: -1 }` B-Tree index directly without 
 - **Test 29 in `tests/run_tests.js`:** Confirmed that `Appointment`, `Message`, and `CareDocument` carry compound indexes.
 - **Test 38 in `tests/run_tests.js`:** Confirmed presence and validity of the `{ date: 1, time: 1, status: 1 }` conflict index.
 - **Result:** **PASSED**.
+

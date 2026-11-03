@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Mic, Upload, Play, Pause, Trash2, ShieldCheck, AlertCircle, CheckCircle2, Clock, FileAudio, Lock } from 'lucide-react';
+import { formatISTDate } from '../utils/dateTime.js';
 
 export default function AudioRecordings({ appointments = [], currentUser }) {
   const [selectedAptId, setSelectedAptId] = useState('');
@@ -236,12 +237,12 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
                         {rec.title}
                       </strong>
                       <div style={{ fontSize: '0.75rem', color: 'var(--color-slate-light)', marginTop: '0.2rem', display: 'flex', gap: '0.75rem' }}>
-                        <span>Uploaded: {new Date(rec.uploadedAt).toLocaleDateString()}</span>
+                        <span>Uploaded: {formatISTDate(rec.uploadedAt)}</span>
                         <span>Size: {(rec.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB</span>
                         <span>Storage: {rec.storageType.toUpperCase()}</span>
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#2A5D48', marginTop: '0.2rem' }}>
-                        ✓ Client consent verified on {new Date(rec.consentDate).toLocaleDateString()}
+                        ✓ Client consent verified on {formatISTDate(rec.consentDate)}
                       </div>
                     </div>
 

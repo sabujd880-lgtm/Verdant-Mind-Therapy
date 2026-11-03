@@ -1,8 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Video, PhoneCall, MessageSquare, Calendar as CalendarIcon, Clock, User, Mail, Phone, Heart, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Video, PhoneCall, MessageSquare, Calendar as CalendarIcon, Clock, User, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  formatCalendarDateToIST, 
+  normalizeToISTDate, 
+  normalizeTo12HourTime, 
+  formatISTDate, 
+  formatISTTime, 
+  isSameISTDate,
+  getISTWeekDays,
+  parseISTDateTimeToUTC,
+  doAppointmentsOverlap 
+} from '../utils/dateTime.js';
 
 export default function BookingEngine({ currentUser, availability, appointments, onAddAppointment }) {
   const [selectedMode, setSelectedMode] = useState('Video Session');
+  const [calendarView, setCalendarView] = useState('month'); // 'month' | 'week' | 'day'
+  const [selectedDuration, setSelectedDuration] = useState(60); // 30 | 45 | 60 minutes
   const [currentDate, setCurrentDate] = useState(new Date(2026, 6, 13)); // Pre-set to July 13, 2026 as per local time info
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -47,17 +60,15 @@ export default function BookingEngine({ currentUser, availability, appointments,
 
   const daysOfWeekShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  // Helper to format Date objects as YYYY-MM-DD
+  // Helper to format Date objects as DD-MM-YYYY (IST authoritative format)
   const formatDateString = (year, month, day) => {
-    const mm = String(month + 1).padStart(2, '0');
-    const dd = String(day).padStart(2, '0');
-    return `${year}-${mm}-${dd}`;
+    return formatCalendarDateToIST(year, month, day);
   };
 
   // Check if date is in the past (before July 13, 2026)
   const isPastDate = (year, month, day) => {
-    const today = new Date(2026, 6, 13); // Fixed current date context
-    const checkDate = new Date(year, month, day);
+    const today = new Date(2026, 6, 13, 0, 0, 0); // Fixed current date context
+    const checkDate = new Date(year, month, day, 12, 0, 0);
     return checkDate < today;
   };
 
@@ -65,7 +76,8 @@ export default function BookingEngine({ currentUser, availability, appointments,
   const isDateDisabled = (year, month, day) => {
     if (isPastDate(year, month, day)) return true;
     
-    const dateObj = new Date(year, month, day);
+    // Explicit midday avoids timezone boundary shifts
+    const dateObj = new Date(year, month, day, 12, 0, 0);
     const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 1 is Monday...
     
     // Check if therapist works on this weekday
@@ -73,16 +85,20 @@ export default function BookingEngine({ currentUser, availability, appointments,
       return true;
     }
     
-    // Check if date is in the blocked dates list
+    // Check if date is in the blocked dates list (supporting DD-MM-YYYY and legacy YYYY-MM-DD)
     const formattedDate = formatDateString(year, month, day);
-    if (availability.blockedDates.includes(formattedDate)) {
+    const legacyYmd = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const blockedList = availability.blockedDates || [];
+    if (
+      blockedList.some(b => isSameISTDate(b, formattedDate) || b === formattedDate || b === legacyYmd)
+    ) {
       return true;
     }
     
     return false;
   };
 
-  // Generate Slots dynamically based on start and end hour settings
+  // Generate Slots dynamically based on start and end hour settings in 12-hour AM/PM format
   const generateTimeSlots = () => {
     if (!availability.startHour || !availability.endHour) return [];
     
@@ -103,7 +119,8 @@ export default function BookingEngine({ currentUser, availability, appointments,
         displayHour = 12;
       }
       
-      slots.push(`${displayHour}:00 ${period}`);
+      const formattedHour = String(displayHour).padStart(2, '0');
+      slots.push(`${formattedHour}:00 ${period}`);
     }
     return slots;
   };
@@ -151,14 +168,51 @@ export default function BookingEngine({ currentUser, availability, appointments,
     calendarDays.push(i);
   }
 
-  // Handle slot selection and double booking check
+  // Handle slot selection and double booking check using Indian Standard Time & Practice Buffer
   const isSlotBooked = (slot) => {
     if (!selectedDate) return false;
-    return appointments.some(apt => 
-      apt.date === selectedDate && 
-      apt.time === slot && 
-      apt.status !== 'Cancelled'
-    );
+    const normSlot = normalizeTo12HourTime(slot);
+    const slotUtc = parseISTDateTimeToUTC(selectedDate, normSlot);
+    if (!slotUtc) return false;
+
+    // Check partial day blocked ranges
+    if (availability?.blockedRanges && Array.isArray(availability.blockedRanges)) {
+      for (const range of availability.blockedRanges) {
+        if (isSameISTDate(range.date, selectedDate)) {
+          const rangeStartUtc = parseISTDateTimeToUTC(selectedDate, range.startTime);
+          const rangeEndUtc = parseISTDateTimeToUTC(selectedDate, range.endTime);
+          if (rangeStartUtc && rangeEndUtc) {
+            const reqStart = slotUtc.getTime();
+            const reqEnd = reqStart + selectedDuration * 60 * 1000;
+            if (Math.max(reqStart, rangeStartUtc.getTime()) < Math.min(reqEnd, rangeEndUtc.getTime())) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    const testWindow = {
+      startUtc: slotUtc,
+      durationMinutes: selectedDuration,
+      bufferMinutes: availability?.bufferMinutes !== undefined ? availability.bufferMinutes : 15
+    };
+
+    return appointments.some(apt => {
+      if (apt.status === 'Cancelled') return false;
+      if (!isSameISTDate(apt.date, selectedDate)) return false;
+
+      const aptUtc = apt.appointmentUtc || parseISTDateTimeToUTC(apt.date, apt.time);
+      if (aptUtc) {
+        const aptWindow = {
+          startUtc: aptUtc,
+          durationMinutes: apt.durationMinutes || 60,
+          bufferMinutes: apt.bufferMinutes !== undefined ? apt.bufferMinutes : 15
+        };
+        return doAppointmentsOverlap(testWindow, aptWindow);
+      }
+      return normalizeTo12HourTime(apt.time) === normSlot;
+    });
   };
 
   // Form handlers
@@ -197,10 +251,15 @@ export default function BookingEngine({ currentUser, availability, appointments,
     e.preventDefault();
     if (!validateForm()) return;
 
+    const normDate = normalizeToISTDate(selectedDate);
+    const normTime = normalizeTo12HourTime(selectedSlot);
+
     const newApt = {
       id: 'apt-' + Date.now(),
-      date: selectedDate,
-      time: selectedSlot,
+      date: normDate,
+      time: normTime,
+      durationMinutes: selectedDuration,
+      bufferMinutes: availability?.bufferMinutes !== undefined ? availability.bufferMinutes : 15,
       clientName: formData.name,
       clientEmail: formData.email,
       clientPhone: formData.phone,
@@ -215,8 +274,9 @@ export default function BookingEngine({ currentUser, availability, appointments,
 
     setSuccessDetails({
       clientName: formData.name,
-      date: selectedDate,
-      time: selectedSlot,
+      date: normDate,
+      time: normTime,
+      durationMinutes: selectedDuration,
       mode: selectedMode
     });
 
@@ -254,8 +314,8 @@ export default function BookingEngine({ currentUser, availability, appointments,
           
           <div className="success-details">
             <div><span>Session Type:</span> {successDetails.mode}</div>
-            <div><span>Date:</span> {successDetails.date}</div>
-            <div><span>Time Slot:</span> {successDetails.time}</div>
+            <div><span>Date:</span> {formatISTDate(successDetails.date)} (DD-MM-YYYY)</div>
+            <div><span>Time Slot:</span> {formatISTTime(successDetails.time)} (IST)</div>
             <div><span>Status:</span> <span style={{ color: 'var(--color-pending)' }}>Pending Therapist Review</span></div>
           </div>
           
@@ -274,7 +334,7 @@ export default function BookingEngine({ currentUser, availability, appointments,
             </h3>
             
             {/* Mode selector */}
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '1.25rem' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.75rem' }}>
                 Select Session Mode:
               </label>
@@ -297,75 +357,243 @@ export default function BookingEngine({ currentUser, availability, appointments,
               </div>
             </div>
 
-            {/* Custom Calendar Picker */}
-            <div className="calendar-picker-container">
-              <div className="calendar-header">
-                <h4>{monthNames[month]} {year}</h4>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {/* Session Duration Selector */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                Consultation Duration:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                {[30, 45, 60].map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    className={`mode-card ${selectedDuration === mins ? 'selected' : ''}`}
+                    style={{ padding: '0.6rem 0.5rem', textAlign: 'center', margin: 0 }}
+                    onClick={() => {
+                      setSelectedDuration(mins);
+                      setSelectedSlot(null);
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{mins} Mins</span>
+                    <span style={{ fontSize: '0.72rem', opacity: 0.8, display: 'block' }}>+15m Practice Buffer</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Calendar View Mode Selector (Month, Week, Day) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Calendar Schedule (Asia/Kolkata):</span>
+              <div style={{ display: 'flex', background: 'rgba(0,0,0,0.04)', padding: '2px', borderRadius: '6px', border: '1px solid var(--color-slate-10)' }}>
+                {['month', 'week', 'day'].map((view) => (
+                  <button
+                    key={view}
+                    type="button"
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      textTransform: 'capitalize',
+                      borderRadius: '4px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: calendarView === view ? 'var(--color-primary)' : 'transparent',
+                      color: calendarView === view ? '#fff' : 'inherit',
+                      transition: 'all 0.15s ease-in-out'
+                    }}
+                    onClick={() => setCalendarView(view)}
+                  >
+                    {view} View
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* View 1: Month Grid Picker */}
+            {calendarView === 'month' && (
+              <div className="calendar-picker-container">
+                <div className="calendar-header">
+                  <h4>{monthNames[month]} {year}</h4>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="calendar-nav-btn"
+                      onClick={handlePrevMonth}
+                      disabled={year === 2026 && month <= 6}
+                      aria-label="Previous month"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="calendar-nav-btn"
+                      onClick={handleNextMonth}
+                      aria-label="Next month"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="calendar-grid">
+                  {daysOfWeekShort.map((day) => (
+                    <div key={day} className="calendar-weekday">{day}</div>
+                  ))}
+                  
+                  {calendarDays.map((day, idx) => {
+                    if (day === null) {
+                      return <div key={`empty-${idx}`}></div>;
+                    }
+                    
+                    const isToday = year === 2026 && month === 6 && day === 13;
+                    const dateStr = formatDateString(year, month, day);
+                    const isSelected = isSameISTDate(selectedDate, dateStr);
+                    const isDisabled = isDateDisabled(year, month, day);
+                    
+                    return (
+                      <button
+                        key={`day-${day}`}
+                        type="button"
+                        disabled={isDisabled}
+                        className={`calendar-day-btn ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                        onClick={() => {
+                          setSelectedDate(dateStr);
+                          setSelectedSlot(null);
+                        }}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+                {formErrors.date && (
+                  <p style={{ color: 'var(--color-cancelled)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                    {formErrors.date}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* View 2: Week View Picker */}
+            {calendarView === 'week' && (
+              <div className="calendar-picker-container">
+                <div className="calendar-header">
+                  <h4>Week Schedule (IST)</h4>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="calendar-nav-btn"
+                      onClick={() => {
+                        const prevWk = new Date(currentDate);
+                        prevWk.setDate(currentDate.getDate() - 7);
+                        if (prevWk >= new Date(2026, 6, 7)) {
+                          setCurrentDate(prevWk);
+                        }
+                      }}
+                      aria-label="Previous week"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="calendar-nav-btn"
+                      onClick={() => {
+                        const nextWk = new Date(currentDate);
+                        nextWk.setDate(currentDate.getDate() + 7);
+                        setCurrentDate(nextWk);
+                      }}
+                      aria-label="Next week"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem', marginTop: '0.5rem' }}>
+                  {getISTWeekDays(currentDate).map((dayItem) => {
+                    const isSelected = isSameISTDate(selectedDate, dayItem.dateStr);
+                    const isDisabled = isDateDisabled(dayItem.dateObj.getFullYear(), dayItem.dateObj.getMonth(), dayItem.dateObj.getDate());
+                    
+                    return (
+                      <button
+                        key={dayItem.dateStr}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => {
+                          setSelectedDate(dayItem.dateStr);
+                          setSelectedSlot(null);
+                        }}
+                        style={{
+                          padding: '0.6rem 0.25rem',
+                          borderRadius: '8px',
+                          border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--color-slate-10)',
+                          background: isSelected ? 'var(--color-primary)' : isDisabled ? 'rgba(0,0,0,0.03)' : '#fff',
+                          color: isSelected ? '#fff' : isDisabled ? 'var(--color-slate-light)' : 'var(--color-slate-dark)',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          textAlign: 'center',
+                          opacity: isDisabled ? 0.45 : 1
+                        }}
+                      >
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600 }}>{dayItem.weekdayShort}</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700, margin: '2px 0' }}>{dayItem.dayNumber}</div>
+                        <div style={{ fontSize: '0.62rem', opacity: 0.85 }}>{isDisabled ? 'Off' : 'Open'}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* View 3: Single Day View Picker */}
+            {calendarView === 'day' && (
+              <div className="calendar-picker-container" style={{ padding: '1rem', textAlign: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <button
                     type="button"
                     className="calendar-nav-btn"
-                    onClick={handlePrevMonth}
-                    disabled={year === 2026 && month <= 6}
-                    aria-label="Previous month"
+                    onClick={() => {
+                      const prevD = new Date(currentDate);
+                      prevD.setDate(currentDate.getDate() - 1);
+                      if (prevD >= new Date(2026, 6, 13)) {
+                        setCurrentDate(prevD);
+                        setSelectedDate(formatCalendarDateToIST(prevD.getFullYear(), prevD.getMonth(), prevD.getDate()));
+                        setSelectedSlot(null);
+                      }
+                    }}
                   >
                     <ChevronLeft size={16} />
                   </button>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem' }}>
+                      {formatISTDate(selectedDate || currentDate)}
+                    </h4>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
+                      Indian Standard Time (UTC+05:30)
+                    </span>
+                  </div>
                   <button
                     type="button"
                     className="calendar-nav-btn"
-                    onClick={handleNextMonth}
-                    aria-label="Next month"
+                    onClick={() => {
+                      const nextD = new Date(currentDate);
+                      nextD.setDate(currentDate.getDate() + 1);
+                      setCurrentDate(nextD);
+                      setSelectedDate(formatCalendarDateToIST(nextD.getFullYear(), nextD.getMonth(), nextD.getDate()));
+                      setSelectedSlot(null);
+                    }}
                   >
                     <ChevronRight size={16} />
                   </button>
                 </div>
               </div>
-              
-              <div className="calendar-grid">
-                {daysOfWeekShort.map((day) => (
-                  <div key={day} className="calendar-weekday">{day}</div>
-                ))}
-                
-                {calendarDays.map((day, idx) => {
-                  if (day === null) {
-                    return <div key={`empty-${idx}`}></div>;
-                  }
-                  
-                  const isToday = year === 2026 && month === 6 && day === 13;
-                  const dateStr = formatDateString(year, month, day);
-                  const isSelected = selectedDate === dateStr;
-                  const isDisabled = isDateDisabled(year, month, day);
-                  
-                  return (
-                    <button
-                      key={`day-${day}`}
-                      type="button"
-                      disabled={isDisabled}
-                      className={`calendar-day-btn ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
-                      onClick={() => {
-                        setSelectedDate(dateStr);
-                        setSelectedSlot(null); // Reset slot on date change
-                      }}
-                    >
-                      {day}
-                    </button>
-                  );
-                })}
-              </div>
-              {formErrors.date && (
-                <p style={{ color: 'var(--color-cancelled)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                  {formErrors.date}
-                </p>
-              )}
-            </div>
+            )}
 
             {/* Time Slot Picker */}
             {selectedDate && (
               <div className="slots-container">
                 <h4 className="panel-title" style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>
                   <Clock size={16} />
-                  Available Times for {selectedDate}
+                  Available Times for {formatISTDate(selectedDate)} ({selectedDuration} mins IST)
                 </h4>
                 <div className="slots-grid">
                   {timeSlots.map((slot) => {
@@ -379,8 +607,10 @@ export default function BookingEngine({ currentUser, availability, appointments,
                         onClick={() => setSelectedSlot(slot)}
                       >
                         {slot}
-                        {isBooked && (
+                        {isBooked ? (
                           <span style={{ display: 'block', fontSize: '0.65rem', opacity: 0.6 }}>Booked</span>
+                        ) : (
+                          <span style={{ display: 'block', fontSize: '0.65rem', color: '#4A8C70', fontWeight: 600 }}>Open</span>
                         )}
                       </button>
                     );
@@ -391,6 +621,22 @@ export default function BookingEngine({ currentUser, availability, appointments,
                     {formErrors.slot}
                   </p>
                 )}
+
+                {/* Accessible Visual State Legend */}
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem', padding: '0.6rem 0.8rem', background: 'rgba(0,0,0,0.02)', borderRadius: '6px', fontSize: '0.75rem', border: '1px solid var(--color-slate-10)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--color-primary)', display: 'inline-block' }}></span>
+                    Selected Slot
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#4A8C70', display: 'inline-block' }}></span>
+                    Available (Open)
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#94a3b8', display: 'inline-block' }}></span>
+                    Booked / Buffer Reserved
+                  </span>
+                </div>
               </div>
             )}
           </div>

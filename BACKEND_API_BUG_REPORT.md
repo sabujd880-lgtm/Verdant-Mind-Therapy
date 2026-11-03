@@ -88,3 +88,4 @@
 ### 8. `PUT /api/availability` Practice Schedule Tampering
 - **Vulnerability:** Practice hours, working days, and blocked dates could be modified by anyone.
 - **Remediation:** Guarded with `requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor'])`.
+

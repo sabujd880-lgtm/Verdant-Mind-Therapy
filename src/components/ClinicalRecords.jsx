@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Brain, AlertTriangle, CheckCircle2, User, Calendar, Save, Plus, ShieldCheck, Download, Trash2, Clock } from 'lucide-react';
+import { formatISTDate, formatISTDateTimeWithZone, normalizeToISTDate } from '../utils/dateTime.js';
 
 export default function ClinicalRecords({ appointments = [], currentUser }) {
   const [activeSubTab, setActiveSubTab] = useState('case-history'); // 'case-history' | 'mse'
@@ -63,7 +64,7 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `patient_record_export_${selectedClientEmail}_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `patient_record_export_${selectedClientEmail}_${formatISTDate(new Date())}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -603,7 +604,7 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
                   <div key={m._id || m.id || idx} style={{ border: '1px solid var(--color-slate-10)', borderRadius: '6px', padding: '1rem', background: '#fff' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', borderBottom: '1px solid #f0f0f0', paddingBottom: '0.25rem' }}>
                       <strong style={{ fontSize: '0.85rem', color: 'var(--color-primary-forest)' }}>
-                        Date: {m.date}
+                        Date: {formatISTDate(m.date)}
                       </strong>
                       <span style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)' }}>
                         Evaluator: {m.counsellorEmail}

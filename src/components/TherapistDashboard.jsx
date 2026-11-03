@@ -2,11 +2,20 @@ import React, { useState } from 'react';
 import { 
   Check, X, Eye, Calendar, Clock, Plus, Trash2, 
   Video, PhoneCall, MessageSquare, BookOpen, AlertCircle,
-  Inbox, FileText, Receipt, Mail, Send, Printer, CheckCircle2, Clipboard
+  Inbox, FileText, Receipt, Mail, Send, Printer, CheckCircle2, Clipboard,
+  RefreshCw, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import ClinicalRecords from './ClinicalRecords';
 import AudioRecordings from './AudioRecordings';
 import AdminManagement from './AdminManagement';
+import { 
+  formatISTDate, 
+  formatISTTime, 
+  formatISTDateTimeWithZone, 
+  normalizeToISTDate, 
+  isSameISTDate,
+  getISTWeekDays 
+} from '../utils/dateTime.js';
 
 export default function TherapistDashboard({ 
   appointments, 
@@ -21,9 +30,21 @@ export default function TherapistDashboard({
   currentUser
 }) {
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' | 'messages' | 'documents' | 'availability' | 'clinical-records' | 'recordings' | 'admin'
+  const [scheduleView, setScheduleView] = useState('table'); // 'table' | 'week' | 'day'
+  const [currentScheduleDate, setCurrentScheduleDate] = useState(new Date(2026, 6, 13));
   const [selectedApt, setSelectedApt] = useState(null); // For detailed inquiry viewer modal
   const [tempNotes, setTempNotes] = useState('');
   const [newBlockedDate, setNewBlockedDate] = useState('');
+
+  // Rescheduling Modal State
+  const [rescheduleApt, setRescheduleApt] = useState(null);
+  const [rescheduleForm, setRescheduleForm] = useState({ date: '', time: '10:00 AM', durationMinutes: 60, reason: '' });
+  const [rescheduleError, setRescheduleError] = useState('');
+  const [rescheduleSuccess, setRescheduleSuccess] = useState('');
+
+  // Cancellation Modal State
+  const [cancelModalApt, setCancelModalApt] = useState(null);
+  const [cancelReasonText, setCancelReasonText] = useState('');
 
   // Messaging Portal States
   const [selectedMsgId, setSelectedMsgId] = useState(messages[0]?.id || null);
@@ -113,17 +134,76 @@ export default function TherapistDashboard({
   const handleAddBlockedDate = (e) => {
     e.preventDefault();
     if (!newBlockedDate) return;
-    
-    if (!availability.blockedDates.includes(newBlockedDate)) {
-      const updatedBlocked = [...availability.blockedDates, newBlockedDate].sort();
+    const normDate = normalizeToISTDate(newBlockedDate);
+    if (!availability.blockedDates.some(d => isSameISTDate(d, normDate))) {
+      const updatedBlocked = [...availability.blockedDates, normDate];
       onUpdateAvailability({ ...availability, blockedDates: updatedBlocked });
     }
     setNewBlockedDate('');
   };
 
   const handleRemoveBlockedDate = (dateToRemove) => {
-    const updatedBlocked = availability.blockedDates.filter(d => d !== dateToRemove);
+    const updatedBlocked = availability.blockedDates.filter(d => !isSameISTDate(d, dateToRemove) && d !== dateToRemove);
     onUpdateAvailability({ ...availability, blockedDates: updatedBlocked });
+  };
+
+  // Rescheduling Submit Handler
+  const handleRescheduleSubmit = async (e) => {
+    e.preventDefault();
+    if (!rescheduleApt) return;
+    setRescheduleError('');
+    setRescheduleSuccess('');
+
+    try {
+      const res = await fetch(`/api/appointments/${rescheduleApt._id || rescheduleApt.id}/reschedule`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          date: rescheduleForm.date,
+          time: rescheduleForm.time,
+          durationMinutes: Number(rescheduleForm.durationMinutes) || 60,
+          reason: rescheduleForm.reason
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reschedule appointment.');
+
+      setRescheduleSuccess('Session successfully rescheduled! Confirmation notice dispatched to client.');
+      if (onUpdateStatus) {
+        onUpdateStatus(rescheduleApt._id || rescheduleApt.id, 'Confirmed', data);
+      }
+      setTimeout(() => {
+        setRescheduleApt(null);
+        setRescheduleSuccess('');
+      }, 1500);
+    } catch (err) {
+      setRescheduleError(err.message);
+    }
+  };
+
+  // Cancellation with Reason Submit Handler
+  const handleCancelSubmit = async (e) => {
+    e.preventDefault();
+    if (!cancelModalApt) return;
+    try {
+      await fetch(`/api/appointments/${cancelModalApt._id || cancelModalApt.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          status: 'Cancelled',
+          cancellationReason: cancelReasonText
+        })
+      });
+      if (onUpdateStatus) {
+        onUpdateStatus(cancelModalApt._id || cancelModalApt.id, 'Cancelled');
+      }
+      setCancelModalApt(null);
+      setCancelReasonText('');
+    } catch (err) {
+      console.error('Cancellation error:', err);
+    }
   };
 
   // Helper for session modes icons
@@ -394,99 +474,351 @@ export default function TherapistDashboard({
       {/* 1. Appointments and Inquiries */}
       {activeTab === 'appointments' && (
         <div className="glass-card appointments-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>Clients & Booking Schedule</h3>
-            <span style={{ fontSize: '0.85rem', color: 'var(--color-slate-light)' }}>
-              Showing {appointments.length} total entries
-            </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Clients & Booking Schedule</h3>
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-slate-light)' }}>
+                Authoritative IST (Asia/Kolkata) • {appointments.length} Total Records
+              </span>
+            </div>
+
+            {/* Schedule View Selector */}
+            <div style={{ display: 'flex', gap: '0.35rem', background: 'rgba(0,0,0,0.04)', padding: '3px', borderRadius: '6px', border: '1px solid var(--color-slate-10)' }}>
+              {[
+                { id: 'table', label: 'Table View' },
+                { id: 'week', label: 'Week Schedule' },
+                { id: 'day', label: 'Day Timeline' }
+              ].map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    borderRadius: '4px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: scheduleView === v.id ? 'var(--color-primary)' : 'transparent',
+                    color: scheduleView === v.id ? '#fff' : 'inherit',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onClick={() => setScheduleView(v.id)}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="table-responsive">
-            {appointments.length === 0 ? (
-              <div className="no-data-state">
-                <AlertCircle size={40} />
-                <p>No bookings or inquiries submitted yet.</p>
+          {/* VIEW 1: TABLE VIEW */}
+          {scheduleView === 'table' && (
+            <div className="table-responsive">
+              {appointments.length === 0 ? (
+                <div className="no-data-state">
+                  <AlertCircle size={40} />
+                  <p>No bookings or inquiries submitted yet.</p>
+                </div>
+              ) : (
+                <table className="appointments-table">
+                  <thead>
+                    <tr>
+                      <th>Client Name</th>
+                      <th>Date & Time (IST)</th>
+                      <th>Duration</th>
+                      <th>Session Mode</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...appointments].reverse().map((apt) => (
+                      <tr key={apt._id || apt.id}>
+                        <td>
+                          <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{apt.clientName}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-slate-light)' }}>{apt.clientAgeGroup || 'Client'}</div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Calendar size={14} style={{ color: 'var(--color-slate-light)' }} />
+                            <span>{formatISTDate(apt.date)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
+                            <Clock size={12} />
+                            <span>{formatISTTime(apt.time)}</span>
+                          </div>
+                          {apt.rescheduledFrom && (
+                            <div style={{ fontSize: '0.68rem', color: '#DF9B34', marginTop: '2px' }}>
+                              Rescheduled from {apt.rescheduledFrom.date} {apt.rescheduledFrom.time}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{apt.durationMinutes || 60}m</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--color-slate-light)', display: 'block' }}>+{apt.bufferMinutes !== undefined ? apt.bufferMinutes : 15}m buf</span>
+                        </td>
+                        <td>
+                          <span className="mode-badge">
+                            {getModeIcon(apt.sessionMode)}
+                            {apt.sessionMode}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${(apt.status || 'Pending').toLowerCase()}`}>
+                            <span className="badge-dot"></span>
+                            {apt.status || 'Pending'}
+                          </span>
+                          {apt.status === 'Cancelled' && apt.cancellationReason && (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--color-cancelled)', marginTop: '2px', maxWidth: '140px' }} title={apt.cancellationReason}>
+                              {apt.cancellationReason}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <div className="action-row">
+                            <button
+                              type="button"
+                              className="action-icon-btn"
+                              title="Review details, write notes, and generate clinical documents"
+                              onClick={() => handleOpenDetails(apt)}
+                            >
+                              <Eye size={14} />
+                            </button>
+
+                            {/* Reschedule Button */}
+                            {apt.status !== 'Cancelled' && (
+                              <button
+                                type="button"
+                                className="action-icon-btn"
+                                title="Reschedule Session"
+                                onClick={() => {
+                                  setRescheduleApt(apt);
+                                  setRescheduleForm({
+                                    date: apt.date,
+                                    time: apt.time,
+                                    durationMinutes: apt.durationMinutes || 60,
+                                    reason: ''
+                                  });
+                                  setRescheduleError('');
+                                  setRescheduleSuccess('');
+                                }}
+                              >
+                                <RefreshCw size={14} />
+                              </button>
+                            )}
+                            
+                            {(apt.status || 'Pending') !== 'Confirmed' && apt.status !== 'Cancelled' && (
+                              <button
+                                type="button"
+                                className="action-icon-btn approve"
+                                title="Confirm Session"
+                                onClick={() => onUpdateStatus(apt._id || apt.id, 'Confirmed')}
+                              >
+                                <Check size={14} />
+                              </button>
+                            )}
+                            
+                            {(apt.status || 'Pending') !== 'Cancelled' && (
+                              <button
+                                type="button"
+                                className="action-icon-btn cancel"
+                                title="Cancel Session"
+                                onClick={() => {
+                                  setCancelModalApt(apt);
+                                  setCancelReasonText('');
+                                }}
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* VIEW 2: WEEK SCHEDULE VIEW */}
+          {scheduleView === 'week' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', padding: '0.5rem 0' }}>
+                <button
+                  type="button"
+                  className="calendar-nav-btn"
+                  onClick={() => {
+                    const prevWk = new Date(currentScheduleDate);
+                    prevWk.setDate(currentScheduleDate.getDate() - 7);
+                    setCurrentScheduleDate(prevWk);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: '#fff', border: '1px solid var(--color-slate-10)', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  <ChevronLeft size={16} /> Previous Week
+                </button>
+                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+                  Week of {formatISTDate(getISTWeekDays(currentScheduleDate)[0]?.dateStr)} to {formatISTDate(getISTWeekDays(currentScheduleDate)[6]?.dateStr)}
+                </div>
+                <button
+                  type="button"
+                  className="calendar-nav-btn"
+                  onClick={() => {
+                    const nextWk = new Date(currentScheduleDate);
+                    nextWk.setDate(currentScheduleDate.getDate() + 7);
+                    setCurrentScheduleDate(nextWk);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: '#fff', border: '1px solid var(--color-slate-10)', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Next Week <ChevronRight size={16} />
+                </button>
               </div>
-            ) : (
-              <table className="appointments-table">
-                <thead>
-                  <tr>
-                    <th>Client Name</th>
-                    <th>Date & Time</th>
-                    <th>Session Mode</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...appointments].reverse().map((apt) => (
-                    <tr key={apt._id || apt.id}>
-                      <td>
-                        <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{apt.clientName}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-slate-light)' }}>{apt.clientAgeGroup}</div>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Calendar size={14} style={{ color: 'var(--color-slate-light)' }} />
-                          <span>{apt.date}</span>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem', minHeight: '340px' }}>
+                {getISTWeekDays(currentScheduleDate).map((dayItem) => {
+                  const dayApts = appointments.filter(a => isSameISTDate(a.date, dayItem.dateStr));
+                  const isBlocked = (availability.blockedDates || []).some(b => isSameISTDate(b, dayItem.dateStr));
+
+                  return (
+                    <div
+                      key={dayItem.dateStr}
+                      style={{
+                        background: isBlocked ? 'rgba(0,0,0,0.02)' : '#fff',
+                        border: '1px solid var(--color-slate-10)',
+                        borderRadius: '8px',
+                        padding: '0.6rem 0.4rem',
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}
+                    >
+                      <div style={{ textAlign: 'center', borderBottom: '1px solid var(--color-slate-10)', paddingBottom: '0.4rem', marginBottom: '0.5rem' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-slate-light)' }}>{dayItem.weekdayShort}</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{dayItem.dayNumber}</div>
+                        {isBlocked && (
+                          <span style={{ fontSize: '0.62rem', background: 'rgba(201,93,93,0.1)', color: 'var(--color-cancelled)', padding: '1px 4px', borderRadius: '3px' }}>
+                            Blocked
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, overflowY: 'auto' }}>
+                        {dayApts.length === 0 ? (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)', textAlign: 'center', margin: 'auto 0' }}>
+                            No sessions
+                          </div>
+                        ) : (
+                          dayApts.map((apt) => (
+                            <div
+                              key={apt._id || apt.id}
+                              onClick={() => handleOpenDetails(apt)}
+                              style={{
+                                padding: '0.4rem',
+                                borderRadius: '4px',
+                                background: apt.status === 'Confirmed' ? 'rgba(74,140,112,0.1)' : apt.status === 'Cancelled' ? 'rgba(201,93,93,0.08)' : 'rgba(223,155,52,0.12)',
+                                borderLeft: `3px solid ${apt.status === 'Confirmed' ? '#4A8C70' : apt.status === 'Cancelled' ? '#C95D5D' : '#DF9B34'}`,
+                                fontSize: '0.72rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <div style={{ fontWeight: 700, color: 'var(--color-slate-dark)' }}>{apt.time}</div>
+                              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.clientName}</div>
+                              <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>{apt.sessionMode?.split(' ')[0]}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* VIEW 3: DAY TIMELINE VIEW */}
+          {scheduleView === 'day' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', padding: '0.5rem 0' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prevD = new Date(currentScheduleDate);
+                    prevD.setDate(currentScheduleDate.getDate() - 1);
+                    setCurrentScheduleDate(prevD);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: '#fff', border: '1px solid var(--color-slate-10)', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  <ChevronLeft size={16} /> Previous Day
+                </button>
+                <div style={{ textAlign: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: '1.1rem' }}>{formatISTDate(currentScheduleDate)} (IST)</h4>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)' }}>
+                    Practice Hours: {availability.startHour || '09:00'} - {availability.endHour || '17:00'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextD = new Date(currentScheduleDate);
+                    nextD.setDate(currentScheduleDate.getDate() + 1);
+                    setCurrentScheduleDate(nextD);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem', background: '#fff', border: '1px solid var(--color-slate-10)', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Next Day <ChevronRight size={16} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '420px', overflowY: 'auto' }}>
+                {appointments
+                  .filter(a => isSameISTDate(a.date, currentScheduleDate))
+                  .length === 0 ? (
+                  <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-slate-light)' }}>
+                    No sessions scheduled for this day.
+                  </div>
+                ) : (
+                  appointments
+                    .filter(a => isSameISTDate(a.date, currentScheduleDate))
+                    .map((apt) => (
+                      <div
+                        key={apt._id || apt.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '0.85rem 1.25rem',
+                          background: '#fff',
+                          border: '1px solid var(--color-slate-10)',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-primary)', minWidth: '90px' }}>
+                            {apt.time}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{apt.clientName}</div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)' }}>{apt.clientEmail} • {apt.sessionMode} • {apt.durationMinutes || 60}m</div>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
-                          <Clock size={12} />
-                          <span>{apt.time}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="mode-badge">
-                          {getModeIcon(apt.sessionMode)}
-                          {apt.sessionMode}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`status-badge ${(apt.status || 'Pending').toLowerCase()}`}>
-                          <span className="badge-dot"></span>
-                          {apt.status || 'Pending'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="action-row">
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <span className={`status-badge ${(apt.status || 'Pending').toLowerCase()}`}>
+                            {apt.status || 'Pending'}
+                          </span>
                           <button
                             type="button"
                             className="action-icon-btn"
-                            title="Review details, write notes, and generate clinical documents"
                             onClick={() => handleOpenDetails(apt)}
                           >
                             <Eye size={14} />
                           </button>
-                          
-                          {(apt.status || 'Pending') !== 'Confirmed' && (
-                            <button
-                              type="button"
-                              className="action-icon-btn approve"
-                              title="Confirm Session"
-                              onClick={() => onUpdateStatus(apt._id || apt.id, 'Confirmed')}
-                            >
-                              <Check size={14} />
-                            </button>
-                          )}
-                          
-                          {(apt.status || 'Pending') !== 'Cancelled' && (
-                            <button
-                              type="button"
-                              className="action-icon-btn cancel"
-                              title="Cancel Session"
-                              onClick={() => onUpdateStatus(apt._id || apt.id, 'Cancelled')}
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -533,7 +865,7 @@ export default function TherapistDashboard({
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
                         <span style={{ fontWeight: msg.status === 'unread' ? 700 : 600, color: 'var(--color-slate-dark)' }}>{msg.senderName}</span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--color-slate-light)' }}>
-                          {new Date(msg.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          {formatISTDate(msg.timestamp)}
                         </span>
                       </div>
                       <div style={{ fontSize: '0.85rem', fontWeight: msg.status === 'unread' ? 600 : 400, color: 'var(--color-slate)' }}>{msg.subject}</div>
@@ -649,7 +981,7 @@ export default function TherapistDashboard({
                           </p>
                         </div>
                         <span style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
-                          {new Date(currentMsg.timestamp).toLocaleString()}
+                          {formatISTDateTimeWithZone(currentMsg.timestamp)}
                         </span>
                       </div>
                       
@@ -675,7 +1007,7 @@ export default function TherapistDashboard({
                         <div key={reply.id} style={{ background: 'var(--color-confirmed-bg)', border: '1px solid rgba(74, 140, 112, 0.15)', padding: '1.25rem', borderRadius: 'var(--radius-sm)', marginLeft: '2rem', marginBottom: '1rem', boxShadow: 'var(--shadow-sm)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(74, 140, 112, 0.1)', paddingBottom: '0.5rem', marginBottom: '0.75rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-confirmed)' }}>
                             <span>SENT REPLY (DISPATCHED OUTBOX):</span>
-                            <span>{new Date(reply.timestamp).toLocaleString()}</span>
+                            <span>{formatISTDateTimeWithZone(reply.timestamp)}</span>
                           </div>
                           <p style={{ whiteSpace: 'pre-wrap', color: 'var(--color-slate-dark)', fontSize: '0.95rem' }}>{reply.message}</p>
                         </div>
@@ -742,7 +1074,7 @@ export default function TherapistDashboard({
                   <option value="">No clients available</option>
                 ) : (
                   appointments.map(apt => (
-                    <option key={apt.id} value={apt.id}>{apt.clientName} ({apt.date} @ {apt.time})</option>
+                    <option key={apt._id || apt.id} value={apt._id || apt.id}>{apt.clientName} ({formatISTDate(apt.date)} @ {formatISTTime(apt.time)})</option>
                   ))
                 )}
               </select>
@@ -1147,7 +1479,7 @@ export default function TherapistDashboard({
                     <div><span style={{ color: '#5A738E' }}>Session Mode:</span> {selectedAptForDoc.sessionMode}</div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem', textAlign: 'right' }}>
-                    <div><span style={{ color: '#5A738E' }}>Date of Issue:</span> {new Date().toLocaleDateString()}</div>
+                    <div><span style={{ color: '#5A738E' }}>Date of Issue:</span> {formatISTDate(new Date())}</div>
                     {docType === 'receipt' && (
                       <>
                         <div><span style={{ color: '#5A738E' }}>Invoice Number:</span> <strong>{invoiceNo}</strong></div>
@@ -1389,7 +1721,7 @@ export default function TherapistDashboard({
                 <div className="blocked-dates-list custom-scroll">
                   {availability.blockedDates.map((date) => (
                     <div key={date} className="blocked-date-tag">
-                      <span>{date}</span>
+                      <span>{formatISTDate(date)}</span>
                       <button
                         type="button"
                         className="remove-tag-btn"
@@ -1466,7 +1798,7 @@ export default function TherapistDashboard({
                 </div>
                 <div className="meta-item">
                   <label>Date & Time Slot</label>
-                  <span>{selectedApt.date} at {selectedApt.time}</span>
+                  <span>{formatISTDate(selectedApt.date)} at {formatISTTime(selectedApt.time)} (IST)</span>
                 </div>
               </div>
 
@@ -1569,6 +1901,173 @@ export default function TherapistDashboard({
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* RESCHEDULE APPOINTMENT MODAL */}
+      {rescheduleApt && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(42,71,62,0.5)', backdropFilter: 'blur(6px)', padding: '1rem' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '480px', padding: '1.75rem', background: '#fff', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--color-slate-dark)' }}>Reschedule Consultation</h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
+                  Patient: {rescheduleApt.clientName} ({rescheduleApt.clientEmail})
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRescheduleApt(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--color-slate-light)' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {rescheduleError && (
+              <div style={{ background: 'rgba(201,93,93,0.1)', color: 'var(--color-cancelled)', padding: '0.6rem 0.8rem', borderRadius: '4px', fontSize: '0.82rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <AlertCircle size={15} /> <span>{rescheduleError}</span>
+              </div>
+            )}
+            {rescheduleSuccess && (
+              <div style={{ background: 'rgba(74,140,112,0.1)', color: '#2A5D48', padding: '0.6rem 0.8rem', borderRadius: '4px', fontSize: '0.82rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <CheckCircle2 size={15} /> <span>{rescheduleSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleRescheduleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Current Slot (IST):
+                </label>
+                <div style={{ fontSize: '0.85rem', color: 'var(--color-slate-light)', background: 'var(--color-slate-05)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
+                  {formatISTDate(rescheduleApt.date)} at {formatISTTime(rescheduleApt.time)}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  New Date (DD-MM-YYYY) *:
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 15-07-2026"
+                  value={rescheduleForm.date}
+                  onChange={(e) => setRescheduleForm(prev => ({ ...prev, date: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                    New Time Slot (IST) *:
+                  </label>
+                  <select
+                    value={rescheduleForm.time}
+                    onChange={(e) => setRescheduleForm(prev => ({ ...prev, time: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', background: '#fff' }}
+                  >
+                    {['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                    Duration (Minutes):
+                  </label>
+                  <select
+                    value={rescheduleForm.durationMinutes}
+                    onChange={(e) => setRescheduleForm(prev => ({ ...prev, durationMinutes: Number(e.target.value) }))}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', background: '#fff' }}
+                  >
+                    <option value={30}>30 Minutes</option>
+                    <option value={45}>45 Minutes</option>
+                    <option value={60}>60 Minutes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Rescheduling Reason (Optional):
+                </label>
+                <textarea
+                  placeholder="e.g. Client requested postponement due to meeting conflict..."
+                  rows={2}
+                  value={rescheduleForm.reason}
+                  onChange={(e) => setRescheduleForm(prev => ({ ...prev, reason: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setRescheduleApt(null)}
+                  style={{ flex: 1, padding: '0.65rem', background: 'var(--color-slate-05)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="premium-btn"
+                  style={{ flex: 1, padding: '0.65rem' }}
+                >
+                  Confirm Reschedule
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CANCELLATION REASON MODAL */}
+      {cancelModalApt && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(42,71,62,0.5)', backdropFilter: 'blur(6px)', padding: '1rem' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '420px', padding: '1.75rem', background: '#fff', borderRadius: 'var(--radius-md)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--color-slate-dark)', marginBottom: '0.5rem' }}>
+              Cancel Appointment
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-slate-light)', margin: '0 0 1rem 0' }}>
+              Are you sure you want to cancel the session with <strong>{cancelModalApt.clientName}</strong> on {formatISTDate(cancelModalApt.date)} at {formatISTTime(cancelModalApt.time)}?
+            </p>
+
+            <form onSubmit={handleCancelSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+                  Cancellation Reason:
+                </label>
+                <textarea
+                  required
+                  placeholder="e.g. Client requested cancellation due to scheduling conflict..."
+                  rows={3}
+                  value={cancelReasonText}
+                  onChange={(e) => setCancelReasonText(e.target.value)}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setCancelModalApt(null)}
+                  style={{ flex: 1, padding: '0.65rem', background: 'var(--color-slate-05)', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  style={{ flex: 1, padding: '0.65rem', background: 'var(--color-cancelled)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Confirm Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

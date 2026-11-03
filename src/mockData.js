@@ -22,13 +22,13 @@ export const INITIAL_AVAILABILITY = {
   workingDays: [1, 2, 3, 4, 5], // Monday (1) to Friday (5)
   startHour: "09:00",
   endHour: "17:00",
-  blockedDates: ["2026-07-17", "2026-07-24"] // Example blocked holiday dates
+  blockedDates: ["17-07-2026", "24-07-2026"] // Example blocked holiday dates in DD-MM-YYYY
 };
 
 export const INITIAL_APPOINTMENTS = [
   {
     id: "apt-1",
-    date: "2026-07-10",
+    date: "10-07-2026",
     time: "11:00 AM",
     clientName: "Aarav Sharma",
     clientEmail: "aarav.sharma@example.com",
@@ -41,7 +41,7 @@ export const INITIAL_APPOINTMENTS = [
   },
   {
     id: "apt-2",
-    date: "2026-07-14",
+    date: "14-07-2026",
     time: "09:00 AM",
     clientName: "Priya Patel",
     clientEmail: "priya.p@example.com",
@@ -54,7 +54,7 @@ export const INITIAL_APPOINTMENTS = [
   },
   {
     id: "apt-3",
-    date: "2026-07-15",
+    date: "15-07-2026",
     time: "02:00 PM",
     clientName: "Rohan Das",
     clientEmail: "rohan.das@example.com",
@@ -67,7 +67,7 @@ export const INITIAL_APPOINTMENTS = [
   },
   {
     id: "apt-4",
-    date: "2026-07-16",
+    date: "16-07-2026",
     time: "04:00 PM",
     clientName: "Meera Sen",
     clientEmail: "meera.sen@example.com",

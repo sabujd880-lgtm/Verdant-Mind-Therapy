@@ -1,11 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock } from 'lucide-react';
+import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save } from 'lucide-react';
+import { formatISTDateTimeWithZone } from '../utils/dateTime.js';
 
 export default function AdminManagement({ currentUser }) {
-  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' | 'audit' | 'assignments'
+  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' | 'audit' | 'assignments' | 'scheduling'
   const [users, setUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
-  // const [isLoading, setIsLoading] = useState(false);
+  const [schedConfig, setSchedConfig] = useState({
+    workingDays: [1, 2, 3, 4, 5],
+    startHour: '09:00',
+    endHour: '17:00',
+    breakStart: '13:00',
+    breakEnd: '14:00',
+    defaultDurationMinutes: 60,
+    permittedDurations: [30, 45, 60],
+    bufferMinutes: 15,
+    minAdvanceHours: 2,
+    maxAdvanceDays: 60,
+    maxAppointmentsPerDay: 8,
+    cancellationDeadlineHours: 24,
+    reschedulingDeadlineHours: 12,
+    blockedDates: []
+  });
+  const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,11 +72,48 @@ export default function AdminManagement({ currentUser }) {
     }
   };
 
+  const fetchSchedulingConfig = async () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/admin/scheduling-config', { credentials: 'include' });
+      if (!res.ok) throw new Error('Could not fetch scheduling configuration.');
+      const data = await res.json();
+      setSchedConfig(prev => ({ ...prev, ...data }));
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveSchedulingConfig = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch('/api/admin/scheduling-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(schedConfig)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save practice scheduling configuration.');
+      setSchedConfig(data);
+      setSuccessMsg('Practice scheduling governance and IST configuration saved successfully.');
+    } catch (err) {
+      setErrorMsg(err.message);
+    }
+  };
+
   useEffect(() => {
     if (activeSubTab === 'users' || activeSubTab === 'assignments') {
       fetchUsers();
     } else if (activeSubTab === 'audit') {
       fetchAuditLogs();
+    } else if (activeSubTab === 'scheduling') {
+      fetchSchedulingConfig();
     }
   }, [activeSubTab]);
 
@@ -212,6 +266,14 @@ export default function AdminManagement({ currentUser }) {
           >
             <Clock size={15} style={{ marginRight: '0.35rem' }} /> Security Audit Logs
           </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeSubTab === 'scheduling' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('scheduling')}
+            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+          >
+            <CalendarDays size={15} style={{ marginRight: '0.35rem' }} /> Practice Scheduling & IST
+          </button>
         </div>
 
         {activeSubTab === 'users' && (
@@ -342,7 +404,7 @@ export default function AdminManagement({ currentUser }) {
 
                         {/* Last Login Info */}
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.78rem', color: 'var(--color-slate-light)' }}>
-                          {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
+                          {user.lastLoginAt ? formatISTDateTimeWithZone(user.lastLoginAt) : 'Never'}
                           {user.lastLoginIp && <div style={{ fontSize: '0.7rem' }}>IP: {user.lastLoginIp}</div>}
                         </td>
 
@@ -525,7 +587,7 @@ export default function AdminManagement({ currentUser }) {
                 auditLogs.map((log, i) => (
                   <tr key={log._id || log.id || i} style={{ borderBottom: '1px solid var(--color-slate-05)' }}>
                     <td style={{ padding: '0.65rem 0.85rem', color: 'var(--color-slate-light)', whiteSpace: 'nowrap' }}>
-                      {new Date(log.timestamp).toLocaleString()}
+                      {formatISTDateTimeWithZone(log.timestamp)}
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
                       <strong style={{ color: 'var(--color-slate-dark)' }}>{log.actorEmail}</strong>
@@ -547,6 +609,237 @@ export default function AdminManagement({ currentUser }) {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* TAB 4: PRACTICE SCHEDULING & IST GOVERNANCE */}
+      {activeSubTab === 'scheduling' && (
+        <div className="glass-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-sm)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-slate-10)', paddingBottom: '0.75rem' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--color-slate-dark)' }}>
+                Practice Scheduling Governance & Time Zone Management
+              </h4>
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
+                Configure working schedules, buffer intervals, operating hours, and Indian Standard Time (IST) rules.
+              </span>
+            </div>
+            <div style={{ background: 'rgba(74,140,112,0.1)', color: '#2A5D48', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}>
+              Authoritative Time Zone: Asia/Kolkata (IST, UTC+05:30)
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveSchedulingConfig} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Working Days */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '0.5rem', color: 'var(--color-slate-dark)' }}>
+                Active Practice Consultation Days:
+              </label>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {[
+                  { day: 0, label: 'Sunday' },
+                  { day: 1, label: 'Monday' },
+                  { day: 2, label: 'Tuesday' },
+                  { day: 3, label: 'Wednesday' },
+                  { day: 4, label: 'Thursday' },
+                  { day: 5, label: 'Friday' },
+                  { day: 6, label: 'Saturday' }
+                ].map(({ day, label }) => {
+                  const isChecked = (schedConfig.workingDays || []).includes(day);
+                  return (
+                    <label key={day} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem', cursor: 'pointer', background: isChecked ? 'rgba(42,71,62,0.08)' : 'transparent', padding: '0.4rem 0.65rem', borderRadius: '4px', border: '1px solid var(--color-slate-10)' }}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const current = schedConfig.workingDays || [];
+                          const updated = e.target.checked
+                            ? [...current, day].sort()
+                            : current.filter(d => d !== day);
+                          setSchedConfig(prev => ({ ...prev, workingDays: updated }));
+                        }}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Operating Hours & Breaks */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Daily Start Hour (IST):
+                </label>
+                <input
+                  type="text"
+                  placeholder="09:00"
+                  value={schedConfig.startHour || ''}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, startHour: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Daily End Hour (IST):
+                </label>
+                <input
+                  type="text"
+                  placeholder="17:00"
+                  value={schedConfig.endHour || ''}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, endHour: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Lunch/Break Start (IST):
+                </label>
+                <input
+                  type="text"
+                  placeholder="13:00"
+                  value={schedConfig.breakStart || ''}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, breakStart: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Lunch/Break End (IST):
+                </label>
+                <input
+                  type="text"
+                  placeholder="14:00"
+                  value={schedConfig.breakEnd || ''}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, breakEnd: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+            </div>
+
+            {/* Durations and Buffer Period */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Default Duration (Minutes):
+                </label>
+                <select
+                  value={schedConfig.defaultDurationMinutes || 60}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, defaultDurationMinutes: Number(e.target.value) }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', background: '#fff' }}
+                >
+                  <option value={30}>30 Minutes</option>
+                  <option value={45}>45 Minutes</option>
+                  <option value={60}>60 Minutes</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Practice Buffer Interval (Minutes):
+                </label>
+                <select
+                  value={schedConfig.bufferMinutes !== undefined ? schedConfig.bufferMinutes : 15}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, bufferMinutes: Number(e.target.value) }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', background: '#fff' }}
+                >
+                  <option value={0}>0 Minutes (No buffer)</option>
+                  <option value={10}>10 Minutes</option>
+                  <option value={15}>15 Minutes (Standard)</option>
+                  <option value={20}>20 Minutes</option>
+                  <option value={30}>30 Minutes</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Min Advance Notice (Hours):
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="72"
+                  value={schedConfig.minAdvanceHours !== undefined ? schedConfig.minAdvanceHours : 2}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, minAdvanceHours: Number(e.target.value) }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Max Advance Booking (Days):
+                </label>
+                <input
+                  type="number"
+                  min="7"
+                  max="180"
+                  value={schedConfig.maxAdvanceDays !== undefined ? schedConfig.maxAdvanceDays : 60}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, maxAdvanceDays: Number(e.target.value) }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+            </div>
+
+            {/* Cancellation and Reschedule Policy */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Cancellation Notice Deadline (Hours):
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="72"
+                  value={schedConfig.cancellationDeadlineHours !== undefined ? schedConfig.cancellationDeadlineHours : 24}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, cancellationDeadlineHours: Number(e.target.value) }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Rescheduling Notice Deadline (Hours):
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="48"
+                  value={schedConfig.reschedulingDeadlineHours !== undefined ? schedConfig.reschedulingDeadlineHours : 12}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, reschedulingDeadlineHours: Number(e.target.value) }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
+                  Max Consultations / Day:
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={schedConfig.maxAppointmentsPerDay !== undefined ? schedConfig.maxAppointmentsPerDay : 8}
+                  onChange={(e) => setSchedConfig(prev => ({ ...prev, maxAppointmentsPerDay: Number(e.target.value) }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="submit"
+                className="premium-btn"
+                style={{ padding: '0.65rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Save size={16} /> Save Practice Governance Settings
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

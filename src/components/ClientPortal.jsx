@@ -3,6 +3,11 @@ import {
   Calendar, Clock, FileText, Receipt, Send, Inbox, 
   MessageSquare, CheckCircle2, Eye, Printer, X
 } from 'lucide-react';
+import { 
+  formatISTDate, 
+  formatISTTime, 
+  formatISTDateTimeWithZone 
+} from '../utils/dateTime.js';
 
 export default function ClientPortal({ 
   currentUser, 
@@ -140,11 +145,11 @@ export default function ClientPortal({
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
                           <Calendar size={14} style={{ color: 'var(--color-slate-light)' }} />
-                          <span>{apt.date}</span>
+                          <span>{formatISTDate(apt.date)}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
                           <Clock size={12} />
-                          <span>{apt.time}</span>
+                          <span>{formatISTTime(apt.time)}</span>
                         </div>
                       </td>
                       <td>
@@ -223,7 +228,7 @@ export default function ClientPortal({
                     }}>
                       {doc.type === 'receipt' ? <Receipt size={20} /> : <FileText size={20} />}
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)', fontWeight: 600 }}>{doc.date}</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)', fontWeight: 600 }}>{formatISTDate(doc.date || doc.createdAt)}</span>
                   </div>
 
                   <div>
@@ -280,7 +285,7 @@ export default function ClientPortal({
                     <div style={{ alignSelf: 'flex-end', background: 'var(--color-slate)', color: '#FFF', padding: '0.85rem 1rem', borderRadius: '12px', borderTopRightRadius: '2px', maxWidth: '85%', boxShadow: 'var(--shadow-sm)' }}>
                       <div style={{ fontSize: '0.72rem', borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '0.25rem', marginBottom: '0.4rem', opacity: 0.8, display: 'flex', justifyContent: 'space-between' }}>
                         <span>Sent Inquiry: {msg.subject}</span>
-                        <span>{new Date(msg.timestamp).toLocaleDateString()}</span>
+                        <span>{formatISTDateTimeWithZone(msg.timestamp)}</span>
                       </div>
                       <p style={{ fontSize: '0.88rem', margin: 0, whiteSpace: 'pre-wrap' }}>{msg.message}</p>
                     </div>
@@ -290,7 +295,7 @@ export default function ClientPortal({
                       <div key={reply.id} style={{ alignSelf: 'flex-start', background: '#FFF', color: 'var(--color-slate-dark)', padding: '0.85rem 1rem', borderRadius: '12px', borderTopLeftRadius: '2px', maxWidth: '85%', border: '1px solid var(--color-slate-10)', boxShadow: 'var(--shadow-sm)' }}>
                         <div style={{ fontSize: '0.72rem', borderBottom: '1px solid var(--color-slate-05)', paddingBottom: '0.25rem', marginBottom: '0.4rem', color: 'var(--color-confirmed)', fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
                           <span>Reply from Mr. Sabuj Das:</span>
-                          <span>{new Date(reply.timestamp).toLocaleDateString()}</span>
+                          <span>{formatISTDateTimeWithZone(reply.timestamp)}</span>
                         </div>
                         <p style={{ fontSize: '0.88rem', margin: 0, whiteSpace: 'pre-wrap' }}>{reply.message}</p>
                       </div>
@@ -448,7 +453,7 @@ export default function ClientPortal({
                     <div><span style={{ color: 'var(--color-slate-light)' }}>Contact Email:</span> {currentUser.email}</div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.8rem', textAlign: 'right' }}>
-                    <div><span style={{ color: 'var(--color-slate-light)' }}>Date of Issue:</span> {selectedDoc.date}</div>
+                    <div><span style={{ color: 'var(--color-slate-light)' }}>Date of Issue:</span> {formatISTDate(selectedDoc.date || selectedDoc.createdAt)}</div>
                     {selectedDoc.type === 'receipt' && (
                       <>
                         <div><span style={{ color: 'var(--color-slate-light)' }}>Invoice Number:</span> <strong>{selectedDoc.data.invoiceNo}</strong></div>

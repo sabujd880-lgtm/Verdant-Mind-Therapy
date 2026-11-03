@@ -80,3 +80,4 @@
   - Direct Token Streaming (`GET /api/recordings/stream/:id`): Validates signed HMAC tokens.
   - Secure Deletion (`DELETE /api/recordings/:id`): Executes S3 object deletion and marks record soft-deleted with audit logging.
 - **Verification Result:** PASS (Complete audio lifecycle adheres to clinical audio protection guidelines).
+

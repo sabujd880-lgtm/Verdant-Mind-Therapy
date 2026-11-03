@@ -1,3 +1,14 @@
+// Authoritative Application Timezone: Asia/Kolkata (Indian Standard Time, UTC+05:30)
+process.env.TZ = 'Asia/Kolkata';
+
+// Intercept background network / DNS unhandled rejections to prevent process crashes
+process.on('unhandledRejection', (reason) => {
+  console.warn('[SYSTEM WARN] Background unhandled rejection intercepted:', reason?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[SYSTEM ALERT] Uncaught exception intercepted:', err?.message || err);
+});
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -15,14 +26,27 @@ import crypto from 'crypto';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { loadSecrets } from './src/config/secrets.js';
+import { 
+  TIMEZONE,
+  normalizeToISTDate, 
+  normalizeTo12HourTime, 
+  parseISTDateTimeToUTC, 
+  formatISTDate, 
+  formatISTTime, 
+  formatISTDateTimeWithZone,
+  isSameISTDate,
+  doAppointmentsOverlap 
+} from './src/utils/dateTime.js';
 
 dotenv.config();
 
-// Ensure reliable DNS resolution for MongoDB Atlas SRV records across public networks
-try {
-  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
-} catch (dnsErr) {
-  console.warn('DNS server configuration warning:', dnsErr.message);
+// In production, ensure reliable DNS resolution for MongoDB Atlas SRV records
+if (process.env.NODE_ENV === 'production') {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+  } catch (dnsErr) {
+    console.warn('DNS server configuration warning:', dnsErr.message);
+  }
 }
 
 // Load secrets from AWS Secrets Manager if configured
@@ -170,7 +194,7 @@ const bookingLimiter = rateLimit({
 // =========================================================================
 let sessionStore = null;
 
-if (process.env.MONGODB_URI) {
+if (process.env.MONGODB_URI && process.env.NODE_ENV !== 'test') {
   try {
     sessionStore = MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
@@ -179,6 +203,14 @@ if (process.env.MONGODB_URI) {
       crypto: {
         secret: process.env.SESSION_SECRET || 'verdant-mind-counselling-session-enc-salt-2026'
       }
+    });
+    if (sessionStore && sessionStore.clientPromise) {
+      sessionStore.clientPromise.catch(err => {
+        console.warn('[SESSION STORE WARNING] MongoStore client connection notice:', err.message);
+      });
+    }
+    sessionStore.on('error', (err) => {
+      console.warn('[SESSION STORE WARNING] MongoStore async connection alert:', err.message);
     });
   } catch (storeErr) {
     console.error('[SESSION ERROR] Could not initialize MongoStore:', storeErr.message);
@@ -431,15 +463,32 @@ const appointmentSchema = new mongoose.Schema({
   clientPhone: { type: String, required: true },
   date: { type: String, required: true },
   time: { type: String, required: true },
+  durationMinutes: { type: Number, default: 60 },
+  bufferMinutes: { type: Number, default: 15 },
+  appointmentUtc: { type: Date, index: true },
   sessionMode: { type: String, required: true },
   problemDescription: { type: String, required: true },
-  status: { type: String, default: 'Pending' }, // 'Pending' | 'Confirmed' | 'Cancelled'
+  status: { type: String, default: 'Pending' }, // 'Pending' | 'Confirmed' | 'Cancelled' | 'Rescheduled'
+  cancellationReason: { type: String, default: '' },
+  rescheduledFrom: {
+    date: String,
+    time: String,
+    rescheduledAt: Date,
+    rescheduledBy: String
+  },
+  history: [{
+    action: String,
+    timestamp: { type: Date, default: Date.now },
+    performedBy: String,
+    details: mongoose.Schema.Types.Mixed
+  }],
   notes: { type: String, default: '' },
   counsellorEmail: { type: String, default: 'sabujd880@gmail.com', lowercase: true }
 });
 appointmentSchema.index({ clientEmail: 1, date: -1 });
 appointmentSchema.index({ counsellorEmail: 1, status: 1 });
 appointmentSchema.index({ date: 1, time: 1, status: 1 });
+appointmentSchema.index({ appointmentUtc: 1, status: 1 });
 let Appointment = mongoose.model('Appointment', appointmentSchema);
 
 // 8. Message Schema (Preserved)
@@ -473,12 +522,39 @@ careDocumentSchema.index({ clientEmail: 1, type: 1 });
 careDocumentSchema.index({ counsellorEmail: 1, date: -1 });
 let CareDocument = mongoose.model('CareDocument', careDocumentSchema);
 
-// 10. Availability Schema (Preserved)
+// 10. Availability & Scheduling Governance Schema
 const availabilitySchema = new mongoose.Schema({
   workingDays: { type: [Number], default: [1, 2, 3, 4, 5] },
   blockedDates: { type: [String], default: [] },
+  blockedRanges: {
+    type: [{
+      date: String,
+      startTime: String,
+      endTime: String,
+      reason: String
+    }],
+    default: []
+  },
   startHour: { type: String, default: '09:00' },
-  endHour: { type: String, default: '17:00' }
+  endHour: { type: String, default: '17:00' },
+  breakStart: { type: String, default: '13:00' },
+  breakEnd: { type: String, default: '14:00' },
+  defaultDurationMinutes: { type: Number, default: 60 },
+  permittedDurations: { type: [Number], default: [30, 45, 60] },
+  bufferMinutes: { type: Number, default: 15 },
+  minAdvanceHours: { type: Number, default: 2 },
+  maxAdvanceDays: { type: Number, default: 60 },
+  maxAppointmentsPerDay: { type: Number, default: 8 },
+  cancellationDeadlineHours: { type: Number, default: 24 },
+  reschedulingDeadlineHours: { type: Number, default: 12 },
+  holidays: {
+    type: [{
+      date: String,
+      name: String,
+      type: { type: String, default: 'holiday' }
+    }],
+    default: []
+  }
 });
 let Availability = mongoose.model('Availability', availabilitySchema);
 
@@ -587,81 +663,134 @@ class MockModel {
   }
 }
 
-const makeMockModel = (collectionName) => {
-  return {
-    async findOne(query = {}) {
-      const db = readData();
-      const list = db[collectionName] || [];
-      const found = list.find(item => {
-        for (let key in query) {
-          if (typeof query[key] === 'string' && typeof item[key] === 'string') {
-            if (item[key].toLowerCase() !== query[key].toLowerCase()) return false;
-          } else if (item[key] !== query[key]) {
-            return false;
-          }
-        }
-        return true;
-      });
-      return found ? new MockModel(collectionName, found) : null;
-    },
-    async find(query = {}) {
-      const db = readData();
-      let list = db[collectionName] || [];
-      if (query.$or) {
-        list = list.filter(item => {
-          return query.$or.some(q => {
-            for (let k in q) {
-              if (k === 'id' && q[k].$regex) {
-                const reg = new RegExp(q[k].$regex, q[k].$options || '');
-                return reg.test(item.senderEmail || item._id || '');
-              }
-              if (item[k] !== q[k]) return false;
-            }
-            return true;
-          });
-        });
-      } else {
-        list = list.filter(item => {
-          for (let key in query) {
-            if (typeof query[key] === 'string' && typeof item[key] === 'string') {
-              if (item[key].toLowerCase() !== query[key].toLowerCase()) return false;
-            } else if (item[key] !== query[key]) {
-              return false;
-            }
-          }
-          return true;
-        });
+function matchesQuery(item, query = {}) {
+  if (!query || Object.keys(query).length === 0) return true;
+
+  if (query.$or && Array.isArray(query.$or)) {
+    const orMatches = query.$or.some(subQuery => matchesQuery(item, subQuery));
+    if (!orMatches) return false;
+  }
+
+  for (const key of Object.keys(query)) {
+    if (key === '$or') continue;
+    const qVal = query[key];
+    const iVal = item[key];
+
+    if (qVal && typeof qVal === 'object' && !Array.isArray(qVal) && !(qVal instanceof RegExp)) {
+      if ('$ne' in qVal) {
+        if (iVal === qVal.$ne) return false;
+        continue;
       }
-      return list.map(item => new MockModel(collectionName, item));
-    },
-    async findById(id) {
-      const db = readData();
-      const list = db[collectionName] || [];
-      const found = list.find(item => item._id === id || item.id === id);
-      return found ? new MockModel(collectionName, found) : null;
-    },
-    async findByIdAndUpdate(id, update, options = {}) {
-      const db = readData();
-      const list = db[collectionName] || [];
-      const index = list.findIndex(item => item._id === id || item.id === id);
-      if (index >= 0) {
-        list[index] = { ...list[index], ...update };
-        writeData(db);
-        return new MockModel(collectionName, list[index]);
+      if ('$in' in qVal && Array.isArray(qVal.$in)) {
+        if (!qVal.$in.includes(iVal)) return false;
+        continue;
       }
-      return null;
-    },
-    async create(data) {
-      const instance = new MockModel(collectionName, data);
-      await instance.save();
-      return instance;
-    },
-    async countDocuments(query = {}) {
-      const db = readData();
-      const list = db[collectionName] || [];
-      return list.length;
+      if ('$regex' in qVal) {
+        const reg = new RegExp(qVal.$regex, qVal.$options || '');
+        if (!reg.test(String(iVal || ''))) return false;
+        continue;
+      }
     }
+
+    if (typeof qVal === 'string' && typeof iVal === 'string') {
+      if (qVal.toLowerCase() !== iVal.toLowerCase()) return false;
+    } else if (iVal !== qVal) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+const makeMockModel = (collectionName) => {
+  function Model(data = {}) {
+    return new MockModel(collectionName, data);
+  }
+  Model.findOne = async function(query = {}) {
+    const db = readData();
+    const list = db[collectionName] || [];
+    const found = list.find(item => matchesQuery(item, query));
+    if (!found && collectionName === 'availabilities') {
+      const defaultAvail = {
+        _id: 'default-avail',
+        workingDays: [1, 2, 3, 4, 5],
+        blockedDates: [],
+        blockedRanges: [],
+        startHour: '09:00',
+        endHour: '17:00',
+        breakStart: '13:00',
+        breakEnd: '14:00',
+        defaultDurationMinutes: 60,
+        permittedDurations: [30, 45, 60],
+        bufferMinutes: 15,
+        minAdvanceHours: 2,
+        maxAdvanceDays: 60,
+        maxAppointmentsPerDay: 8,
+        cancellationDeadlineHours: 24,
+        reschedulingDeadlineHours: 12,
+        holidays: []
+      };
+      db.availabilities = [defaultAvail];
+      writeData(db);
+      return new MockModel('availabilities', defaultAvail);
+    }
+    return found ? new MockModel(collectionName, found) : null;
   };
+  Model.find = async function(query = {}) {
+    const db = readData();
+    const list = db[collectionName] || [];
+    const filtered = list.filter(item => matchesQuery(item, query));
+    return filtered.map(item => new MockModel(collectionName, item));
+  };
+  Model.findById = async function(id) {
+    const db = readData();
+    const list = db[collectionName] || [];
+    const found = list.find(item => item._id === id || item.id === id);
+    return found ? new MockModel(collectionName, found) : null;
+  };
+  Model.findByIdAndUpdate = async function(id, update, options = {}) {
+    const db = readData();
+    const list = db[collectionName] || [];
+    const index = list.findIndex(item => item._id === id || item.id === id);
+    if (index >= 0) {
+      list[index] = { ...list[index], ...update };
+      writeData(db);
+      return new MockModel(collectionName, list[index]);
+    }
+    return null;
+  };
+  Model.create = async function(data) {
+    const instance = new MockModel(collectionName, data);
+    await instance.save();
+    return instance;
+  };
+  Model.countDocuments = async function(query = {}) {
+    const db = readData();
+    const list = db[collectionName] || [];
+    return list.length;
+  };
+  Model.deleteOne = async function(query = {}) {
+    const db = readData();
+    const list = db[collectionName] || [];
+    const idx = list.findIndex(item => matchesQuery(item, query));
+    if (idx >= 0) {
+      list.splice(idx, 1);
+      db[collectionName] = list;
+      writeData(db);
+      return { deletedCount: 1 };
+    }
+    return { deletedCount: 0 };
+  };
+  Model.deleteMany = async function(query = {}) {
+    const db = readData();
+    const list = db[collectionName] || [];
+    const remaining = list.filter(item => !matchesQuery(item, query));
+    const count = list.length - remaining.length;
+    db[collectionName] = remaining;
+    writeData(db);
+    return { deletedCount: count };
+  };
+  return Model;
 };
 
 function setupLocalDBFallback() {
@@ -742,12 +871,12 @@ async function initializeAvailability() {
 const mongoOptions = {
   maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '50', 10),
   minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || '10', 10),
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: process.env.NODE_ENV === 'test' ? 1500 : 5000,
   socketTimeoutMS: 45000,
   family: 4
 };
 
-if (process.env.MONGODB_URI) {
+if (process.env.MONGODB_URI && process.env.NODE_ENV !== 'test') {
   try {
     await mongoose.connect(process.env.MONGODB_URI, mongoOptions);
     console.log(`Successfully connected to MongoDB Atlas (Pool: min=${mongoOptions.minPoolSize}, max=${mongoOptions.maxPoolSize}).`);
@@ -900,6 +1029,9 @@ app.get('/api/health', (req, res) => {
       rssMb: Math.round(mem.rss / 1024 / 1024),
       heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024)
     },
+    timezone: 'Asia/Kolkata',
+    timeZoneOffset: '+05:30',
+    currentTimeIST: formatISTDateTimeWithZone(new Date()),
     timestamp: new Date().toISOString()
   });
 });
@@ -916,7 +1048,7 @@ app.get('/api/health/ready', (req, res) => {
 // =========================================================================
 const sendEmail = async ({ toEmail, toName, subject, htmlContent }) => {
   try {
-    if (!process.env.BREVO_API_KEY) {
+    if (!process.env.BREVO_API_KEY || process.env.NODE_ENV === 'test') {
       console.log(`[EMAIL SIMULATED] To: ${toEmail} | Subject: ${subject}`);
       return { success: true, simulated: true };
     }
@@ -1558,7 +1690,7 @@ app.post('/api/recordings/upload',
         clientEmail: (clientEmail || '').toLowerCase(),
         clientName: clientName || 'Client',
         counsellorEmail: actor.email,
-        title: title || `Clinical Session Audio - ${new Date().toLocaleDateString()}`,
+        title: title || `Clinical Session Audio - ${formatISTDate(new Date())}`,
         storageType,
         storageKey,
         s3Bucket: storageType === 's3' ? s3Bucket : undefined,
@@ -1870,7 +2002,7 @@ app.post('/api/clinical/mse',
         clientEmail: clientEmail.toLowerCase(),
         clientName,
         counsellorEmail: user.email,
-        date: date || new Date().toISOString().split('T')[0],
+        date: normalizeToISTDate(date || new Date()),
         appearanceAndBehavior,
         speechAndCommunication,
         moodAndAffect,
@@ -2391,7 +2523,15 @@ app.get('/api/appointments', async (req, res) => {
     // If an authenticated session exists, enforce RBAC filtering
     if (user) {
       const filtered = list.filter(apt => canAccessClientRecord(user, apt.clientEmail));
-      return res.json(filtered);
+      const formatted = filtered.map(apt => {
+        const item = apt.toObject ? apt.toObject() : apt;
+        return {
+          ...item,
+          date: normalizeToISTDate(item.date),
+          time: normalizeTo12HourTime(item.time)
+        };
+      });
+      return res.json(formatted);
     }
 
     // Public/booking query: only return non-sensitive date/time slots if unauthenticated
@@ -2399,38 +2539,139 @@ app.get('/api/appointments', async (req, res) => {
       return res.json([]);
     }
 
-    res.json(list);
+    const formattedList = list.map(apt => {
+      const item = apt.toObject ? apt.toObject() : apt;
+      return {
+        ...item,
+        date: normalizeToISTDate(item.date),
+        time: normalizeTo12HourTime(item.time)
+      };
+    });
+    res.json(formattedList);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 app.post('/api/appointments', bookingLimiter, async (req, res) => {
-  const { clientEmail, clientName, clientPhone, date, time, sessionMode, problemDescription } = req.body;
+  const { 
+    clientEmail, 
+    clientName, 
+    clientPhone, 
+    date, 
+    time, 
+    sessionMode, 
+    problemDescription,
+    durationMinutes,
+    bufferMinutes
+  } = req.body;
+
   try {
     if (!clientEmail || !clientName || !date || !time) {
       return res.status(400).json({ error: 'Client email, name, date, and time are required.' });
     }
 
-    // Prevent double-booking / slot conflicts
-    const conflict = await Appointment.findOne({
-      date,
-      time,
+    // 1. Authoritative Indian Standard Time (Asia/Kolkata) Normalization & Parsing
+    const normalizedDate = normalizeToISTDate(date);
+    const normalizedTime = normalizeTo12HourTime(time);
+    const durMins = Number(durationMinutes) || 60;
+    const bufMins = bufferMinutes !== undefined ? Number(bufferMinutes) : 15;
+    const appointmentUtc = parseISTDateTimeToUTC(normalizedDate, normalizedTime);
+
+    if (!appointmentUtc) {
+      return res.status(400).json({ error: 'Invalid appointment date or time specified.' });
+    }
+
+    // 2. Check Counsellor Availability & Blocked dates/ranges
+    let availConfig = await Availability.findOne();
+    if (!availConfig) {
+      availConfig = {
+        workingDays: [1, 2, 3, 4, 5],
+        blockedDates: [],
+        blockedRanges: [],
+        startHour: '09:00',
+        endHour: '17:00',
+        bufferMinutes: 15
+      };
+    }
+
+    // Check if date is in blockedDates
+    if (availConfig.blockedDates && availConfig.blockedDates.some(b => isSameISTDate(b, normalizedDate))) {
+      return res.status(409).json({ error: `Selected date (${normalizedDate}) is unavailable for consultations.` });
+    }
+
+    // Check partial day blocked ranges
+    if (availConfig.blockedRanges && Array.isArray(availConfig.blockedRanges)) {
+      for (const range of availConfig.blockedRanges) {
+        if (isSameISTDate(range.date, normalizedDate)) {
+          const rangeStartUtc = parseISTDateTimeToUTC(normalizedDate, range.startTime);
+          const rangeEndUtc = parseISTDateTimeToUTC(normalizedDate, range.endTime);
+          if (rangeStartUtc && rangeEndUtc) {
+            const reqStart = appointmentUtc.getTime();
+            const reqEnd = reqStart + durMins * 60 * 1000;
+            if (Math.max(reqStart, rangeStartUtc.getTime()) < Math.min(reqEnd, rangeEndUtc.getTime())) {
+              return res.status(409).json({ 
+                error: `The requested time window overlaps with a blocked period (${range.startTime} - ${range.endTime}): ${range.reason || 'Counsellor unavailable'}` 
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Prevent double-booking / slot conflicts using interval overlap & buffer checking
+    const activeAppointments = await Appointment.find({
       status: { $ne: 'Cancelled' }
     });
-    if (conflict) {
-      return res.status(409).json({ error: 'This consultation time slot is already booked. Please choose another time.' });
+
+    const newAptWindow = {
+      startUtc: appointmentUtc,
+      durationMinutes: durMins,
+      bufferMinutes: bufMins
+    };
+
+    for (const existing of activeAppointments) {
+      if (!isSameISTDate(existing.date, normalizedDate)) {
+        continue;
+      }
+      const existingUtc = existing.appointmentUtc || parseISTDateTimeToUTC(existing.date, existing.time);
+      if (existingUtc) {
+        const existingWindow = {
+          startUtc: existingUtc,
+          durationMinutes: existing.durationMinutes || 60,
+          bufferMinutes: existing.bufferMinutes !== undefined ? existing.bufferMinutes : 15
+        };
+        if (doAppointmentsOverlap(newAptWindow, existingWindow)) {
+          return res.status(409).json({ 
+            error: 'This consultation time slot is already booked or conflicts with the required buffer period. Please choose another time.' 
+          });
+        }
+      } else if (isSameISTDate(existing.date, normalizedDate) && normalizeTo12HourTime(existing.time) === normalizedTime) {
+        return res.status(409).json({ 
+          error: 'This consultation time slot is already booked. Please choose another time.' 
+        });
+      }
     }
 
     const newApt = await Appointment.create({
       clientEmail: clientEmail.toLowerCase().trim(),
       clientName: clientName.trim(),
       clientPhone: (clientPhone || '').trim(),
-      date,
-      time,
+      date: normalizedDate,
+      time: normalizedTime,
+      durationMinutes: durMins,
+      bufferMinutes: bufMins,
+      appointmentUtc: appointmentUtc,
       sessionMode: sessionMode || 'Online Video Consultation',
       problemDescription: problemDescription || '',
-      counsellorEmail: 'sabujd880@gmail.com'
+      status: 'Pending',
+      counsellorEmail: 'sabujd880@gmail.com',
+      history: [{
+        action: 'CREATED',
+        timestamp: new Date(),
+        performedBy: clientEmail.toLowerCase().trim(),
+        details: { date: normalizedDate, time: normalizedTime, durationMinutes: durMins, bufferMinutes: bufMins }
+      }]
     });
 
     // Notify Client via Brevo
@@ -2440,9 +2681,10 @@ app.post('/api/appointments', bookingLimiter, async (req, res) => {
         <p>Dear ${clientName},</p>
         <p>We have successfully received your session request. Your inquiry is currently pending therapist approval.</p>
         <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
-          <strong>Session Details:</strong><br/>
-          - <strong>Date</strong>: ${date}<br/>
-          - <strong>Time Slot</strong>: ${time}<br/>
+          <strong>Session Details (Indian Standard Time):</strong><br/>
+          - <strong>Date</strong>: ${normalizedDate} (DD-MM-YYYY)<br/>
+          - <strong>Time Slot</strong>: ${normalizedTime} (IST)<br/>
+          - <strong>Duration</strong>: ${durMins} minutes<br/>
           - <strong>Session Format</strong>: ${sessionMode}<br/>
         </div>
         <p>Mr. Das will review your slot request and you will receive a confirmation email shortly.</p>
@@ -2464,11 +2706,12 @@ app.post('/api/appointments', bookingLimiter, async (req, res) => {
         <p>Mr. Das,</p>
         <p>A new consultation inquiry has been submitted by a client:</p>
         <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
-          <strong>Inquiry Overview:</strong><br/>
+          <strong>Inquiry Overview (Indian Standard Time):</strong><br/>
           - <strong>Client Name</strong>: ${clientName}<br/>
           - <strong>Contact Email</strong>: ${clientEmail}<br/>
-          - <strong>Selected Date</strong>: ${date}<br/>
-          - <strong>Selected Time</strong>: ${time}<br/>
+          - <strong>Selected Date</strong>: ${normalizedDate} (DD-MM-YYYY)<br/>
+          - <strong>Selected Time</strong>: ${normalizedTime} (IST)<br/>
+          - <strong>Duration</strong>: ${durMins} minutes<br/>
           - <strong>Format Type</strong>: ${sessionMode}<br/>
           - <strong>Reason for Visit</strong>: ${problemDescription}
         </div>
@@ -2491,7 +2734,7 @@ app.post('/api/appointments', bookingLimiter, async (req, res) => {
 // 7. Update Appointment Status
 app.patch('/api/appointments/:id/status', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, cancellationReason, reason } = req.body;
   const user = req.session.user;
   try {
     const apt = await Appointment.findById(id);
@@ -2514,8 +2757,30 @@ app.patch('/api/appointments/:id/status', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Access denied: You are not authorized for this client.' });
     }
 
+    const cancelReason = cancellationReason || reason || '';
     apt.status = status;
+    if (status === 'Cancelled') {
+      apt.cancellationReason = cancelReason;
+    }
+
+    if (!Array.isArray(apt.history)) apt.history = [];
+    apt.history.push({
+      action: status === 'Cancelled' ? 'CANCELLED' : status === 'Confirmed' ? 'CONFIRMED' : `STATUS_${status.toUpperCase()}`,
+      timestamp: new Date(),
+      performedBy: user.email,
+      details: { status, reason: cancelReason }
+    });
+
     await apt.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: status === 'Cancelled' ? 'APPOINTMENT_CANCELLED' : 'APPOINTMENT_STATUS_UPDATED',
+      targetResource: `appointment:${apt._id || apt.id}`,
+      details: { clientEmail: apt.clientEmail, status, reason: cancelReason },
+      req
+    });
 
     const emailSubject = status === 'Confirmed'
       ? 'Booking Confirmation - Verdant Mind'
@@ -2533,11 +2798,176 @@ app.patch('/api/appointments/:id/status', requireAuth, async (req, res) => {
             : 'We regret to inform you that your upcoming consultation slot has been cancelled.'}
         </p>
         <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
-          <strong>Session Details:</strong><br/>
-          - <strong>Date</strong>: ${apt.date}<br/>
-          - <strong>Time</strong>: ${apt.time}<br/>
+          <strong>Session Details (Indian Standard Time):</strong><br/>
+          - <strong>Date</strong>: ${apt.date} (DD-MM-YYYY)<br/>
+          - <strong>Time</strong>: ${apt.time} (IST)<br/>
           - <strong>Format</strong>: ${apt.sessionMode}<br/>
           - <strong>Status</strong>: <strong style="color: ${status === 'Confirmed' ? '#4A8C70' : '#C95D5D'}">${status.toUpperCase()}</strong>
+          ${status === 'Cancelled' && cancelReason ? `<br/>- <strong>Reason</strong>: ${cancelReason}` : ''}
+        </div>
+      </div>
+    `;
+
+    await sendEmail({
+      toEmail: apt.clientEmail,
+      toName: apt.clientName,
+      subject: emailSubject,
+      htmlContent: emailHtml
+    });
+
+    res.json(apt);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 7b. Reschedule Appointment Endpoint
+app.patch('/api/appointments/:id/reschedule', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { date, time, durationMinutes, reason } = req.body;
+  const user = req.session.user;
+
+  try {
+    if (!date || !time) {
+      return res.status(400).json({ error: 'New date and time are required to reschedule.' });
+    }
+
+    const apt = await Appointment.findById(id);
+    if (!apt) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+
+    const isStaff = ['Super Admin', 'Administrator', 'Counsellor', 'Viewer', 'provider'].includes(user.role);
+    const isOwnerClient = user.role === 'client' && user.email.toLowerCase() === apt.clientEmail.toLowerCase();
+
+    if (!isStaff && !isOwnerClient) {
+      return res.status(403).json({ error: 'Access denied: You are not authorized to reschedule this appointment.' });
+    }
+
+    if (isStaff && !canAccessClientRecord(user, apt.clientEmail)) {
+      return res.status(403).json({ error: 'Access denied: You are not authorized for this client.' });
+    }
+
+    // Authoritative Indian Standard Time Normalization
+    const normalizedDate = normalizeToISTDate(date);
+    const normalizedTime = normalizeTo12HourTime(time);
+    const durMins = Number(durationMinutes) || apt.durationMinutes || 60;
+    const bufMins = apt.bufferMinutes !== undefined ? apt.bufferMinutes : 15;
+    const newAppointmentUtc = parseISTDateTimeToUTC(normalizedDate, normalizedTime);
+
+    if (!newAppointmentUtc) {
+      return res.status(400).json({ error: 'Invalid new date or time specified.' });
+    }
+
+    // Check availability / blocked dates
+    const availConfig = await Availability.findOne();
+    if (availConfig && availConfig.blockedDates && availConfig.blockedDates.some(b => isSameISTDate(b, normalizedDate))) {
+      return res.status(409).json({ error: `Selected date (${normalizedDate}) is marked as unavailable.` });
+    }
+
+    // Check overlap with other active appointments
+    const activeAppointments = await Appointment.find({
+      status: { $ne: 'Cancelled' }
+    });
+
+    const newAptWindow = {
+      startUtc: newAppointmentUtc,
+      durationMinutes: durMins,
+      bufferMinutes: bufMins
+    };
+
+    for (const existing of activeAppointments) {
+      const existingId = existing._id ? String(existing._id) : String(existing.id);
+      const targetId = apt._id ? String(apt._id) : String(apt.id);
+      if (existingId === targetId) continue; // Skip the appointment being rescheduled
+
+      if (!isSameISTDate(existing.date, normalizedDate)) {
+        continue;
+      }
+
+      const existingUtc = existing.appointmentUtc || parseISTDateTimeToUTC(existing.date, existing.time);
+      if (existingUtc) {
+        const existingWindow = {
+          startUtc: existingUtc,
+          durationMinutes: existing.durationMinutes || 60,
+          bufferMinutes: existing.bufferMinutes !== undefined ? existing.bufferMinutes : 15
+        };
+        if (doAppointmentsOverlap(newAptWindow, existingWindow)) {
+          return res.status(409).json({ 
+            error: 'The requested rescheduled slot conflicts with an existing appointment or buffer window. Please select another slot.' 
+          });
+        }
+      } else if (isSameISTDate(existing.date, normalizedDate) && normalizeTo12HourTime(existing.time) === normalizedTime) {
+        return res.status(409).json({ 
+          error: 'The requested rescheduled slot is already booked. Please select another slot.' 
+        });
+      }
+    }
+
+    // Preserve previous slot in rescheduledFrom and history audit trail
+    const previousDate = apt.date;
+    const previousTime = apt.time;
+
+    apt.rescheduledFrom = {
+      date: previousDate,
+      time: previousTime,
+      rescheduledAt: new Date(),
+      rescheduledBy: user.email
+    };
+
+    if (!Array.isArray(apt.history)) apt.history = [];
+    apt.history.push({
+      action: 'RESCHEDULED',
+      timestamp: new Date(),
+      performedBy: user.email,
+      details: {
+        from: { date: previousDate, time: previousTime },
+        to: { date: normalizedDate, time: normalizedTime },
+        reason: reason || ''
+      }
+    });
+
+    apt.date = normalizedDate;
+    apt.time = normalizedTime;
+    apt.appointmentUtc = newAppointmentUtc;
+    apt.durationMinutes = durMins;
+    apt.bufferMinutes = bufMins;
+    apt.status = isStaff ? 'Confirmed' : 'Pending';
+
+    await apt.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'APPOINTMENT_RESCHEDULED',
+      targetResource: `appointment:${apt._id || apt.id}`,
+      details: {
+        clientEmail: apt.clientEmail,
+        previousDate,
+        previousTime,
+        newDate: normalizedDate,
+        newTime: normalizedTime,
+        reason: reason || ''
+      },
+      req
+    });
+
+    // Notify Client via Brevo
+    const emailSubject = 'Consultation Rescheduled - Verdant Mind';
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+        <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Session Rescheduled</h2>
+        <p>Dear ${apt.clientName},</p>
+        <p>Your consultation session has been successfully rescheduled.</p>
+        <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
+          <strong>Updated Appointment (Indian Standard Time):</strong><br/>
+          - <strong>New Date</strong>: ${normalizedDate} (DD-MM-YYYY)<br/>
+          - <strong>New Time</strong>: ${normalizedTime} (IST)<br/>
+          - <strong>Duration</strong>: ${durMins} minutes<br/>
+          - <strong>Previous Slot</strong>: ${previousDate} at ${previousTime}<br/>
+          - <strong>Format</strong>: ${apt.sessionMode}<br/>
+          - <strong>Status</strong>: <strong>${apt.status.toUpperCase()}</strong>
+          ${reason ? `<br/>- <strong>Reason</strong>: ${reason}` : ''}
         </div>
       </div>
     `;
@@ -2612,7 +3042,7 @@ app.post('/api/messages', bookingLimiter, async (req, res) => {
   const { senderName, senderEmail, subject, message } = req.body;
   try {
     const newMsg = await Message.create({
-      senderName, senderEmail, subject, message
+      senderName, senderEmail, subject, message, status: 'unread', replies: []
     });
 
     const alertHtml = `
@@ -2720,10 +3150,17 @@ app.get('/api/documents', requireAuth, async (req, res) => {
       query.clientEmail = clientEmail.toLowerCase();
     }
     const list = await CareDocument.find(query);
+    const formatDocs = (docs) => docs.map(d => {
+      const item = d.toObject ? d.toObject() : d;
+      return {
+        ...item,
+        date: normalizeToISTDate(item.date || item.createdAt)
+      };
+    });
 
     if (user.role === 'client') {
       const filtered = list.filter(doc => doc.clientEmail.toLowerCase() === user.email.toLowerCase());
-      return res.json(filtered);
+      return res.json(formatDocs(filtered));
     }
 
     const isStaff = ['Super Admin', 'Administrator', 'Counsellor', 'Viewer', 'provider'].includes(user.role);
@@ -2732,7 +3169,7 @@ app.get('/api/documents', requireAuth, async (req, res) => {
     }
 
     const filtered = list.filter(doc => canAccessClientRecord(user, doc.clientEmail));
-    return res.json(filtered);
+    return res.json(formatDocs(filtered));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2745,11 +3182,12 @@ app.post('/api/documents', requireAuth, requireRole(['Super Admin', 'Administrat
     if (!canAccessClientRecord(user, clientEmail)) {
       return res.status(403).json({ error: 'Access denied: You are not authorized for this client.' });
     }
+    const normalizedDate = normalizeToISTDate(date || new Date());
     const newDoc = await CareDocument.create({
       clientEmail: clientEmail.toLowerCase().trim(),
       clientName,
       type,
-      date,
+      date: normalizedDate,
       data,
       counsellorEmail: user.email || 'sabujd880@gmail.com'
     });
@@ -2810,7 +3248,11 @@ app.post('/api/documents', requireAuth, requireRole(['Super Admin', 'Administrat
 // 13. Availability endpoints
 app.get('/api/availability', async (req, res) => {
   try {
-    const config = await Availability.findOne();
+    let config = await Availability.findOne();
+    if (!config) {
+      config = new Availability();
+      await config.save();
+    }
     res.json(config);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2818,17 +3260,103 @@ app.get('/api/availability', async (req, res) => {
 });
 
 app.put('/api/availability', requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor']), async (req, res) => {
-  const { workingDays, blockedDates, startHour, endHour } = req.body;
+  const { workingDays, blockedDates, blockedRanges, startHour, endHour, breakStart, breakEnd, bufferMinutes, defaultDurationMinutes } = req.body;
   try {
     let config = await Availability.findOne();
     if (!config) {
       config = new Availability();
     }
-    config.workingDays = workingDays;
-    config.blockedDates = blockedDates;
-    config.startHour = startHour;
-    config.endHour = endHour;
+    if (workingDays !== undefined) config.workingDays = workingDays;
+    if (blockedDates !== undefined) config.blockedDates = blockedDates.map(d => normalizeToISTDate(d));
+    if (blockedRanges !== undefined) config.blockedRanges = blockedRanges;
+    if (startHour !== undefined) config.startHour = startHour;
+    if (endHour !== undefined) config.endHour = endHour;
+    if (breakStart !== undefined) config.breakStart = breakStart;
+    if (breakEnd !== undefined) config.breakEnd = breakEnd;
+    if (bufferMinutes !== undefined) config.bufferMinutes = Number(bufferMinutes);
+    if (defaultDurationMinutes !== undefined) config.defaultDurationMinutes = Number(defaultDurationMinutes);
     await config.save();
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 13b. Admin Practice Scheduling & Governance Endpoints
+app.get('/api/admin/scheduling-config', requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor']), async (req, res) => {
+  try {
+    let config = await Availability.findOne();
+    if (!config) {
+      config = new Availability();
+      await config.save();
+    }
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/scheduling-config', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const user = req.session.user;
+  const {
+    workingDays,
+    blockedDates,
+    blockedRanges,
+    startHour,
+    endHour,
+    breakStart,
+    breakEnd,
+    defaultDurationMinutes,
+    permittedDurations,
+    bufferMinutes,
+    minAdvanceHours,
+    maxAdvanceDays,
+    maxAppointmentsPerDay,
+    cancellationDeadlineHours,
+    reschedulingDeadlineHours,
+    holidays
+  } = req.body;
+
+  try {
+    let config = await Availability.findOne();
+    if (!config) {
+      config = new Availability();
+    }
+
+    if (workingDays !== undefined) config.workingDays = workingDays;
+    if (blockedDates !== undefined) config.blockedDates = blockedDates.map(d => normalizeToISTDate(d));
+    if (blockedRanges !== undefined) config.blockedRanges = blockedRanges;
+    if (startHour !== undefined) config.startHour = startHour;
+    if (endHour !== undefined) config.endHour = endHour;
+    if (breakStart !== undefined) config.breakStart = breakStart;
+    if (breakEnd !== undefined) config.breakEnd = breakEnd;
+    if (defaultDurationMinutes !== undefined) config.defaultDurationMinutes = Number(defaultDurationMinutes);
+    if (permittedDurations !== undefined) config.permittedDurations = permittedDurations;
+    if (bufferMinutes !== undefined) config.bufferMinutes = Number(bufferMinutes);
+    if (minAdvanceHours !== undefined) config.minAdvanceHours = Number(minAdvanceHours);
+    if (maxAdvanceDays !== undefined) config.maxAdvanceDays = Number(maxAdvanceDays);
+    if (maxAppointmentsPerDay !== undefined) config.maxAppointmentsPerDay = Number(maxAppointmentsPerDay);
+    if (cancellationDeadlineHours !== undefined) config.cancellationDeadlineHours = Number(cancellationDeadlineHours);
+    if (reschedulingDeadlineHours !== undefined) config.reschedulingDeadlineHours = Number(reschedulingDeadlineHours);
+    if (holidays !== undefined) config.holidays = holidays;
+
+    await config.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'SCHEDULING_CONFIG_UPDATED',
+      targetResource: 'practice:scheduling_governance',
+      details: {
+        workingDays: config.workingDays,
+        startHour: config.startHour,
+        endHour: config.endHour,
+        bufferMinutes: config.bufferMinutes,
+        defaultDurationMinutes: config.defaultDurationMinutes
+      },
+      req
+    });
+
     res.json(config);
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -100,3 +100,4 @@ A production dependency scan (`npm audit --omit=dev`) confirms:
    - Generated Service Worker and PWA manifest: Verified.
 3. **Automated Test Suite (`node tests/run_tests.js`):**
    - Result: **41 PASSED, 0 FAILED**.
+

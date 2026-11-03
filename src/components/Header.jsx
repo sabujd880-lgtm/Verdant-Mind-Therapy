@@ -1,5 +1,6 @@
 import React from 'react';
 import { Brain, User, ShieldAlert, LogIn, LogOut } from 'lucide-react';
+import LiveISTClock from './LiveISTClock';
 
 export default function Header({ 
   currentUser, 
@@ -41,15 +42,18 @@ export default function Header({
   return (
     <header className="header-wrapper">
       <div className="container header-container">
-        {/* Brand Logo */}
-        <div className="logo-section" style={{ cursor: 'pointer' }} onClick={() => handleNavClick('hero')}>
-          <div className="logo-icon">
-            <Brain size={20} />
+        {/* Brand Logo & Live IST Application Clock */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+          <div className="logo-section" style={{ cursor: 'pointer' }} onClick={() => handleNavClick('hero')}>
+            <div className="logo-icon">
+              <Brain size={20} />
+            </div>
+            <div className="logo-text">
+              <h1>Verdant Mind</h1>
+              <p>Clinical Psychology & Counselling Portal</p>
+            </div>
           </div>
-          <div className="logo-text">
-            <h1>Verdant Mind</h1>
-            <p>Clinical Psychology & Counselling Portal</p>
-          </div>
+          <LiveISTClock />
         </div>
 
         {/* Navigation & Mode Switcher */}

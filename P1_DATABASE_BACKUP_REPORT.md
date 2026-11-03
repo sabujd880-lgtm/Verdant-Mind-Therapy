@@ -56,3 +56,4 @@ Cleaned up test sandbox database.
 ```
 
 - **Safety Guarantee:** Restoration was executed strictly against an isolated sandbox database (`test_counselling_restore_sandbox`). The live production database was **not** modified.
+

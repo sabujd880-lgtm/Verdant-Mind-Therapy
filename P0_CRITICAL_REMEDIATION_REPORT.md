@@ -178,3 +178,4 @@ In production, CORS requests from origins not explicitly enumerated in `allowedO
 | **Session** | Default/weak `SESSION_SECRET` | `server.js` (lines 146-149) | Test 31 | **PASSED** (Exit 1 enforced) |
 | **CORS** | Permissive origin reflection | `server.js` (lines 75-85) | Production CORS guard | **PASSED** (Rejects untrusted) |
 | **OAuth** | `dev_mock_code` usable in prod | `server.js` (line 922) | Test 33 | **PASSED** (Prod guard enforced) |
+

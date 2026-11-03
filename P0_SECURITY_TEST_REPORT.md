@@ -109,3 +109,4 @@ COVERAGE: Authentication, RBAC, Admin Console, Caseload IDOR, Audio Storage,
 
 1. **MongoDB Atlas Password Rotation:** The password previously committed in commit `a93739c` must be rotated in the MongoDB Atlas Console.
 2. **AWS Secrets Manager Deployment:** In the production environment (AWS Mumbai `ap-south-1`), set `AWS_SECRET_NAME=counselling/production/secrets` to inject all production variables dynamically at container initialization.
+

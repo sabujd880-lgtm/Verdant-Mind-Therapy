@@ -92,3 +92,4 @@ The database layer consists of 10 Mongoose schemas optimized for query performan
    - Script: `scripts/backup-db.js`.
    - Creates timestamped, gzip-compressed mongodumps (`backups/dump_*.gz`).
    - Backup retention policy: 30 days retention with automated prune.
+

@@ -46,3 +46,4 @@ A comprehensive rate-limiting architecture was implemented to protect critical e
 
 - **Test 25 in `tests/run_tests.js`:** Verified that AI limiters and booking limiters return HTTP 429 and emit proper standard headers when quotas are exceeded.
 - **Result:** **PASSED**.
+

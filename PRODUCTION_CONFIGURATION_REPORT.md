@@ -63,3 +63,4 @@ Verdant Mind is deployed across a secure, low-latency multicloud topology:
    - Returns HTTP 200 when ready to accept traffic; returns 503 during startup or connection interruptions.
 3. **Docker Container Probe:**
    - Evaluates `wget --spider http://localhost:5000/api/health` every 30 seconds with 3 retries.
+
