@@ -81,14 +81,15 @@ export default function BookingEngine({ currentUser, availability, appointments,
     const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 1 is Monday...
     
     // Check if therapist works on this weekday
-    if (!availability.workingDays.includes(dayOfWeek)) {
+    const workingDays = availability?.workingDays || [1, 2, 3, 4, 5];
+    if (!workingDays.includes(dayOfWeek)) {
       return true;
     }
     
     // Check if date is in the blocked dates list (supporting DD-MM-YYYY and legacy YYYY-MM-DD)
     const formattedDate = formatDateString(year, month, day);
     const legacyYmd = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const blockedList = availability.blockedDates || [];
+    const blockedList = availability?.blockedDates || [];
     if (
       blockedList.some(b => isSameISTDate(b, formattedDate) || b === formattedDate || b === legacyYmd)
     ) {
@@ -96,15 +97,16 @@ export default function BookingEngine({ currentUser, availability, appointments,
     }
 
     // Check if date is in designated practice holidays
-    const holidaysList = availability.holidays || [];
+    const holidaysList = availability?.holidays || [];
     if (holidaysList.some(h => isSameISTDate(h.date || h, formattedDate))) {
       return true;
     }
 
     // Check maximum advance booking horizon
-    const maxDays = availability.maxAdvanceDays || 60;
-    const maxDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
-    if (checkDate > maxDate) {
+    const maxDays = availability?.maxAdvanceDays || 60;
+    const now = new Date();
+    const maxDate = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
+    if (dateObj > maxDate) {
       return true;
     }
     
@@ -113,7 +115,7 @@ export default function BookingEngine({ currentUser, availability, appointments,
 
   // Generate Slots dynamically based on start and end hour settings in 12-hour AM/PM format
   const generateTimeSlots = () => {
-    if (!availability.startHour || !availability.endHour) return [];
+    if (!availability?.startHour || !availability?.endHour) return [];
     
     const startHourNum = parseInt(availability.startHour.split(':')[0], 10);
     const endHourNum = parseInt(availability.endHour.split(':')[0], 10);
