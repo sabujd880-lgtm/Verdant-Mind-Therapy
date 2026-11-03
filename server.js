@@ -463,7 +463,7 @@ const appointmentSchema = new mongoose.Schema({
   time: { type: String, required: true },
   durationMinutes: { type: Number, default: 60 },
   bufferMinutes: { type: Number, default: 15 },
-  appointmentUtc: { type: Date, index: true },
+  appointmentUtc: { type: Date },
   sessionMode: { type: String, required: true },
   problemDescription: { type: String, required: true },
   status: { type: String, default: 'Pending' }, // 'Pending' | 'Confirmed' | 'Cancelled' | 'Rescheduled'
