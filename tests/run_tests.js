@@ -332,13 +332,29 @@ async function run() {
     assert.ok(logs.length > 0);
   });
 
-  // Test 16: Google OAuth initiation route
+  // Test 16: Google OAuth initiation route & CSRF verification
   await test('GET /api/auth/google initiates OAuth or developer mock flow', async () => {
     const res = await fetch(`${BASE_URL}/api/auth/google`, { redirect: 'manual' });
     // Should return 302 redirect
     assert.strictEqual(res.status, 302);
     const loc = res.headers.get('location');
     assert.ok(loc, 'Expected location header on redirect');
+    
+    // Verify parameters when pointing to Google OAuth endpoint
+    if (loc.startsWith('https://accounts.google.com/o/oauth2/v2/auth')) {
+      const parsedUrl = new URL(loc);
+      assert.ok(parsedUrl.searchParams.get('client_id'), 'client_id must be present');
+      assert.ok(parsedUrl.searchParams.get('redirect_uri'), 'redirect_uri must be present');
+      assert.strictEqual(parsedUrl.searchParams.get('response_type'), 'code');
+      assert.ok(parsedUrl.searchParams.get('state'), 'state must be generated for CSRF protection');
+      assert.ok(!parsedUrl.searchParams.get('redirect_uri').includes('127.0.0.1'), 'redirect_uri must use localhost or public domain, never raw 127.0.0.1');
+    }
+
+    // Verify callback rejects CSRF mismatch
+    const badStateRes = await fetch(`${BASE_URL}/api/auth/google/callback?code=test_code&state=invalid_csrf_state`, { redirect: 'manual' });
+    assert.strictEqual(badStateRes.status, 302);
+    const badStateLoc = badStateRes.headers.get('location') || '';
+    assert.ok(badStateLoc.includes('auth_error=csrf_validation_failed'), 'Mismatched CSRF state must be rejected');
   });
 
   // Test 17: Logout terminates session

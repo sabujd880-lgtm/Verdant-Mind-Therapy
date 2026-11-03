@@ -1134,7 +1134,13 @@ const sendEmail = async ({ toEmail, toName, subject, htmlContent }) => {
 // 1. Initiate Google OAuth 2.0 Server-Side Flow
 app.get('/api/auth/google', (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
-  const callbackUrl = process.env.GOOGLE_CALLBACK_URL || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+  
+  // Resolve authoritative callback URL (strictly avoiding raw 127.0.0.1 which Google OAuth prohibits)
+  let callbackUrl = process.env.GOOGLE_CALLBACK_URL;
+  if (!callbackUrl) {
+    const host = (req.get('host') || 'localhost:5000').replace(/^127\.0\.0\.1/, 'localhost');
+    callbackUrl = `${req.protocol}://${host}/api/auth/google/callback`;
+  }
 
   // Cryptographic random state parameter for CSRF mitigation
   const state = crypto.randomBytes(24).toString('hex');
@@ -1145,7 +1151,7 @@ app.get('/api/auth/google', (req, res) => {
     // If running in development without credentials, provide developer mock login flow option
     if (!isProd) {
       const mockStateUrl = `/api/auth/google/callback?code=dev_mock_code&state=${state}`;
-      return res.redirect(mockStateUrl);
+      return req.session.save(() => res.redirect(mockStateUrl));
     }
     return res.status(500).json({ 
       error: 'Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' 
@@ -1154,7 +1160,11 @@ app.get('/api/auth/google', (req, res) => {
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(process.env.GOOGLE_CLIENT_ID)}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&state=${state}&access_type=online&prompt=select_account`;
   
-  res.redirect(googleAuthUrl);
+  // Explicitly persist session state before sending 302 redirect to ensure CSRF token is saved
+  req.session.save((err) => {
+    if (err) console.error('Failed to save session prior to Google OAuth redirect:', err);
+    res.redirect(googleAuthUrl);
+  });
 });
 
 // 2. Google OAuth 2.0 Authorization Callback
@@ -1188,7 +1198,11 @@ app.get('/api/auth/google/callback', async (req, res) => {
         email_verified: true
       };
     } else {
-      const callbackUrl = process.env.GOOGLE_CALLBACK_URL || `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+      let callbackUrl = process.env.GOOGLE_CALLBACK_URL;
+      if (!callbackUrl) {
+        const host = (req.get('host') || 'localhost:5000').replace(/^127\.0\.0\.1/, 'localhost');
+        callbackUrl = `${req.protocol}://${host}/api/auth/google/callback`;
+      }
 
       // Token Exchange
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
