@@ -325,6 +325,11 @@ export default function AuthPortal({ onLogin, onRegister, onClose, initialStatus
 
         {/* Form Title Headers */}
         <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', overflow: 'hidden', padding: 0, border: '2px solid rgba(42, 71, 62, 0.15)', boxShadow: '0 4px 12px rgba(42, 71, 62, 0.08)' }}>
+              <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+          </div>
           <h3 style={{ fontSize: '1.35rem', color: 'var(--color-slate-dark)', fontWeight: 700 }}>
             {authMode === 'client-login' && 'Sign In to Client Portal'}
             {authMode === 'provider-login' && 'Staff & Practitioner Sign In'}

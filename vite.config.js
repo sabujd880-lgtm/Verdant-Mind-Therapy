@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt', // Prompt user to reload on updates
-      includeAssets: ['favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'icons.svg'],
+      includeAssets: ['favicon.ico', 'favicon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'icons.svg'],
       manifest: {
         name: 'Verdant Mind',
         short_name: 'Verdant Mind',

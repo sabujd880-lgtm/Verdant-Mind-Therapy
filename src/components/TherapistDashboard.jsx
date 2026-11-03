@@ -368,11 +368,16 @@ export default function TherapistDashboard({
       
       {/* Title & Tab switch */}
       <div className="dashboard-title-row">
-        <div>
-          <h2>Therapist Control Panel</h2>
-          <p style={{ color: 'var(--color-slate-light)' }}>
-            Welcome back, Sabuj Das. Manage your schedule, view inbox messages, compile clinical reports, and manage shift hours.
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid rgba(42, 71, 62, 0.15)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          <div>
+            <h2>Therapist Control Panel</h2>
+            <p style={{ color: 'var(--color-slate-light)' }}>
+              Welcome back, Sabuj Das. Manage your schedule, view inbox messages, compile clinical reports, and manage shift hours.
+            </p>
+          </div>
         </div>
         
         <div className="dashboard-tabs">

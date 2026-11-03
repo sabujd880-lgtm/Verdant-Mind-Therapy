@@ -191,8 +191,10 @@ export default function AIBotWidget() {
         >
           {/* Header */}
           <div style={{ padding: '1rem 1.25rem', background: 'var(--color-slate)', color: 'var(--color-white)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Bot size={20} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <div style={{ width: '26px', height: '26px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.4)' }}>
+                <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
               <div>
                 <h4 style={{ fontSize: '0.9rem', margin: 0, fontWeight: 600, color: '#FFF' }}>Aura - Assistant</h4>
                 <span style={{ fontSize: '0.68rem', opacity: 0.85, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -235,7 +237,7 @@ export default function AIBotWidget() {
                       flexShrink: 0
                     }}
                   >
-                    {isBot ? <Bot size={14} /> : <User size={14} />}
+                    {isBot ? <img src="/pwa-192x192.png" alt="Aura Logo" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <User size={14} />}
                   </div>
 
                   <div 

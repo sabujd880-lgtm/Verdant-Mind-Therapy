@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, User, ShieldAlert, LogIn, LogOut } from 'lucide-react';
+import { User, ShieldAlert, LogIn, LogOut } from 'lucide-react';
 import LiveISTClock from './LiveISTClock';
 
 export default function Header({ 
@@ -45,8 +45,8 @@ export default function Header({
         {/* Brand Logo & Live IST Application Clock */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
           <div className="logo-section" style={{ cursor: 'pointer' }} onClick={() => handleNavClick('hero')}>
-            <div className="logo-icon">
-              <Brain size={20} />
+            <div className="logo-icon" style={{ overflow: 'hidden', padding: 0, border: '2px solid rgba(42, 71, 62, 0.2)' }}>
+              <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
             </div>
             <div className="logo-text">
               <h1>Verdant Mind</h1>

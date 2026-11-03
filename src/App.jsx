@@ -6,7 +6,7 @@ import TherapistDashboard from './components/TherapistDashboard';
 import AuthPortal from './components/AuthPortal';
 import ClientPortal from './components/ClientPortal';
 import { INITIAL_PROFILE } from './mockData';
-import { Brain, Mail, Phone, MapPin, Clock } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import ReloadPrompt from './components/ReloadPrompt';
 
 function App() {
@@ -583,7 +583,7 @@ function App() {
           {/* Brand Info */}
           <div className="footer-brand">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <Brain size={20} fill="var(--color-terracotta)" color="var(--color-terracotta)" />
+              <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
               <h3 style={{ margin: 0 }}>Verdant Mind</h3>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-terracotta)', fontWeight: 600, marginBottom: '0.75rem' }}>

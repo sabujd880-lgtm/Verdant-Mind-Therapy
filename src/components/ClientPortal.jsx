@@ -86,10 +86,15 @@ export default function ClientPortal({
       
       {/* Title / User Greeting header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', borderBottom: '1px solid rgba(42,71,62,0.1)', paddingBottom: '1.5rem' }}>
-        <div>
-          <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-terracotta)', fontWeight: 600 }}>Secure Account Portal</span>
-          <h2 style={{ fontSize: '1.8rem', color: 'var(--color-slate-dark)', marginTop: '0.2rem' }}>Welcome back, {currentUser.name}</h2>
-          <p style={{ fontSize: '0.88rem', color: 'var(--color-slate-light)' }}>View your upcoming therapeutic plan, past invoices, and message your psychologist.</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid rgba(42, 71, 62, 0.15)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-terracotta)', fontWeight: 600 }}>Secure Account Portal</span>
+            <h2 style={{ fontSize: '1.8rem', color: 'var(--color-slate-dark)', marginTop: '0.2rem' }}>Welcome back, {currentUser.name}</h2>
+            <p style={{ fontSize: '0.88rem', color: 'var(--color-slate-light)' }}>View your upcoming therapeutic plan, past invoices, and message your psychologist.</p>
+          </div>
         </div>
         
         <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(42,71,62,0.05)', padding: '0.25rem', borderRadius: 'var(--radius-sm)' }}>
