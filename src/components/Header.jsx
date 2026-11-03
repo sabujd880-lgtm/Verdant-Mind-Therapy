@@ -83,17 +83,40 @@ export default function Header({
           )}
 
           {/* User authentication actions and role routing toggles */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             {!currentUser ? (
-              /* Signed Out -> Render simple Sign In CTA */
-              <button
-                type="button"
-                className="premium-btn"
-                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
-                onClick={onOpenAuth}
-              >
-                <LogIn size={14} /> Sign In
-              </button>
+              /* Signed Out -> Render direct Staff/Admin button and Client Sign In */
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.42rem 0.85rem',
+                    borderRadius: 'var(--radius-pill)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: 'rgba(128, 80, 232, 0.08)',
+                    color: '#8050E8',
+                    border: '1px solid rgba(128, 80, 232, 0.28)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onClick={() => onOpenAuth('provider-login')}
+                  title="Staff, Counsellor & Practice Administration Sign In"
+                >
+                  <ShieldAlert size={14} /> Staff / Admin
+                </button>
+                <button
+                  type="button"
+                  className="premium-btn"
+                  style={{ padding: '0.45rem 1.15rem', fontSize: '0.82rem' }}
+                  onClick={() => onOpenAuth('client-login')}
+                >
+                  <LogIn size={14} /> Sign In
+                </button>
+              </div>
             ) : (
               /* Authenticated States */
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

@@ -1,9 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { User, ShieldAlert, LogIn, Mail, Lock, UserPlus, Phone, KeyRound, ArrowLeft, AlertCircle, Clock, ShieldX } from 'lucide-react';
 
-export default function AuthPortal({ onLogin, onRegister, onClose, initialStatus = '', initialError = '' }) {
+export default function AuthPortal({ 
+  onLogin, 
+  onRegister, 
+  onClose, 
+  initialMode = 'client-login',
+  initialStatus = '', 
+  initialError = '' 
+}) {
   // Modes: 'client-login' | 'provider-login' | 'client-register' | 'client-verify-otp' | 'client-forgot-password' | 'client-reset-password'
-  const [authMode, setAuthMode] = useState('client-login');
+  const [authMode, setAuthMode] = useState(initialMode);
+
+  useEffect(() => {
+    if (initialMode) {
+      setAuthMode(initialMode);
+    }
+  }, [initialMode]);
   
   // Login Form States
   const [loginEmail, setLoginEmail] = useState('');

@@ -14,8 +14,16 @@ function App() {
   const [activeSection, setActiveSection] = useState('hero');
   const [profile] = useState(INITIAL_PROFILE);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authInitialMode, setAuthInitialMode] = useState('client-login');
   const [initialAuthStatus, setInitialAuthStatus] = useState('');
   const [initialAuthError, setInitialAuthError] = useState('');
+
+  const handleOpenAuth = (mode = 'client-login') => {
+    setInitialAuthStatus('');
+    setInitialAuthError('');
+    setAuthInitialMode(mode);
+    setAuthOpen(true);
+  };
 
   // Authentication State
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
@@ -75,6 +83,10 @@ function App() {
           }
         })
         .catch(() => {});
+
+      if (window.location.hash === '#admin' || window.location.search.includes('admin')) {
+        handleOpenAuth('provider-login');
+      }
     }
   }, []);
 
@@ -419,11 +431,7 @@ function App() {
       {/* Shared Nav Header */}
       <Header 
         currentUser={currentUser}
-        onOpenAuth={() => {
-          setInitialAuthStatus('');
-          setInitialAuthError('');
-          setAuthOpen(true);
-        }}
+        onOpenAuth={handleOpenAuth}
         onSignOut={handleSignOut}
         activeView={activeView} 
         setActiveView={setActiveView} 
@@ -490,6 +498,7 @@ function App() {
             setInitialAuthStatus('');
             setInitialAuthError('');
           }}
+          initialMode={authInitialMode}
           initialStatus={initialAuthStatus}
           initialError={initialAuthError}
         />
@@ -601,7 +610,7 @@ function App() {
               <li><a href="#hero" onClick={(e) => { e.preventDefault(); setActiveView('client'); setActiveSection('hero'); }}>Overview</a></li>
               <li><a href="#specializations" onClick={(e) => { e.preventDefault(); setActiveView('client'); setActiveSection('specializations'); }}>Specializations</a></li>
               <li><a href="#booking" onClick={(e) => { e.preventDefault(); setActiveView('client'); setActiveSection('booking'); }}>Book Consultation</a></li>
-              <li><a href="#portal" onClick={(e) => { e.preventDefault(); if (currentUser) { setActiveView(isStaff ? 'therapist' : 'client-portal'); } else { setAuthOpen(true); } }}>Staff & Client Portal</a></li>
+              <li><a href="#admin" onClick={(e) => { e.preventDefault(); if (currentUser && isStaff) { setActiveView('therapist'); } else { handleOpenAuth('provider-login'); } }}>Admin & Staff Portal</a></li>
             </ul>
           </div>
 
