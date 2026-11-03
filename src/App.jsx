@@ -6,7 +6,7 @@ import TherapistDashboard from './components/TherapistDashboard';
 import AuthPortal from './components/AuthPortal';
 import ClientPortal from './components/ClientPortal';
 import { INITIAL_PROFILE } from './mockData';
-import { Brain, Mail, Phone, MapPin } from 'lucide-react';
+import { Brain, Mail, Phone, MapPin, Clock } from 'lucide-react';
 import ReloadPrompt from './components/ReloadPrompt';
 
 function App() {
@@ -18,6 +18,8 @@ function App() {
   const [initialAuthError, setInitialAuthError] = useState('');
 
   // Authentication State
+  const [showInactivityWarning, setShowInactivityWarning] = useState(false);
+  const [warningCountdown, setWarningCountdown] = useState(120);
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('therapist_current_user');
     return saved ? JSON.parse(saved) : null;
@@ -132,17 +134,29 @@ function App() {
     }
   }, [currentUser]);
 
+  // Session Inactivity Warning & Keep-Alive Renewal (Phase P2 Healthcare Compliance)
+  const handleExtendSession = async () => {
+    try {
+      await fetch('/api/auth/keep-alive', { method: 'POST', credentials: 'include' });
+    } catch (err) {
+      console.warn('Session extension heartbeat warning:', err);
+    }
+    setShowInactivityWarning(false);
+    setWarningCountdown(120);
+  };
+
   // 15-Minute Inactivity Idle Auto-Lock (Clinical Records Privacy & HIPAA/DPDP Compliance)
   useEffect(() => {
     if (!currentUser) return;
-    const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+    const IDLE_TIMEOUT_MS = 13 * 60 * 1000; // 13 minutes (2-minute warning window)
     let timeoutId;
 
     const resetTimer = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        handleSignOut();
-        alert('Your session has timed out due to 15 minutes of inactivity to protect client privacy.');
+        setShowInactivityWarning(true);
+        setWarningCountdown(120);
+
       }, IDLE_TIMEOUT_MS);
     };
 
@@ -154,7 +168,26 @@ function App() {
       clearTimeout(timeoutId);
       events.forEach(evt => window.removeEventListener(evt, resetTimer));
     };
-  }, [currentUser]);
+  }, [currentUser, showInactivityWarning]);
+
+  // 2-Minute Pre-Logout Countdown (Phase P2)
+  useEffect(() => {
+    if (!showInactivityWarning) return;
+    const interval = setInterval(() => {
+      setWarningCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setShowInactivityWarning(false);
+          handleSignOut();
+          alert('Your session has timed out due to 15 minutes of inactivity to protect client privacy.');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showInactivityWarning]);
 
   // Handle intersection observer to highlight current navigation section
   useEffect(() => {
@@ -460,6 +493,87 @@ function App() {
           initialStatus={initialAuthStatus}
           initialError={initialAuthError}
         />
+      )}
+
+      {/* Session Inactivity Warning Modal (Phase P2 Healthcare Compliance) */}
+      {showInactivityWarning && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '1rem',
+            maxWidth: '460px',
+            width: '100%',
+            padding: '2rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            textAlign: 'center',
+            border: '1px solid #E2E8F0'
+          }}>
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              borderRadius: '50%',
+              backgroundColor: '#FEF3C7',
+              color: '#D97706',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem'
+            }}>
+              <Clock size={32} />
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', marginBottom: '0.5rem' }}>
+              Session Inactivity Warning
+            </h3>
+            <p style={{ color: '#475569', fontSize: '0.92rem', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+              To protect clinical privacy and healthcare data integrity, your session will automatically log out in{' '}
+              <strong style={{ color: '#DC2626', fontSize: '1.1rem' }}>{warningCountdown}s</strong> due to inactivity.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={handleExtendSession}
+                style={{
+                  backgroundColor: '#0D9488',
+                  color: '#FFFFFF',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem'
+                }}
+              >
+                Continue Session
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                style={{
+                  backgroundColor: '#F1F5F9',
+                  color: '#475569',
+                  padding: '0.75rem 1.25rem',
+                  borderRadius: '0.5rem',
+                  fontWeight: 500,
+                  border: '1px solid #CBD5E1',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem'
+                }}
+              >
+                Sign Out Now
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Premium Footer */}

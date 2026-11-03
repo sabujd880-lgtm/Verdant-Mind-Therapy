@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Brain, AlertTriangle, CheckCircle2, User, Calendar, Save, Plus, ShieldCheck } from 'lucide-react';
+import { FileText, Brain, AlertTriangle, CheckCircle2, User, Calendar, Save, Plus, ShieldCheck, Download, Trash2, Clock } from 'lucide-react';
 
 export default function ClinicalRecords({ appointments = [], currentUser }) {
   const [activeSubTab, setActiveSubTab] = useState('case-history'); // 'case-history' | 'mse'
@@ -38,6 +38,87 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
 
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
+
+  const [exportStatus, setExportStatus] = useState('idle');
+  const [showPurgeModal, setShowPurgeModal] = useState(false);
+  const [purgeConfirmText, setPurgeConfirmText] = useState('');
+  const [purgeLoading, setPurgeLoading] = useState(false);
+
+  const handleExportClientData = async () => {
+    if (!selectedClientEmail) return;
+    setExportStatus('requested');
+    setStatusMsg({ type: 'info', text: 'Generating consolidated patient record export bundle (DSAR)...' });
+
+    try {
+      setExportStatus('processing');
+      const res = await fetch(`/api/clients/${encodeURIComponent(selectedClientEmail)}/export?reason=DSAR_Patient_Request`, {
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to export patient records.');
+      }
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `patient_record_export_${selectedClientEmail}_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setExportStatus('completed');
+      setStatusMsg({ type: 'success', text: `Patient export bundle successfully generated for ${selectedClientEmail}.` });
+      setTimeout(() => setExportStatus('idle'), 4000);
+    } catch (err) {
+      setExportStatus('failed');
+      setStatusMsg({ type: 'error', text: err.message });
+      setTimeout(() => setExportStatus('idle'), 4000);
+    }
+  };
+
+  const handlePurgePatient = async () => {
+    if (purgeConfirmText !== 'PERMANENTLY_DELETE_PATIENT') {
+      alert('You must type PERMANENTLY_DELETE_PATIENT to confirm data erasure.');
+      return;
+    }
+    setPurgeLoading(true);
+    try {
+      const res = await fetch(`/api/clients/${encodeURIComponent(selectedClientEmail)}/purge`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          confirmationText: purgeConfirmText,
+          reason: 'GDPR/DPDP Right to be Forgotten Request'
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to purge patient data.');
+      }
+      const data = await res.json();
+      setShowPurgeModal(false);
+      setPurgeConfirmText('');
+      setStatusMsg({ type: 'success', text: data.message || 'Patient data permanently erased.' });
+      setCaseHistory({
+        presentingProblems: '',
+        historyOfPresentIllness: '',
+        pastPsychiatricHistory: '',
+        medicalHistory: '',
+        familyPsychiatricHistory: '',
+        personalAndSocialHistory: '',
+        riskAssessment: { suicideRisk: 'None', selfHarmRisk: 'None', harmToOthers: 'None', riskNotes: '' }
+      });
+      setMseList([]);
+    } catch (err) {
+      setStatusMsg({ type: 'error', text: err.message });
+    } finally {
+      setPurgeLoading(false);
+    }
+  };
 
   const isReadOnly = currentUser?.role === 'Viewer';
 
