@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save } from 'lucide-react';
-import { formatISTDateTimeWithZone } from '../utils/dateTime.js';
+import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save, Trash2, Plus, Bell } from 'lucide-react';
+import { formatISTDateTimeWithZone, normalizeToISTDate } from '../utils/dateTime.js';
 
 export default function AdminManagement({ currentUser }) {
   const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' | 'audit' | 'assignments' | 'scheduling'
@@ -20,8 +20,12 @@ export default function AdminManagement({ currentUser }) {
     maxAppointmentsPerDay: 8,
     cancellationDeadlineHours: 24,
     reschedulingDeadlineHours: 12,
-    blockedDates: []
+    blockedDates: [],
+    holidays: []
   });
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [reminderStatus, setReminderStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -104,6 +108,42 @@ export default function AdminManagement({ currentUser }) {
       setSuccessMsg('Practice scheduling governance and IST configuration saved successfully.');
     } catch (err) {
       setErrorMsg(err.message);
+    }
+  };
+
+  const handleAddHoliday = (e) => {
+    e.preventDefault();
+    if (!newHolidayDate || !newHolidayName) return;
+    const normDate = normalizeToISTDate(newHolidayDate);
+    const existing = schedConfig.holidays || [];
+    if (!existing.some(h => h.date === normDate)) {
+      setSchedConfig(prev => ({
+        ...prev,
+        holidays: [...(prev.holidays || []), { date: normDate, name: newHolidayName, type: 'holiday' }]
+      }));
+    }
+    setNewHolidayDate('');
+    setNewHolidayName('');
+  };
+
+  const handleRemoveHoliday = (dateToRemove) => {
+    setSchedConfig(prev => ({
+      ...prev,
+      holidays: (prev.holidays || []).filter(h => h.date !== dateToRemove)
+    }));
+  };
+
+  const handleTriggerReminders = async () => {
+    setReminderStatus('Dispatching automated IST session reminders...');
+    try {
+      const res = await fetch('/api/appointments/process-reminders', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      setReminderStatus(`Dispatched: ${data.reminders24hSent} (24h) and ${data.reminders1hSent} (1h) notices dispatched.`);
+    } catch (err) {
+      setReminderStatus('Failed to dispatch reminders.');
     }
   };
 
@@ -827,6 +867,90 @@ export default function AdminManagement({ currentUser }) {
                   style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}
                 />
               </div>
+            </div>
+
+            {/* Practice Holidays & Special Closures */}
+            <div style={{ borderTop: '1px solid var(--color-slate-10)', paddingTop: '1.25rem' }}>
+              <h5 style={{ margin: '0 0 0.5rem 0', fontSize: '0.92rem', color: 'var(--color-slate-dark)' }}>
+                Practice Holidays & Special Clinic Closures
+              </h5>
+              <p style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)', margin: '0 0 0.75rem 0' }}>
+                Dates entered here are blocked across all public calendars and cannot be booked.
+              </p>
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  placeholder="Date (DD-MM-YYYY)"
+                  value={newHolidayDate}
+                  onChange={(e) => setNewHolidayDate(e.target.value)}
+                  style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px', width: '160px' }}
+                />
+                <input
+                  type="text"
+                  placeholder="Holiday / Closure Name (e.g. Diwali)"
+                  value={newHolidayName}
+                  onChange={(e) => setNewHolidayName(e.target.value)}
+                  style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px', flex: 1, minWidth: '200px' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddHoliday}
+                  style={{ padding: '0.45rem 0.8rem', fontSize: '0.82rem', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  <Plus size={14} /> Add Holiday
+                </button>
+              </div>
+
+              {(schedConfig.holidays || []).length === 0 ? (
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)', fontStyle: 'italic', marginBottom: '1rem' }}>
+                  No holidays or special closures registered.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                  {(schedConfig.holidays || []).map((h) => (
+                    <div
+                      key={h.date}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(201,93,93,0.08)', border: '1px solid rgba(201,93,93,0.2)', padding: '0.35rem 0.65rem', borderRadius: '6px', fontSize: '0.78rem' }}
+                    >
+                      <strong style={{ color: 'var(--color-cancelled)' }}>{h.date}</strong>
+                      <span>{h.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveHoliday(h.date)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-cancelled)', padding: 0 }}
+                        title="Remove Holiday"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Automated Reminder Dispatcher */}
+            <div style={{ borderTop: '1px solid var(--color-slate-10)', paddingTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h5 style={{ margin: '0 0 0.25rem 0', fontSize: '0.92rem', color: 'var(--color-slate-dark)' }}>
+                  Automated IST Session Reminders (24h & 1h)
+                </h5>
+                <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)' }}>
+                  Evaluates upcoming confirmed appointments and dispatches email notices.
+                </span>
+                {reminderStatus && (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--color-confirmed)', fontWeight: 600, marginTop: '0.25rem' }}>
+                    {reminderStatus}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleTriggerReminders}
+                style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', background: '#fff', border: '1px solid var(--color-slate-10)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Bell size={14} /> Dispatch Reminders Now
+              </button>
             </div>
 
             {/* Save Button */}

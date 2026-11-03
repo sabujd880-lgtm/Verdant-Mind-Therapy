@@ -482,6 +482,8 @@ const appointmentSchema = new mongoose.Schema({
     performedBy: String,
     details: mongoose.Schema.Types.Mixed
   }],
+  reminded24h: { type: Boolean, default: false },
+  reminded1h: { type: Boolean, default: false },
   notes: { type: String, default: '' },
   counsellorEmail: { type: String, default: 'sabujd880@gmail.com', lowercase: true }
 });
@@ -489,6 +491,7 @@ appointmentSchema.index({ clientEmail: 1, date: -1 });
 appointmentSchema.index({ counsellorEmail: 1, status: 1 });
 appointmentSchema.index({ date: 1, time: 1, status: 1 });
 appointmentSchema.index({ appointmentUtc: 1, status: 1 });
+appointmentSchema.index({ appointmentUtc: 1 }, { unique: true, partialFilterExpression: { status: { $ne: 'Cancelled' } } });
 let Appointment = mongoose.model('Appointment', appointmentSchema);
 
 // 8. Message Schema (Preserved)
@@ -2600,6 +2603,16 @@ app.post('/api/appointments', bookingLimiter, async (req, res) => {
       return res.status(409).json({ error: `Selected date (${normalizedDate}) is unavailable for consultations.` });
     }
 
+    // Check if date is in holidays list
+    if (availConfig.holidays && Array.isArray(availConfig.holidays)) {
+      const holidayMatch = availConfig.holidays.find(h => isSameISTDate(h.date || h, normalizedDate));
+      if (holidayMatch) {
+        return res.status(409).json({ 
+          error: `Selected date (${normalizedDate}) is a designated practice holiday: ${holidayMatch.name || 'Practice Closed'}.` 
+        });
+      }
+    }
+
     // Check partial day blocked ranges
     if (availConfig.blockedRanges && Array.isArray(availConfig.blockedRanges)) {
       for (const range of availConfig.blockedRanges) {
@@ -2623,6 +2636,15 @@ app.post('/api/appointments', bookingLimiter, async (req, res) => {
     const activeAppointments = await Appointment.find({
       status: { $ne: 'Cancelled' }
     });
+
+    // Check daily consultation cap
+    const maxPerDay = availConfig.maxAppointmentsPerDay || 8;
+    const sameDaySessions = activeAppointments.filter(a => isSameISTDate(a.date, normalizedDate));
+    if (sameDaySessions.length >= maxPerDay) {
+      return res.status(409).json({ 
+        error: `Daily consultation limit (${maxPerDay} sessions) reached for ${normalizedDate}. Please select another date.` 
+      });
+    }
 
     const newAptWindow = {
       startUtc: appointmentUtc,
@@ -2821,6 +2843,81 @@ app.patch('/api/appointments/:id/status', requireAuth, async (req, res) => {
   }
 });
 
+// 7c. Process Automated Consultation Reminders (24h and 1h notices in IST)
+app.post('/api/appointments/process-reminders', requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor']), async (req, res) => {
+  try {
+    const now = Date.now();
+    const confirmedApts = await Appointment.find({ status: 'Confirmed' });
+    let reminders24hSent = 0;
+    let reminders1hSent = 0;
+
+    for (const apt of confirmedApts) {
+      const aptUtc = apt.appointmentUtc ? new Date(apt.appointmentUtc).getTime() : parseISTDateTimeToUTC(apt.date, apt.time)?.getTime();
+      if (!aptUtc) continue;
+
+      const diffMs = aptUtc - now;
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      // 24-hour reminder window (between 1 hour and 25 hours away)
+      if (diffHours > 1 && diffHours <= 25 && !apt.reminded24h) {
+        await sendEmail({
+          toEmail: apt.clientEmail,
+          toName: apt.clientName,
+          subject: 'Appointment Reminder: Upcoming Consultation Tomorrow - Verdant Mind',
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+              <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Session Reminder (24h Notice)</h2>
+              <p>Dear ${apt.clientName},</p>
+              <p>This is a gentle reminder that your scheduled counselling session with Mr. Sabuj Das is approaching:</p>
+              <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
+                <strong>Session Details (Indian Standard Time):</strong><br/>
+                - <strong>Date</strong>: ${apt.date} (DD-MM-YYYY)<br/>
+                - <strong>Time Slot</strong>: ${apt.time} (IST)<br/>
+                - <strong>Format</strong>: ${apt.sessionMode}<br/>
+                - <strong>Duration</strong>: ${apt.durationMinutes || 60} minutes
+              </div>
+              <p style="font-size: 0.85rem; color: #666;">Please ensure a quiet, private space with a stable internet connection for your session.</p>
+            </div>
+          `
+        });
+        apt.reminded24h = true;
+        await apt.save();
+        reminders24hSent++;
+      }
+
+      // 1-hour immediate session alert window
+      if (diffHours > 0 && diffHours <= 1.5 && !apt.reminded1h) {
+        await sendEmail({
+          toEmail: apt.clientEmail,
+          toName: apt.clientName,
+          subject: 'Session Alert: Consultation Starting in 1 Hour - Verdant Mind',
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+              <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Session Starting Shortly (1h Notice)</h2>
+              <p>Dear ${apt.clientName},</p>
+              <p>Your consultation session will begin in approximately 1 hour at <strong>${apt.time} (IST)</strong>.</p>
+              <p>Log into your Client Portal to join the session.</p>
+            </div>
+          `
+        });
+        apt.reminded1h = true;
+        await apt.save();
+        reminders1hSent++;
+      }
+    }
+
+    res.json({
+      success: true,
+      confirmedAppointmentsChecked: confirmedApts.length,
+      reminders24hSent,
+      reminders1hSent,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 7b. Reschedule Appointment Endpoint
 app.patch('/api/appointments/:id/reschedule', requireAuth, async (req, res) => {
   const { id } = req.params;
@@ -2980,6 +3077,81 @@ app.patch('/api/appointments/:id/reschedule', requireAuth, async (req, res) => {
     });
 
     res.json(apt);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 7c. Process Automated Consultation Reminders (24h and 1h notices in IST)
+app.post('/api/appointments/process-reminders', requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor']), async (req, res) => {
+  try {
+    const now = Date.now();
+    const confirmedApts = await Appointment.find({ status: 'Confirmed' });
+    let reminders24hSent = 0;
+    let reminders1hSent = 0;
+
+    for (const apt of confirmedApts) {
+      const aptUtc = apt.appointmentUtc ? new Date(apt.appointmentUtc).getTime() : parseISTDateTimeToUTC(apt.date, apt.time)?.getTime();
+      if (!aptUtc) continue;
+
+      const diffMs = aptUtc - now;
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      // 24-hour reminder window (between 1 hour and 25 hours away)
+      if (diffHours > 1 && diffHours <= 25 && !apt.reminded24h) {
+        await sendEmail({
+          toEmail: apt.clientEmail,
+          toName: apt.clientName,
+          subject: 'Appointment Reminder: Upcoming Consultation Tomorrow - Verdant Mind',
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+              <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Session Reminder (24h Notice)</h2>
+              <p>Dear ${apt.clientName},</p>
+              <p>This is a gentle reminder that your scheduled counselling session with Mr. Sabuj Das is approaching:</p>
+              <div style="background: #FFF; padding: 1rem; border-radius: 6px; border: 1px solid #E2ECE9; margin: 1rem 0; font-size: 0.9rem; line-height: 1.6;">
+                <strong>Session Details (Indian Standard Time):</strong><br/>
+                - <strong>Date</strong>: ${apt.date} (DD-MM-YYYY)<br/>
+                - <strong>Time Slot</strong>: ${apt.time} (IST)<br/>
+                - <strong>Format</strong>: ${apt.sessionMode}<br/>
+                - <strong>Duration</strong>: ${apt.durationMinutes || 60} minutes
+              </div>
+              <p style="font-size: 0.85rem; color: #666;">Please ensure a quiet, private space with a stable internet connection for your session.</p>
+            </div>
+          `
+        });
+        apt.reminded24h = true;
+        await apt.save();
+        reminders24hSent++;
+      }
+
+      // 1-hour immediate session alert window
+      if (diffHours > 0 && diffHours <= 1.5 && !apt.reminded1h) {
+        await sendEmail({
+          toEmail: apt.clientEmail,
+          toName: apt.clientName,
+          subject: 'Session Alert: Consultation Starting in 1 Hour - Verdant Mind',
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; padding: 2rem; color: #0F383D; background-color: #FAF9F6; border-radius: 8px; border: 1px solid #E2ECE9;">
+              <h2 style="color: #1A2E28; border-bottom: 2px solid #2A473E; padding-bottom: 0.5rem; margin-top: 0;">Session Starting Shortly (1h Notice)</h2>
+              <p>Dear ${apt.clientName},</p>
+              <p>Your consultation session will begin in approximately 1 hour at <strong>${apt.time} (IST)</strong>.</p>
+              <p>Log into your Client Portal to join the session.</p>
+            </div>
+          `
+        });
+        apt.reminded1h = true;
+        await apt.save();
+        reminders1hSent++;
+      }
+    }
+
+    res.json({
+      success: true,
+      confirmedAppointmentsChecked: confirmedApts.length,
+      reminders24hSent,
+      reminders1hSent,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

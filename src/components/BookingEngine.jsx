@@ -94,6 +94,19 @@ export default function BookingEngine({ currentUser, availability, appointments,
     ) {
       return true;
     }
+
+    // Check if date is in designated practice holidays
+    const holidaysList = availability.holidays || [];
+    if (holidaysList.some(h => isSameISTDate(h.date || h, formattedDate))) {
+      return true;
+    }
+
+    // Check maximum advance booking horizon
+    const maxDays = availability.maxAdvanceDays || 60;
+    const maxDate = new Date(today.getTime() + maxDays * 24 * 60 * 60 * 1000);
+    if (checkDate > maxDate) {
+      return true;
+    }
     
     return false;
   };

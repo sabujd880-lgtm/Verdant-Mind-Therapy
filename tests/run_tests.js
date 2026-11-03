@@ -1214,6 +1214,61 @@ async function run() {
     assert.deepStrictEqual(updatedConfig.workingDays, [1, 2, 3, 4, 5, 6]);
   });
 
+  // Test 46: Practice Holiday & Closure Collision Rejection
+  await test('Practice Holidays: Rejects bookings on designated clinic closure dates', async () => {
+    const holidayDate = '26-01-2035'; // Republic Day 2035
+
+    // 1. Admin adds practice holiday
+    const putRes = await fetch(`${BASE_URL}/api/admin/scheduling-config`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({
+        holidays: [
+          { date: holidayDate, name: 'Republic Day (National Holiday)' }
+        ]
+      })
+    });
+    assert.strictEqual(putRes.status, 200);
+
+    // 2. Client attempts to book on the holiday
+    const bookRes = await fetch(`${BASE_URL}/api/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientEmail: 'holiday_patient@example.com',
+        clientName: 'Holiday Patient',
+        clientPhone: '+91 91111 22222',
+        date: holidayDate,
+        time: '11:00 AM',
+        sessionMode: 'Video Session',
+        problemDescription: 'Holiday attempt'
+      })
+    });
+    assert.strictEqual(bookRes.status, 409);
+    const body = await bookRes.json();
+    assert.ok(body.error.includes('practice holiday'));
+  });
+
+  // Test 47: Automated Session Reminder Dispatcher Endpoint
+  await test('Reminder Dispatcher: Evaluates upcoming confirmed sessions and triggers IST notices', async () => {
+    const reminderRes = await fetch(`${BASE_URL}/api/appointments/process-reminders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      }
+    });
+    assert.strictEqual(reminderRes.status, 200);
+    const result = await reminderRes.json();
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(typeof result.confirmedAppointmentsChecked, 'number');
+    assert.strictEqual(typeof result.reminders24hSent, 'number');
+    assert.strictEqual(typeof result.reminders1hSent, 'number');
+  });
+
   console.log('\n===========================================================');
   console.log(`TEST SUMMARY: ${passedCount} PASSED, ${failedCount} FAILED`);
   console.log('===========================================================');
