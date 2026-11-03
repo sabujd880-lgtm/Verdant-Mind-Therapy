@@ -1370,10 +1370,11 @@ button {
   padding-top: 1.25rem;
   margin-top: 1.5rem;
   display: flex;
-  justifyContent: space-between;
+  flex-direction: column;
+  justifyContent: center;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  text-align: center;
+  gap: 0.45rem;
   font-size: 0.72rem;
   line-height: 1.4;
   color: var(--color-white-80, rgba(255, 255, 255, 0.7));
@@ -1386,15 +1387,18 @@ button {
   margin: 0 !important;
   font-weight: 400;
   letter-spacing: 0.01em;
+  text-align: center;
 }
 
 .footer-compliance-badges {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 0.75rem;
   font-size: 0.68rem;
   color: inherit;
   flex-wrap: wrap;
+  text-align: center;
 }
 
 .footer-compliance-badges span {
@@ -1405,8 +1409,9 @@ button {
 @media (max-width: 768px) {
   .footer-bottom {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
+    align-items: center;
+    text-align: center;
+    gap: 0.45rem;
   }
 }
 
