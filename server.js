@@ -40,13 +40,11 @@ import {
 
 dotenv.config();
 
-// In production, ensure reliable DNS resolution for MongoDB Atlas SRV records
-if (process.env.NODE_ENV === 'production') {
-  try {
-    dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
-  } catch (dnsErr) {
-    console.warn('DNS server configuration warning:', dnsErr.message);
-  }
+// Ensure reliable DNS resolution for MongoDB Atlas SRV records across all environments (fixes Windows querySrv ECONNREFUSED)
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+} catch (dnsErr) {
+  console.warn('DNS server configuration warning:', dnsErr.message);
 }
 
 // Load secrets from AWS Secrets Manager if configured
