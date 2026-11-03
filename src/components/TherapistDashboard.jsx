@@ -14,7 +14,8 @@ import {
   formatISTDateTimeWithZone, 
   normalizeToISTDate, 
   isSameISTDate,
-  getISTWeekDays 
+  getISTWeekDays,
+  getNowIST 
 } from '../utils/dateTime.js';
 
 export default function TherapistDashboard({ 
@@ -31,7 +32,7 @@ export default function TherapistDashboard({
 }) {
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' | 'messages' | 'documents' | 'availability' | 'clinical-records' | 'recordings' | 'admin'
   const [scheduleView, setScheduleView] = useState('table'); // 'table' | 'week' | 'day'
-  const [currentScheduleDate, setCurrentScheduleDate] = useState(new Date(2026, 6, 13));
+  const [currentScheduleDate, setCurrentScheduleDate] = useState(() => getNowIST().dateObj);
   const [selectedApt, setSelectedApt] = useState(null); // For detailed inquiry viewer modal
   const [tempNotes, setTempNotes] = useState('');
   const [newBlockedDate, setNewBlockedDate] = useState('');
@@ -1707,7 +1708,7 @@ export default function TherapistDashboard({
             <form onSubmit={handleAddBlockedDate} className="holiday-input-row">
               <input
                 type="date"
-                min="2026-07-13"
+                min={getNowIST().isoDateStr}
                 value={newBlockedDate}
                 onChange={(e) => setNewBlockedDate(e.target.value)}
               />
@@ -1958,7 +1959,7 @@ export default function TherapistDashboard({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 15-07-2026"
+                  placeholder={`e.g. ${getNowIST().dateStr}`}
                   value={rescheduleForm.date}
                   onChange={(e) => setRescheduleForm(prev => ({ ...prev, date: e.target.value }))}
                   style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}

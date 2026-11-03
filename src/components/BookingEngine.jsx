@@ -9,14 +9,17 @@ import {
   isSameISTDate,
   getISTWeekDays,
   parseISTDateTimeToUTC,
-  doAppointmentsOverlap 
+  doAppointmentsOverlap,
+  getNowIST,
+  isPastISTDate,
+  isTodayIST
 } from '../utils/dateTime.js';
 
 export default function BookingEngine({ currentUser, availability, appointments, onAddAppointment }) {
   const [selectedMode, setSelectedMode] = useState('Video Session');
   const [calendarView, setCalendarView] = useState('month'); // 'month' | 'week' | 'day'
   const [selectedDuration, setSelectedDuration] = useState(60); // 30 | 45 | 60 minutes
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 6, 13)); // Pre-set to July 13, 2026 as per local time info
+  const [currentDate, setCurrentDate] = useState(() => getNowIST().dateObj);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   
@@ -65,11 +68,9 @@ export default function BookingEngine({ currentUser, availability, appointments,
     return formatCalendarDateToIST(year, month, day);
   };
 
-  // Check if date is in the past (before July 13, 2026)
+  // Check if date is in the past (before today in Asia/Kolkata)
   const isPastDate = (year, month, day) => {
-    const today = new Date(2026, 6, 13, 0, 0, 0); // Fixed current date context
-    const checkDate = new Date(year, month, day, 12, 0, 0);
-    return checkDate < today;
+    return isPastISTDate(year, month, day);
   };
 
   // Check if a date is active based on working days & blocked dates
@@ -104,14 +105,22 @@ export default function BookingEngine({ currentUser, availability, appointments,
 
     // Check maximum advance booking horizon
     const maxDays = availability?.maxAdvanceDays || 60;
-    const now = new Date();
-    const maxDate = new Date(now.getTime() + maxDays * 24 * 60 * 60 * 1000);
+    const nowIST = getNowIST();
+    const maxDate = new Date(nowIST.dateObj.getTime() + maxDays * 24 * 60 * 60 * 1000);
     if (dateObj > maxDate) {
       return true;
     }
     
     return false;
   };
+
+  // Auto-select current IST date if available, or leave unselected
+  useEffect(() => {
+    const today = getNowIST();
+    if (!selectedDate && !isDateDisabled(today.year, today.month, today.day)) {
+      setSelectedDate(today.dateStr);
+    }
+  }, [availability]);
 
   // Generate Slots dynamically based on start and end hour settings in 12-hour AM/PM format
   const generateTimeSlots = () => {
@@ -153,8 +162,14 @@ export default function BookingEngine({ currentUser, availability, appointments,
   };
 
   const handlePrevMonth = () => {
-    // Prevent going past July 2026
-    if (currentDate.getFullYear() === 2026 && currentDate.getMonth() <= 6) return;
+    const nowIST = getNowIST();
+    // Prevent navigating to months prior to current IST month
+    if (
+      currentDate.getFullYear() < nowIST.year ||
+      (currentDate.getFullYear() === nowIST.year && currentDate.getMonth() <= nowIST.month)
+    ) {
+      return;
+    }
     
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
     setSelectedDate(null);
@@ -434,7 +449,7 @@ export default function BookingEngine({ currentUser, availability, appointments,
                       type="button"
                       className="calendar-nav-btn"
                       onClick={handlePrevMonth}
-                      disabled={year === 2026 && month <= 6}
+                      disabled={year < getNowIST().year || (year === getNowIST().year && month <= getNowIST().month)}
                       aria-label="Previous month"
                     >
                       <ChevronLeft size={16} />
@@ -460,7 +475,7 @@ export default function BookingEngine({ currentUser, availability, appointments,
                       return <div key={`empty-${idx}`}></div>;
                     }
                     
-                    const isToday = year === 2026 && month === 6 && day === 13;
+                    const isToday = isTodayIST(year, month, day);
                     const dateStr = formatDateString(year, month, day);
                     const isSelected = isSameISTDate(selectedDate, dateStr);
                     const isDisabled = isDateDisabled(year, month, day);
@@ -501,7 +516,9 @@ export default function BookingEngine({ currentUser, availability, appointments,
                       onClick={() => {
                         const prevWk = new Date(currentDate);
                         prevWk.setDate(currentDate.getDate() - 7);
-                        if (prevWk >= new Date(2026, 6, 7)) {
+                        const now = getNowIST();
+                        const currentWeekStart = new Date(now.year, now.month, now.day - now.dateObj.getDay(), 0, 0, 0);
+                        if (prevWk >= currentWeekStart) {
                           setCurrentDate(prevWk);
                         }
                       }}
@@ -569,7 +586,9 @@ export default function BookingEngine({ currentUser, availability, appointments,
                     onClick={() => {
                       const prevD = new Date(currentDate);
                       prevD.setDate(currentDate.getDate() - 1);
-                      if (prevD >= new Date(2026, 6, 13)) {
+                      const now = getNowIST();
+                      const todayStart = new Date(now.year, now.month, now.day, 0, 0, 0);
+                      if (prevD >= todayStart) {
                         setCurrentDate(prevD);
                         setSelectedDate(formatCalendarDateToIST(prevD.getFullYear(), prevD.getMonth(), prevD.getDate()));
                         setSelectedSlot(null);

@@ -344,3 +344,63 @@ export function getISTWeekDays(currentDateInput = new Date()) {
   return days;
 }
 
+/**
+ * Returns the current date and time components strictly according to Indian Standard Time (Asia/Kolkata).
+ * Eliminates browser/server local timezone bias.
+ */
+export function getNowIST() {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parseInt(parts.find(p => p.type === 'year').value, 10);
+  const month = parseInt(parts.find(p => p.type === 'month').value, 10) - 1; // 0-indexed (0 = Jan, 11 = Dec)
+  const day = parseInt(parts.find(p => p.type === 'day').value, 10);
+  const hour = parseInt(parts.find(p => p.type === 'hour').value, 10);
+  const minute = parseInt(parts.find(p => p.type === 'minute').value, 10);
+  const second = parseInt(parts.find(p => p.type === 'second').value, 10);
+
+  const dd = String(day).padStart(2, '0');
+  const mm = String(month + 1).padStart(2, '0');
+
+  return {
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    dateObj: new Date(year, month, day, 12, 0, 0),
+    dateStr: `${dd}-${mm}-${year}`,
+    isoDateStr: `${year}-${mm}-${dd}`
+  };
+}
+
+/**
+ * Checks if a given calendar day (year, monthIndex, day) is strictly before today in Asia/Kolkata.
+ */
+export function isPastISTDate(year, monthIndex, day) {
+  const now = getNowIST();
+  if (year < now.year) return true;
+  if (year > now.year) return false;
+  if (monthIndex < now.month) return true;
+  if (monthIndex > now.month) return false;
+  return day < now.day;
+}
+
+/**
+ * Checks if a given calendar day (year, monthIndex, day) is today in Asia/Kolkata.
+ */
+export function isTodayIST(year, monthIndex, day) {
+  const now = getNowIST();
+  return year === now.year && monthIndex === now.month && day === now.day;
+}
+
+

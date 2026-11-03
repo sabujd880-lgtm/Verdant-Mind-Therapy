@@ -152,3 +152,4 @@ processFavicon().catch(err => {
   console.error('Fatal favicon generation error:', err);
   process.exit(1);
 });
+
