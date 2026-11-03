@@ -13,6 +13,7 @@
     "all": "npm run dev:all",
     "build": "vite build",
     "lint": "oxlint",
+    "generate:favicons": "node scripts/generate-favicons.cjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -31,7 +32,8 @@
     "mongoose": "^9.7.4",
     "multer": "^2.5.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "sharp": "^0.35.5"
   },
   "overrides": {
     "proxy-addr": "2.0.8"
@@ -43,6 +45,7 @@
     "concurrently": "^10.0.3",
     "nodemon": "^3.1.14",
     "oxlint": "^1.71.0",
+    "png-to-ico": "^3.0.2",
     "vite": "^8.1.1",
     "vite-plugin-pwa": "^1.3.0"
   }
