@@ -267,8 +267,6 @@ if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && s3Buck
     }
   });
   console.log(`Configured AWS S3 client in region ${awsRegion} for bucket: ${s3Bucket}`);
-} else {
-  console.log('AWS S3 credentials not fully configured; using secure server-side encrypted local audio storage.');
 }
 
 // Multer disk-backed streaming storage for audio uploads (Prevents RAM Exhaustion / OOM crashes)

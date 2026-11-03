@@ -164,7 +164,7 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#2A5D48', background: 'rgba(74,140,112,0.1)', padding: '0.5rem 1rem', borderRadius: '20px' }}>
           <ShieldCheck size={16} />
-          <span>Storage: AES-256 Server-Side Encrypted (HIPAA 7-Year Retention)</span>
+          <span>AES-256 Healthcare Encryption (HIPAA Compliant)</span>
         </div>
       </div>
 
@@ -239,7 +239,7 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
                       <div style={{ fontSize: '0.75rem', color: 'var(--color-slate-light)', marginTop: '0.2rem', display: 'flex', gap: '0.75rem' }}>
                         <span>Uploaded: {formatISTDate(rec.uploadedAt)}</span>
                         <span>Size: {(rec.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB</span>
-                        <span>Storage: {rec.storageType.toUpperCase()}</span>
+                        <span>Encrypted Audio</span>
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#2A5D48', marginTop: '0.2rem' }}>
                         ✓ Client consent verified on {formatISTDate(rec.consentDate)}
