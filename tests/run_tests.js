@@ -27,7 +27,7 @@ let activePort = TEST_PORT;
 let BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 
 console.log('===========================================================');
-console.log('STARTING COUNSELLING PORTAL SYSTEM VERIFICATION SUITE');
+console.log('STARTING MENTAL HEALTH PORTAL SYSTEM VERIFICATION SUITE');
 console.log(`In-Process Express Server running on: ${BASE_URL}`);
 console.log('===========================================================\n');
 
@@ -991,8 +991,9 @@ async function run() {
 
   // Test 42: Overlapping session duration and practice buffer period conflict detection
   await test('Double-Booking Engine: Prevents overlapping duration and buffer collision', async () => {
-    const uniqueYear = 2035 + (Date.now() % 300);
-    const testDate = `22-10-${uniqueYear}`;
+    const uniqueYear = 2050 + Math.floor(Math.random() * 800);
+    const day = 10 + Math.floor(Math.random() * 15);
+    const testDate = `${day}-10-${uniqueYear}`;
 
     // 1. Book session at 10:00 AM with 60 min duration and 15 min buffer (busy until 11:15 AM)
     const baseRes = await fetch(`${BASE_URL}/api/appointments`, {
@@ -1082,9 +1083,10 @@ async function run() {
 
   // Test 43: Rescheduling workflow preserves history and prevents collisions
   await test('Rescheduling Workflow: Updates slot, logs history, and preserves previous record', async () => {
-    const uniqueYear = 2038 + (Date.now() % 200);
-    const origDate = `05-11-${uniqueYear}`;
-    const newDate = `06-11-${uniqueYear}`;
+    const uniqueYear = 2050 + Math.floor(Math.random() * 800);
+    const day = 10 + Math.floor(Math.random() * 10);
+    const origDate = `${day}-11-${uniqueYear}`;
+    const newDate = `${day + 1}-11-${uniqueYear}`;
 
     // 1. Create an appointment
     const createRes = await fetch(`${BASE_URL}/api/appointments`, {
@@ -1135,8 +1137,9 @@ async function run() {
 
   // Test 44: Cancellation with reason records cancellationReason and history entry
   await test('Cancellation Governance: Records cancellation reason and logs audit history', async () => {
-    const uniqueYear = 2040 + (Date.now() % 100);
-    const cancelDate = `12-12-${uniqueYear}`;
+    const uniqueYear = 2050 + Math.floor(Math.random() * 800);
+    const cancelDay = 10 + Math.floor(Math.random() * 15);
+    const cancelDate = `${cancelDay}-12-${uniqueYear}`;
 
     const createRes = await fetch(`${BASE_URL}/api/appointments`, {
       method: 'POST',

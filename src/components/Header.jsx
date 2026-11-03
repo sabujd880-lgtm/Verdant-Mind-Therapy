@@ -50,7 +50,7 @@ export default function Header({
             </div>
             <div className="logo-text">
               <h1>Verdant Mind</h1>
-              <p>Counselling Portal</p>
+              <p>Mental Health Portal</p>
             </div>
           </div>
           <LiveISTClock />

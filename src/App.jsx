@@ -634,7 +634,7 @@ function App() {
         </div>
 
         <div className="container footer-bottom">
-          <p className="footer-copyright-text">© {new Date().getFullYear()} Verdant Mind Counselling Portal. Encrypted Healthcare Portal.</p>
+          <p className="footer-copyright-text">© {new Date().getFullYear()} Verdant Mind Mental Health Portal. Encrypted Healthcare Portal.</p>
           <div className="footer-compliance-badges">
             <span>HIPAA & Healthcare Data Protection Standard</span>
             <span>•</span>

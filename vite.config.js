@@ -20,9 +20,9 @@ export default defineConfig({
         'pwa-512x512.png'
       ],
       manifest: {
-        name: 'Verdant Mind',
+        name: 'Verdant Mind - Mental Health Portal',
         short_name: 'Verdant Mind',
-        description: 'Verdant Mind - Counselling practice by Sabuj Das, Consultant Psychologist. Specialized in ADHD, Anxiety, Depression, and DBT based in Kolkata, India.',
+        description: 'Verdant Mind - Mental Health Portal by Sabuj Das, Consultant Psychologist. Specialized in ADHD, Anxiety, Depression, and DBT based in Kolkata, India.',
         theme_color: '#0F383D',
         background_color: '#ffffff',
         display: 'standalone',
