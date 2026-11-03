@@ -1,0 +1,145 @@
+/**
+ * ============================================================================
+ * LAVENDER + DUSTY ROSE BRAND THEME
+ * Project: Psychology Portfolio - Verdant Mind
+ * 
+ * Official Color Palette:
+ * - Primary Brand: Lavender Purple (#8050E8)
+ * - Primary Hover: Deep Purple (#693BD0)
+ * - Secondary Brand: Dusty Rose (#D98C9B)
+ * - Secondary Hover: Deep Rose (#C47789)
+ * - Main Background: Warm Ivory (#F8F6F1)
+ * - Secondary Background: Soft Lavender (#F4EEFF)
+ * - Alternative Background: Pale Rose (#FAF0F2)
+ * - Main Text: Deep Plum (#35264F)
+ * - Secondary Text: Muted Slate (#756B83)
+ * - Card Background: White (#FFFFFF)
+ * - Borders: Lavender Grey (#E7E0F0)
+ * - Neutral Dark: Slate (#485064)
+ * - Success: Muted Teal (#398C83)
+ * - Warning: Soft Amber (#D99A35)
+ * - Error: Muted Red (#C84C55)
+ * ============================================================================
+ */
+
+:root,
+:root[data-theme="lavender-rose"] {
+  /* Official Core Tokens */
+  --color-primary: #8050E8;           /* Lavender Purple */
+  --color-primary-hover: #693BD0;     /* Deep Purple */
+  --color-secondary: #D98C9B;         /* Dusty Rose */
+  --color-secondary-hover: #C47789;   /* Deep Rose */
+  --color-background: #F8F6F1;        /* Warm Ivory */
+  --color-bg-secondary: #F4EEFF;      /* Soft Lavender */
+  --color-bg-alt: #FAF0F2;            /* Pale Rose */
+  --color-text-main: #35264F;         /* Deep Plum */
+  --color-text-secondary: #756B83;    /* Muted Slate */
+  --color-card: #FFFFFF;              /* Card Surface */
+  --color-border: #E7E0F0;            /* Lavender Grey */
+  --color-neutral-dark: #485064;      /* Slate */
+  --color-success: #398C83;           /* Muted Teal */
+  --color-warning: #D99A35;           /* Soft Amber */
+  --color-error: #C84C55;             /* Muted Red */
+
+  /* Semantic Component Mappings (Seamlessly applies to all layout modules) */
+  --color-slate: #8050E8;             /* Primary Brand Accent (Lavender Purple) */
+  --color-slate-light: #756B83;       /* Secondary Text (Muted Slate) */
+  --color-slate-dark: #35264F;        /* Deep Plum (Headings, primary buttons, high-contrast text) */
+  --color-terracotta: #D98C9B;        /* Secondary Accent (Dusty Rose for badges, CTA highlights) */
+  --color-terracotta-light: #F0C4CC;  /* Pale Rose Soft Tint */
+  --color-sage: #F4EEFF;              /* Soft Lavender (Card fills, soft tags, calendar empty cells) */
+  --color-cream: #F8F6F1;             /* Warm Ivory base */
+  --color-white: #FFFFFF;
+
+  /* Opacity Variants */
+  --color-slate-05: rgba(128, 80, 232, 0.05);   /* Soft lavender surface wash */
+  --color-slate-10: rgba(128, 80, 232, 0.10);   /* Lavender outline / border */
+  --color-slate-20: rgba(128, 80, 232, 0.20);   /* Distinct lavender line */
+  --color-slate-80: rgba(53, 38, 79, 0.80);     /* Deep Plum text */
+  --color-terracotta-10: rgba(217, 140, 155, 0.15); /* Dusty Rose pill tint */
+  --color-white-80: rgba(255, 255, 255, 0.85);
+
+  /* Linear Gradients */
+  --gradient-primary: linear-gradient(135deg, #35264F 0%, #8050E8 100%);
+  --gradient-accent: linear-gradient(135deg, #D98C9B 0%, #E8ACB7 100%);
+  --gradient-background: linear-gradient(180deg, #F8F6F1 0%, #F4EEFF 50%, #FAF0F2 100%);
+  --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 238, 255, 0.70) 100%);
+
+  /* Functional Status Colors (Used strictly where clinically necessary) */
+  --color-pending: #D99A35;           /* Soft Amber */
+  --color-pending-bg: #FFF9ED;
+  --color-confirmed: #398C83;         /* Muted Teal */
+  --color-confirmed-bg: #EEF8F6;
+  --color-cancelled: #C84C55;         /* Muted Red */
+  --color-cancelled-bg: #FDF2F3;
+
+  /* Typography */
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Shadows with Soft Plum undertones */
+  --shadow-sm: 0 4px 12px rgba(53, 38, 79, 0.04);
+  --shadow-md: 0 12px 32px rgba(53, 38, 79, 0.07);
+  --shadow-lg: 0 20px 48px rgba(53, 38, 79, 0.12);
+  --shadow-glass: 0 8px 32px 0 rgba(128, 80, 232, 0.07);
+
+  /* Geometry */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 28px;
+  --radius-pill: 9999px;
+
+  /* Transitions */
+  --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  --container-width: 1200px;
+  --header-bg: rgba(248, 246, 241, 0.92);
+  --header-border: rgba(128, 80, 232, 0.10);
+
+  --theme-name: 'lavender-rose';
+  --theme-label: 'Lavender & Dusty Rose';
+}
+
+/* ============================================================================
+ * DARK MODE CONFIGURATION (LAVENDER + DUSTY ROSE)
+ * ============================================================================
+ */
+:root[data-theme="lavender-rose"][data-mode="dark"] {
+  --color-background: #1E162A;
+  --color-bg-secondary: #261D36;
+  --color-bg-alt: #2D2240;
+  --color-text-main: #F8F6F1;
+  --color-text-secondary: #B9AEC9;
+  --color-card: #281F38;
+  --color-border: rgba(231, 224, 240, 0.15);
+  --color-neutral-dark: #A39DB0;
+
+  --color-slate-dark: #F8F6F1;
+  --color-slate-light: #B9AEC9;
+  --color-slate: #9E77F7;
+  --color-terracotta: #D98C9B;
+  --color-terracotta-light: #E8ACB7;
+  --color-cream: #281F38;
+  --color-sage: #261D36;
+  --color-white: #281F38;
+
+  --color-slate-05: rgba(158, 119, 247, 0.08);
+  --color-slate-10: rgba(158, 119, 247, 0.15);
+  --color-slate-20: rgba(158, 119, 247, 0.25);
+  --color-slate-80: rgba(248, 246, 241, 0.85);
+
+  --gradient-primary: linear-gradient(135deg, #9E77F7 0%, #D98C9B 100%);
+  --gradient-accent: linear-gradient(135deg, #D98C9B 0%, #E8ACB7 100%);
+  --gradient-background: linear-gradient(180deg, #181223 0%, #1E162A 50%, #251B34 100%);
+  --gradient-card: linear-gradient(135deg, rgba(40, 31, 56, 0.95) 0%, rgba(30, 22, 42, 0.85) 100%);
+
+  --header-bg: rgba(24, 18, 35, 0.94);
+  --header-border: rgba(158, 119, 247, 0.15);
+
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.60);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.40);
+}

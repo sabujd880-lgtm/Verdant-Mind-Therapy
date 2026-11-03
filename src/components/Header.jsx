@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { User, ShieldAlert, LogIn, LogOut, Palette } from 'lucide-react';
+import React from 'react';
+import { User, ShieldAlert, LogIn, LogOut } from 'lucide-react';
 import LiveISTClock from './LiveISTClock';
-import { getActiveTheme, toggleTheme, THEMES } from '../styles/theme-config.js';
 
 export default function Header({ 
   currentUser, 
@@ -12,18 +11,6 @@ export default function Header({
   activeSection, 
   setActiveSection 
 }) {
-  const [currentTheme, setCurrentTheme] = useState(() => getActiveTheme());
-
-  useEffect(() => {
-    const handleThemeChange = (e) => {
-      if (e.detail?.theme) {
-        setCurrentTheme(e.detail.theme);
-      }
-    };
-    window.addEventListener('themeChanged', handleThemeChange);
-    return () => window.removeEventListener('themeChanged', handleThemeChange);
-  }, []);
-
   const handleNavClick = (sectionId) => {
     setActiveView('client');
     setActiveSection(sectionId);
@@ -70,35 +57,7 @@ export default function Header({
         </div>
 
         {/* Navigation & Mode Switcher */}
-        <div className="nav-links" style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-          {/* Theme Quick Switcher Pill */}
-          <button
-            type="button"
-            className="theme-switcher-pill"
-            onClick={() => {
-              const next = toggleTheme();
-              setCurrentTheme(next);
-            }}
-            title={`Active Theme: ${currentTheme === THEMES.BOTANICAL ? 'Botanical Wellness' : 'Classic Oceanic Teal'} (Click to toggle)`}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              padding: '0.35rem 0.75rem',
-              borderRadius: '20px',
-              fontSize: '0.76rem',
-              fontWeight: 600,
-              background: currentTheme === THEMES.BOTANICAL ? 'rgba(128, 80, 232, 0.12)' : 'rgba(15, 56, 61, 0.08)',
-              color: currentTheme === THEMES.BOTANICAL ? '#8050E8' : 'var(--color-slate)',
-              border: currentTheme === THEMES.BOTANICAL ? '1px solid rgba(128, 80, 232, 0.3)' : '1px solid var(--color-slate-20)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            <Palette size={13} />
-            <span>{currentTheme === THEMES.BOTANICAL ? '🌿 Botanical' : '🌊 Classic'}</span>
-          </button>
+        <div className="nav-links" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
           {/* Public client portfolio navigation (only visible when viewing client portfolio) */}
           {activeView === 'client' && (
             <nav style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>

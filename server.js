@@ -561,6 +561,24 @@ const availabilitySchema = new mongoose.Schema({
 });
 let Availability = mongoose.model('Availability', availabilitySchema);
 
+// 11. Theme Governance Schema (Restricted to Super Admin & Administrator)
+const themeConfigSchema = new mongoose.Schema({
+  activeTheme: { type: String, default: 'lavender-rose' },
+  themeMode: { type: String, default: 'light' },
+  updatedBy: { type: String, default: 'System Initializer' },
+  updatedAt: { type: Date, default: Date.now },
+  history: {
+    type: [{
+      theme: String,
+      mode: String,
+      updatedBy: String,
+      timestamp: { type: Date, default: Date.now }
+    }],
+    default: []
+  }
+});
+let ThemeConfig = mongoose.model('ThemeConfig', themeConfigSchema);
+
 // =========================================================================
 // AUDIT LOGGER HELPER
 // =========================================================================
@@ -575,6 +593,8 @@ async function logAuditEvent({ actorEmail, actorRole, action, targetResource, de
       action,
       targetResource: targetResource || 'general',
       details,
+      timestamp: new Date(),
+      createdAt: new Date(),
       ipAddress: clientIp,
       userAgent
     });
@@ -628,7 +648,7 @@ function readData() {
   } catch (e) {
     return { 
       clients: [], appointments: [], messages: [], caredocuments: [], availabilities: [],
-      users: [], auditlogs: [], audiorecordings: [], casehistories: [], mserecords: [] 
+      users: [], auditlogs: [], audiorecordings: [], casehistories: [], mserecords: [], themeconfigs: [] 
     };
   }
 }
@@ -811,8 +831,10 @@ function setupLocalDBFallback() {
   AudioRecording = makeMockModel('audiorecordings');
   ClinicalCaseHistory = makeMockModel('casehistories');
   MentalStatusExam = makeMockModel('mserecords');
+  ThemeConfig = makeMockModel('themeconfigs');
   initializeAvailability();
   initializeSuperAdmin();
+  initializeThemeConfig();
 }
 
 // Bootstrap initial Super Admin safely if not already present
@@ -870,6 +892,30 @@ async function initializeAvailability() {
   }
 }
 
+// Bootstrap authoritative practice theme safely if not already present
+async function initializeThemeConfig() {
+  try {
+    let config = await ThemeConfig.findOne();
+    if (!config) {
+      await ThemeConfig.create({
+        activeTheme: 'lavender-rose',
+        themeMode: 'light',
+        updatedBy: 'System Bootstrap',
+        updatedAt: new Date(),
+        history: [{
+          theme: 'lavender-rose',
+          mode: 'light',
+          updatedBy: 'System Bootstrap',
+          timestamp: new Date()
+        }]
+      });
+      console.log('Initialized default lavender-rose brand theme configuration.');
+    }
+  } catch (err) {
+    console.warn('[THEME WARNING] Initial theme bootstrap skipped:', err.message);
+  }
+}
+
 // Mongoose Connection Pool Configuration
 const mongoOptions = {
   maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '50', 10),
@@ -885,6 +931,7 @@ if (process.env.MONGODB_URI && process.env.NODE_ENV !== 'test') {
     console.log(`Successfully connected to MongoDB Atlas (Pool: min=${mongoOptions.minPoolSize}, max=${mongoOptions.maxPoolSize}).`);
     await initializeAvailability();
     await initializeSuperAdmin();
+    await initializeThemeConfig();
   } catch (err) {
     console.error('[FATAL] Error connecting to MongoDB Atlas:', err.message);
     if (isProd) {
@@ -1559,7 +1606,14 @@ app.get('/api/admin/audit-logs', requireAuth, requireRole(['Super Admin', 'Admin
   try {
     const logs = await AuditLog.find();
     // Return latest 100 entries sorted descending
-    const sorted = logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 100);
+    const getTime = (entry) => {
+      if (!entry) return 0;
+      const t = entry.timestamp || entry.createdAt;
+      if (!t) return 0;
+      const time = new Date(t).getTime();
+      return isNaN(time) ? 0 : time;
+    };
+    const sorted = logs.sort((a, b) => getTime(b) - getTime(a)).slice(0, 100);
     res.json(sorted);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -3525,6 +3579,118 @@ app.put('/api/admin/scheduling-config', requireAuth, requireRole(['Super Admin',
         endHour: config.endHour,
         bufferMinutes: config.bufferMinutes,
         defaultDurationMinutes: config.defaultDurationMinutes
+      },
+      req
+    });
+
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =========================================================================
+// 13c. Brand Theme & Visual Identity Endpoints (Role-Restricted Governance)
+// =========================================================================
+
+// Public Theme Endpoint (Read-Only: Allows all visitors, clients, and staff to render the active theme)
+app.get('/api/theme', async (req, res) => {
+  try {
+    let config = await ThemeConfig.findOne();
+    if (!config) {
+      config = await ThemeConfig.create({
+        activeTheme: 'lavender-rose',
+        themeMode: 'light',
+        updatedBy: 'System Default',
+        updatedAt: new Date()
+      });
+    }
+    res.json({
+      activeTheme: config.activeTheme || 'lavender-rose',
+      themeMode: config.themeMode || 'light',
+      updatedAt: config.updatedAt
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin Theme Endpoint (Protected: Super Admin & Administrator only)
+app.get('/api/admin/theme', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  try {
+    let config = await ThemeConfig.findOne();
+    if (!config) {
+      config = await ThemeConfig.create({
+        activeTheme: 'lavender-rose',
+        themeMode: 'light',
+        updatedBy: 'System Default',
+        updatedAt: new Date()
+      });
+    }
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin Update Theme Endpoint (Strict RBAC: Super Admin & Administrator only)
+app.patch('/api/admin/theme', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  try {
+    const { activeTheme, themeMode } = req.body;
+    const allowedThemes = ['lavender-rose', 'classic'];
+    const allowedModes = ['light', 'dark'];
+
+    if (activeTheme && !allowedThemes.includes(activeTheme)) {
+      return res.status(400).json({ 
+        error: `Invalid theme '${activeTheme}'. Supported themes are: ${allowedThemes.join(', ')}.` 
+      });
+    }
+
+    if (themeMode && !allowedModes.includes(themeMode)) {
+      return res.status(400).json({ 
+        error: `Invalid theme mode '${themeMode}'. Supported modes are: ${allowedModes.join(', ')}.` 
+      });
+    }
+
+    let config = await ThemeConfig.findOne();
+    if (!config) {
+      config = new ThemeConfig();
+    }
+
+    const previousTheme = config.activeTheme || 'lavender-rose';
+    const previousMode = config.themeMode || 'light';
+
+    if (activeTheme) config.activeTheme = activeTheme;
+    if (themeMode) config.themeMode = themeMode;
+
+    const user = req.session.user;
+    config.updatedBy = user.email;
+    config.updatedAt = new Date();
+
+    if (!config.history) config.history = [];
+    config.history.unshift({
+      theme: config.activeTheme,
+      mode: config.themeMode,
+      updatedBy: user.email,
+      timestamp: new Date()
+    });
+
+    if (config.history.length > 25) {
+      config.history = config.history.slice(0, 25);
+    }
+
+    await config.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'BRAND_THEME_UPDATED',
+      targetResource: 'practice:brand_theme',
+      details: {
+        newTheme: config.activeTheme,
+        newMode: config.themeMode,
+        previousTheme,
+        previousMode
       },
       req
     });

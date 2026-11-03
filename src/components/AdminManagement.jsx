@@ -1,15 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save, Trash2, Plus, Bell, Palette } from 'lucide-react';
-import { getActiveTheme, applyTheme, THEMES } from '../styles/theme-config.js';
+import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save, Trash2, Plus, Bell, Palette, Sun, Moon } from 'lucide-react';
+import { getActiveTheme, getActiveMode, applyTheme, THEMES, THEME_MODES } from '../styles/theme-config.js';
 import { formatISTDateTimeWithZone, normalizeToISTDate } from '../utils/dateTime.js';
 
 export default function AdminManagement({ currentUser }) {
   const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' | 'audit' | 'assignments' | 'scheduling' | 'appearance'
   const [currentTheme, setCurrentTheme] = useState(() => getActiveTheme());
+  const [currentMode, setCurrentMode] = useState(() => getActiveMode());
+  const [themeServerConfig, setThemeServerConfig] = useState({
+    activeTheme: 'lavender-rose',
+    themeMode: 'light',
+    history: []
+  });
+  const [pendingTheme, setPendingTheme] = useState('lavender-rose');
+  const [pendingMode, setPendingMode] = useState('light');
+  const [showThemeConfirmModal, setShowThemeConfirmModal] = useState(false);
+  const [themeActionType, setThemeActionType] = useState('apply'); // 'apply' | 'restore'
+  const [themeSaving, setThemeSaving] = useState(false);
+
+  const canManageTheme = currentUser && ['Super Admin', 'Administrator', 'provider'].includes(currentUser.role);
 
   useEffect(() => {
     const handleThemeChange = (e) => {
       if (e.detail?.theme) setCurrentTheme(e.detail.theme);
+      if (e.detail?.mode) setCurrentMode(e.detail.mode);
     };
     window.addEventListener('themeChanged', handleThemeChange);
     return () => window.removeEventListener('themeChanged', handleThemeChange);
@@ -157,6 +171,51 @@ export default function AdminManagement({ currentUser }) {
     }
   };
 
+  const fetchAdminTheme = async () => {
+    try {
+      const res = await fetch('/api/admin/theme', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setThemeServerConfig(data);
+        setCurrentTheme(data.activeTheme || THEMES.LAVENDER_ROSE);
+        setCurrentMode(data.themeMode || THEME_MODES.LIGHT);
+        setPendingTheme(data.activeTheme || THEMES.LAVENDER_ROSE);
+        setPendingMode(data.themeMode || THEME_MODES.LIGHT);
+      }
+    } catch (err) {
+      console.warn('Could not fetch admin theme config:', err);
+    }
+  };
+
+  const handleSaveThemeConfirm = async () => {
+    setThemeSaving(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const targetTheme = themeActionType === 'restore' ? THEMES.CLASSIC : pendingTheme;
+      const targetMode = pendingMode;
+      const res = await fetch('/api/admin/theme', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ activeTheme: targetTheme, themeMode: targetMode })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update global brand theme.');
+
+      applyTheme(targetTheme, targetMode);
+      setCurrentTheme(targetTheme);
+      setCurrentMode(targetMode);
+      setThemeServerConfig(data || { activeTheme: targetTheme, themeMode: targetMode, history: [] });
+      setSuccessMsg(`Brand theme successfully updated to ${targetTheme === THEMES.LAVENDER_ROSE ? 'Lavender & Dusty Rose' : 'Classic Oceanic Teal'} (${targetMode} mode).`);
+      setShowThemeConfirmModal(false);
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setThemeSaving(false);
+    }
+  };
+
   useEffect(() => {
     if (activeSubTab === 'users' || activeSubTab === 'assignments') {
       fetchUsers();
@@ -164,6 +223,8 @@ export default function AdminManagement({ currentUser }) {
       fetchAuditLogs();
     } else if (activeSubTab === 'scheduling') {
       fetchSchedulingConfig();
+    } else if (activeSubTab === 'appearance') {
+      fetchAdminTheme();
     }
   }, [activeSubTab]);
 
@@ -324,14 +385,16 @@ export default function AdminManagement({ currentUser }) {
           >
             <CalendarDays size={15} style={{ marginRight: '0.35rem' }} /> Practice Scheduling & IST
           </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeSubTab === 'appearance' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('appearance')}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-          >
-            <Palette size={15} style={{ marginRight: '0.35rem' }} /> Brand Theme & Appearance
-          </button>
+          {canManageTheme && (
+            <button
+              type="button"
+              className={`tab-btn ${activeSubTab === 'appearance' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('appearance')}
+              style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+            >
+              <Palette size={15} style={{ marginRight: '0.35rem' }} /> Brand Theme & Appearance
+            </button>
+          )}
         </div>
 
         {activeSubTab === 'users' && (
@@ -986,90 +1049,194 @@ export default function AdminManagement({ currentUser }) {
       )}
 
       {/* SUBTAB 5: BRAND THEME & APPEARANCE */}
-      {activeSubTab === 'appearance' && (
+      {canManageTheme && activeSubTab === 'appearance' && (
         <div className="glass-card" style={{ padding: '2rem', borderRadius: 'var(--radius-md)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          {/* Header & Status Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h4 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--color-slate-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Palette size={18} style={{ color: 'var(--color-slate)' }} />
+              <h4 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--color-slate-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Palette size={20} style={{ color: 'var(--color-slate)' }} />
                 Brand Theme & Visual Identity Governance
               </h4>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--color-slate-light)' }}>
-                Select and preview the authoritative brand theme applied across the public homepage, booking engine, client portal, and clinical administration.
+              <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.85rem', color: 'var(--color-slate-light)' }}>
+                Authoritative brand identity settings for the entire application. Restricted exclusively to Super Administrators.
               </p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-slate-light)' }}>Current Active:</span>
-              <span style={{
-                padding: '0.35rem 0.85rem',
-                borderRadius: '20px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                background: currentTheme === THEMES.BOTANICAL ? 'rgba(128, 80, 232, 0.15)' : 'rgba(15, 56, 61, 0.12)',
-                color: currentTheme === THEMES.BOTANICAL ? '#8050E8' : 'var(--color-slate)',
-                border: currentTheme === THEMES.BOTANICAL ? '1px solid rgba(128, 80, 232, 0.35)' : '1px solid var(--color-slate-20)'
-              }}>
-                {currentTheme === THEMES.BOTANICAL ? '🌿 Botanical Wellness' : '🌊 Classic Oceanic Teal'}
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-slate-light)' }}>Active Theme:</span>
+                <span style={{
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  background: currentTheme === THEMES.LAVENDER_ROSE ? 'rgba(128, 80, 232, 0.12)' : 'rgba(15, 56, 61, 0.12)',
+                  color: currentTheme === THEMES.LAVENDER_ROSE ? '#8050E8' : '#0F383D',
+                  border: currentTheme === THEMES.LAVENDER_ROSE ? '1px solid rgba(128, 80, 232, 0.35)' : '1px solid rgba(15, 56, 61, 0.35)'
+                }}>
+                  {currentTheme === THEMES.LAVENDER_ROSE ? '🌸 Lavender & Dusty Rose' : '🌊 Classic Oceanic Teal'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-slate-light)' }}>Mode:</span>
+                <span style={{
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  background: 'var(--color-slate-05)',
+                  color: 'var(--color-slate-dark)',
+                  border: '1px solid var(--color-slate-10)'
+                }}>
+                  {currentMode === THEME_MODES.DARK ? '🌙 Dark' : '☀️ Light'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Mode Switcher Selector */}
+          <div style={{
+            background: 'var(--color-slate-05)',
+            border: '1px solid var(--color-slate-10)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-slate-dark)' }}>
+                Theme Appearance Mode
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
+                Select whether the active brand theme should display in Light or Dark contrast mode.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', background: '#FFFFFF', padding: '0.25rem', borderRadius: '8px', border: '1px solid var(--color-slate-10)' }}>
+              <button
+                type="button"
+                onClick={() => setPendingMode(THEME_MODES.LIGHT)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.4rem 0.85rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: pendingMode === THEME_MODES.LIGHT ? '#8050E8' : 'transparent',
+                  color: pendingMode === THEME_MODES.LIGHT ? '#FFFFFF' : 'var(--color-slate-dark)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Sun size={14} /> Light Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingMode(THEME_MODES.DARK)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.4rem 0.85rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: pendingMode === THEME_MODES.DARK ? '#35264F' : 'transparent',
+                  color: pendingMode === THEME_MODES.DARK ? '#FFFFFF' : 'var(--color-slate-dark)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Moon size={14} /> Dark Mode
+              </button>
             </div>
           </div>
 
           {/* Theme Selection Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', marginBottom: '1.75rem' }}>
             
-            {/* THEME 1: BOTANICAL WELLNESS */}
+            {/* THEME 1: OFFICIAL LAVENDER + DUSTY ROSE */}
             <div style={{
               borderRadius: 'var(--radius-md)',
-              border: currentTheme === THEMES.BOTANICAL ? '2px solid #8050E8' : '1px solid var(--color-slate-10)',
-              background: currentTheme === THEMES.BOTANICAL ? 'rgba(128, 80, 232, 0.04)' : '#FFFFFF',
+              border: currentTheme === THEMES.LAVENDER_ROSE ? '2px solid #8050E8' : '1px solid var(--color-slate-10)',
+              background: currentTheme === THEMES.LAVENDER_ROSE ? 'rgba(128, 80, 232, 0.03)' : '#FFFFFF',
               padding: '1.5rem',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              boxShadow: currentTheme === THEMES.BOTANICAL ? '0 10px 25px -5px rgba(128, 80, 232, 0.2)' : 'none',
+              boxShadow: currentTheme === THEMES.LAVENDER_ROSE ? '0 10px 25px -5px rgba(128, 80, 232, 0.2)' : 'none',
               transition: 'all 0.2s ease'
             }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <h5 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#35264F' }}>
-                    🌿 Botanical Wellness
+                  <h5 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#35264F' }}>
+                    🌸 Lavender & Dusty Rose
                   </h5>
-                  {currentTheme === THEMES.BOTANICAL && (
+                  {currentTheme === THEMES.LAVENDER_ROSE && (
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#8050E8', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '12px' }}>
-                      ACTIVE
+                      ACTIVE THEME
                     </span>
                   )}
                 </div>
-                <p style={{ fontSize: '0.84rem', color: '#674E8C', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                  Contemporary mental wellness aesthetic blending therapeutic Lavender Purple with vitality Botanical Green and soothing Warm Ivory surfaces.
+                <p style={{ fontSize: '0.84rem', color: '#756B83', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+                  Official brand visual identity: Therapeutic Lavender Purple, Dusty Rose secondary accents, Warm Ivory surfaces, and Deep Plum typography. Fully removes green brand accents.
                 </p>
 
-                {/* Swatches */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                {/* Swatches breakdown */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.45rem', marginBottom: '1.25rem' }}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ height: '36px', background: '#8050E8', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Lavender #8050E8</span>
+                    <div style={{ height: '32px', background: '#8050E8', borderRadius: '6px', marginBottom: '0.2rem' }}></div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#35264F' }}>Lavender<br/>#8050E8</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ height: '36px', background: '#55B96A', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Botanical #55B96A</span>
+                    <div style={{ height: '32px', background: '#D98C9B', borderRadius: '6px', marginBottom: '0.2rem' }}></div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#35264F' }}>Dusty Rose<br/>#D98C9B</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ height: '36px', background: '#F8F6F1', border: '1px solid #E2DED5', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Warm Ivory #F8F6F1</span>
+                    <div style={{ height: '32px', background: '#F8F6F1', border: '1px solid #E2DED5', borderRadius: '6px', marginBottom: '0.2rem' }}></div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#35264F' }}>Ivory<br/>#F8F6F1</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ height: '36px', background: '#F4EEFF', border: '1px solid #E4D8FA', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Soft Lav #F4EEFF</span>
+                    <div style={{ height: '32px', background: '#35264F', borderRadius: '6px', marginBottom: '0.2rem' }}></div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#35264F' }}>Plum<br/>#35264F</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ height: '36px', background: '#EFF7EE', border: '1px solid #DAEBD8', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Pale Sage #EFF7EE</span>
+                    <div style={{ height: '32px', background: '#693BD0', borderRadius: '6px', marginBottom: '0.2rem' }}></div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#35264F' }}>Deep Purp<br/>#693BD0</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ height: '36px', background: '#35264F', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Deep Plum #35264F</span>
+                    <div style={{ height: '32px', background: '#F4EEFF', border: '1px solid #E7E0F0', borderRadius: '6px', marginBottom: '0.2rem' }}></div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#35264F' }}>Soft Lav<br/>#F4EEFF</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '32px', background: '#FAF0F2', border: '1px solid #E7E0F0', borderRadius: '6px', marginBottom: '0.2rem' }}></div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#35264F' }}>Pale Rose<br/>#FAF0F2</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '32px', background: '#756B83', borderRadius: '6px', marginBottom: '0.2rem' }}></div>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#35264F' }}>Slate<br/>#756B83</span>
+                  </div>
+                </div>
+
+                {/* Functional status swatches */}
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', padding: '0.5rem', background: '#FAF0F2', borderRadius: '6px' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#398C83' }}></div> Teal Success
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#D99A35' }}></div> Amber Warning
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#C84C55' }}></div> Red Error
                   </div>
                 </div>
               </div>
@@ -1077,24 +1244,25 @@ export default function AdminManagement({ currentUser }) {
               <button
                 type="button"
                 onClick={() => {
-                  applyTheme(THEMES.BOTANICAL);
-                  setCurrentTheme(THEMES.BOTANICAL);
+                  setPendingTheme(THEMES.LAVENDER_ROSE);
+                  setThemeActionType('apply');
+                  setShowThemeConfirmModal(true);
                 }}
-                disabled={currentTheme === THEMES.BOTANICAL}
+                disabled={currentTheme === THEMES.LAVENDER_ROSE && currentMode === pendingMode}
                 style={{
                   width: '100%',
-                  padding: '0.65rem 1rem',
+                  padding: '0.7rem 1rem',
                   borderRadius: 'var(--radius-pill)',
                   border: 'none',
-                  background: currentTheme === THEMES.BOTANICAL ? 'rgba(128, 80, 232, 0.2)' : 'linear-gradient(135deg, #35264F 0%, #8050E8 100%)',
-                  color: currentTheme === THEMES.BOTANICAL ? '#8050E8' : '#FFFFFF',
+                  background: (currentTheme === THEMES.LAVENDER_ROSE && currentMode === pendingMode) ? 'rgba(128, 80, 232, 0.2)' : 'linear-gradient(135deg, #35264F 0%, #8050E8 100%)',
+                  color: (currentTheme === THEMES.LAVENDER_ROSE && currentMode === pendingMode) ? '#8050E8' : '#FFFFFF',
                   fontWeight: 600,
                   fontSize: '0.85rem',
-                  cursor: currentTheme === THEMES.BOTANICAL ? 'default' : 'pointer',
+                  cursor: (currentTheme === THEMES.LAVENDER_ROSE && currentMode === pendingMode) ? 'default' : 'pointer',
                   transition: 'all 0.2s ease'
                 }}
               >
-                {currentTheme === THEMES.BOTANICAL ? '✓ Currently Active Theme' : 'Apply Botanical Wellness Theme'}
+                {(currentTheme === THEMES.LAVENDER_ROSE && currentMode === pendingMode) ? '✓ Currently Active Theme' : 'Apply Lavender & Dusty Rose Globally'}
               </button>
             </div>
 
@@ -1102,7 +1270,7 @@ export default function AdminManagement({ currentUser }) {
             <div style={{
               borderRadius: 'var(--radius-md)',
               border: currentTheme === THEMES.CLASSIC ? '2px solid #0F383D' : '1px solid var(--color-slate-10)',
-              background: currentTheme === THEMES.CLASSIC ? 'rgba(15, 56, 61, 0.04)' : '#FFFFFF',
+              background: currentTheme === THEMES.CLASSIC ? 'rgba(15, 56, 61, 0.03)' : '#FFFFFF',
               padding: '1.5rem',
               display: 'flex',
               flexDirection: 'column',
@@ -1112,8 +1280,8 @@ export default function AdminManagement({ currentUser }) {
             }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <h5 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0F383D' }}>
-                    🌊 Classic Oceanic Teal (Preserved Original)
+                  <h5 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0F383D' }}>
+                    🌊 Classic Oceanic Teal (Permanent Backup)
                   </h5>
                   {currentTheme === THEMES.CLASSIC && (
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#0F383D', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '12px' }}>
@@ -1122,34 +1290,34 @@ export default function AdminManagement({ currentUser }) {
                   )}
                 </div>
                 <p style={{ fontSize: '0.84rem', color: '#2E6863', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                  Original clinical identity featuring deep oceanic teal, warm copper terracotta accents, and calm alabaster ice white backgrounds.
+                  Original clinical identity featuring deep oceanic teal, warm copper terracotta accents, and calm alabaster ice white backgrounds. Preserved permanently as a reliable rollback option.
                 </p>
 
-                {/* Swatches */}
+                {/* Swatches breakdown */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.25rem' }}>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ height: '36px', background: '#0F383D', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Deep Teal #0F383D</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Deep Teal<br/>#0F383D</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ height: '36px', background: '#D97736', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Terracotta #D97736</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Terracotta<br/>#D97736</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ height: '36px', background: '#F4FAF8', border: '1px solid #D6E8E3', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Alabaster #F4FAF8</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Alabaster<br/>#F4FAF8</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ height: '36px', background: '#CBE6E3', border: '1px solid #B0D5D1', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Mint Sage #CBE6E3</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Mint Sage<br/>#CBE6E3</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ height: '36px', background: '#2E6863', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Eucalyptus #2E6863</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Eucalyptus<br/>#2E6863</span>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ height: '36px', background: '#072226', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Midnight #072226</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Midnight<br/>#072226</span>
                   </div>
                 </div>
               </div>
@@ -1157,30 +1325,77 @@ export default function AdminManagement({ currentUser }) {
               <button
                 type="button"
                 onClick={() => {
-                  applyTheme(THEMES.CLASSIC);
-                  setCurrentTheme(THEMES.CLASSIC);
+                  setThemeActionType('restore');
+                  setShowThemeConfirmModal(true);
                 }}
-                disabled={currentTheme === THEMES.CLASSIC}
+                disabled={currentTheme === THEMES.CLASSIC && currentMode === pendingMode}
                 style={{
                   width: '100%',
-                  padding: '0.65rem 1rem',
+                  padding: '0.7rem 1rem',
                   borderRadius: 'var(--radius-pill)',
                   border: 'none',
-                  background: currentTheme === THEMES.CLASSIC ? 'rgba(15, 56, 61, 0.2)' : 'linear-gradient(135deg, #072226 0%, #0F383D 100%)',
-                  color: currentTheme === THEMES.CLASSIC ? '#0F383D' : '#FFFFFF',
+                  background: (currentTheme === THEMES.CLASSIC && currentMode === pendingMode) ? 'rgba(15, 56, 61, 0.2)' : 'linear-gradient(135deg, #072226 0%, #0F383D 100%)',
+                  color: (currentTheme === THEMES.CLASSIC && currentMode === pendingMode) ? '#0F383D' : '#FFFFFF',
                   fontWeight: 600,
                   fontSize: '0.85rem',
-                  cursor: currentTheme === THEMES.CLASSIC ? 'default' : 'pointer',
+                  cursor: (currentTheme === THEMES.CLASSIC && currentMode === pendingMode) ? 'default' : 'pointer',
                   transition: 'all 0.2s ease'
                 }}
               >
-                {currentTheme === THEMES.CLASSIC ? '✓ Currently Active Theme' : 'Restore Classic Theme'}
+                {(currentTheme === THEMES.CLASSIC && currentMode === pendingMode) ? '✓ Currently Active Theme' : 'Restore Previous Classic Theme'}
               </button>
             </div>
 
           </div>
 
-          {/* Rollback Safety & Architecture Info */}
+          {/* Theme Audit & Change History */}
+          <div style={{ marginBottom: '1.75rem' }}>
+            <h5 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-slate-dark)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Clock size={16} /> Theme Modification Audit History
+            </h5>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-slate-05)', textAlign: 'left', borderBottom: '1px solid var(--color-slate-10)' }}>
+                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>IST Timestamp</th>
+                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>Theme</th>
+                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>Mode</th>
+                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>Updated By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {themeServerConfig.history && themeServerConfig.history.length > 0 ? (
+                    themeServerConfig.history.slice(-5).reverse().map((entry, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--color-slate-10)' }}>
+                        <td style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate)' }}>
+                          {formatISTDateTimeWithZone(entry.changedAt || entry.updatedAt)}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.85rem', fontWeight: 600 }}>
+                          {entry.theme === THEMES.LAVENDER_ROSE ? '🌸 Lavender & Rose' : '🌊 Classic Teal'}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.85rem' }}>
+                          <span style={{ textTransform: 'capitalize', padding: '2px 6px', borderRadius: '4px', background: 'var(--color-slate-05)', fontSize: '0.75rem' }}>
+                            {entry.mode || 'light'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-light)' }}>
+                          {entry.changedBy || entry.updatedBy || 'Super Admin'}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" style={{ padding: '1rem', textAlign: 'center', color: 'var(--color-slate-light)' }}>
+                        No previous theme changes recorded. Running on authoritative initial configuration.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Rollback Safety & Architecture Guarantee */}
           <div style={{
             background: 'var(--color-slate-05)',
             border: '1px solid var(--color-slate-10)',
@@ -1194,11 +1409,75 @@ export default function AdminManagement({ currentUser }) {
           }}>
             <div>
               <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--color-slate-dark)', marginBottom: '0.2rem' }}>
-                🛡️ Rollback Guarantee & Preservation Architecture
+                🛡️ Rollback Guarantee & Security Governance
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)', lineHeight: 1.4 }}>
-                The original theme is permanently archived in <code>src/styles/themes/classic-theme.css</code> and Git branch <code>theme-backup-classic</code>. Switching themes dynamically updates CSS variables with zero risk to clinical data, appointments, or user authentication.
+                The original theme is permanently archived in <code>src/styles/themes/classic-theme.css</code> and Git branch <code>theme-backup-classic</code>. Theme changes update CSS variables in real time and are logged in the tamper-evident security audit trail with zero risk to clinical patient records, appointments, or authentication.
               </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL: APPLY GLOBAL THEME CHANGE */}
+      {showThemeConfirmModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(30,22,42,0.6)', backdropFilter: 'blur(6px)', padding: '1rem' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '480px', padding: '2rem', borderRadius: 'var(--radius-md)', background: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
+              <Palette size={22} style={{ color: '#8050E8' }} />
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--color-slate-dark)' }}>
+                {themeActionType === 'restore' ? 'Confirm Restore Classic Theme' : 'Confirm Global Theme Change'}
+              </h3>
+            </div>
+            
+            <p style={{ fontSize: '0.88rem', color: 'var(--color-slate-light)', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+              {themeActionType === 'restore' ? (
+                <>Are you sure you want to restore the <strong>Classic Oceanic Teal</strong> theme globally? This will immediately apply across the public homepage, booking engine, client portal, and all clinical dashboards.</>
+              ) : (
+                <>You are about to globally apply the <strong>Lavender & Dusty Rose</strong> brand theme in <strong>{pendingMode}</strong> mode. This authoritative setting will be broadcast to all visitors and stored in the database.</>
+              )}
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowThemeConfirmModal(false)}
+                disabled={themeSaving}
+                style={{
+                  padding: '0.6rem 1.25rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1px solid var(--color-slate-20)',
+                  background: 'transparent',
+                  color: 'var(--color-slate-dark)',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveThemeConfirm}
+                disabled={themeSaving}
+                style={{
+                  padding: '0.6rem 1.35rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'none',
+                  background: themeActionType === 'restore' ? '#0F383D' : '#8050E8',
+                  color: '#FFFFFF',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                {themeSaving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />}
+                {themeSaving ? 'Applying...' : 'Confirm & Apply Globally'}
+              </button>
             </div>
           </div>
         </div>

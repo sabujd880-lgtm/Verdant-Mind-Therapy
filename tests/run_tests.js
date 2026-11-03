@@ -1270,6 +1270,89 @@ async function run() {
     assert.strictEqual(typeof result.reminders1hSent, 'number');
   });
 
+  // Test 48: Public Global Theme Configuration Retrieval
+  await test('Brand Theme: Public GET /api/theme returns active theme and mode', async () => {
+    const themeRes = await fetch(`${BASE_URL}/api/theme`);
+    assert.strictEqual(themeRes.status, 200);
+    const themeData = await themeRes.json();
+    assert.ok(themeData.activeTheme === 'lavender-rose' || themeData.activeTheme === 'classic');
+    assert.ok(themeData.themeMode === 'light' || themeData.themeMode === 'dark');
+  });
+
+  // Test 49: Role-Restricted Admin Theme Governance Rejection
+  await test('Brand Theme: GET/PATCH /api/admin/theme rejects unauthenticated requests and invalid theme values', async () => {
+    // Unauthenticated GET
+    const unauthRes = await fetch(`${BASE_URL}/api/admin/theme`);
+    assert.strictEqual(unauthRes.status, 401);
+
+    // Unauthenticated PATCH
+    const unauthPatch = await fetch(`${BASE_URL}/api/admin/theme`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activeTheme: 'classic' })
+    });
+    assert.strictEqual(unauthPatch.status, 401);
+
+    // Invalid theme value validation
+    const invalidPatch = await fetch(`${BASE_URL}/api/admin/theme`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({ activeTheme: 'unsupported-neon-green' })
+    });
+    assert.strictEqual(invalidPatch.status, 400);
+    const errBody = await invalidPatch.json();
+    assert.ok(errBody.error.includes('Invalid theme'));
+  });
+
+  // Test 50: Super Admin Theme Switch, Mode Toggle, and Audit Trail Verification
+  await test('Brand Theme: Super Admin can update theme globally with audit logging', async () => {
+    // 1. Super Admin switches to classic theme in dark mode
+    const patchClassic = await fetch(`${BASE_URL}/api/admin/theme`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({ activeTheme: 'classic', themeMode: 'dark' })
+    });
+    assert.strictEqual(patchClassic.status, 200);
+    const classicBody = await patchClassic.json();
+    assert.strictEqual(classicBody.activeTheme, 'classic');
+    assert.strictEqual(classicBody.themeMode, 'dark');
+
+    // 2. Verify public endpoint reflects change immediately
+    const verifyPublic = await fetch(`${BASE_URL}/api/theme`);
+    const publicData = await verifyPublic.json();
+    assert.strictEqual(publicData.activeTheme, 'classic');
+    assert.strictEqual(publicData.themeMode, 'dark');
+
+    // 3. Super Admin switches back to authoritative lavender-rose theme in light mode
+    const patchLavender = await fetch(`${BASE_URL}/api/admin/theme`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({ activeTheme: 'lavender-rose', themeMode: 'light' })
+    });
+    assert.strictEqual(patchLavender.status, 200);
+    const lavenderBody = await patchLavender.json();
+    assert.strictEqual(lavenderBody.activeTheme, 'lavender-rose');
+    assert.strictEqual(lavenderBody.themeMode, 'light');
+
+    // 4. Verify audit log captures BRAND_THEME_UPDATED
+    const auditRes = await fetch(`${BASE_URL}/api/admin/audit-logs`, {
+      headers: { Cookie: adminSessionCookie }
+    });
+    assert.strictEqual(auditRes.status, 200);
+    const logs = await auditRes.json();
+    const themeAudit = logs.find(l => l.action === 'BRAND_THEME_UPDATED');
+    assert.ok(themeAudit, 'Audit trail must record BRAND_THEME_UPDATED event');
+  });
+
   console.log('\n===========================================================');
   console.log(`TEST SUMMARY: ${passedCount} PASSED, ${failedCount} FAILED`);
   console.log('===========================================================');

@@ -2,7 +2,7 @@
 
 /* Centralized Theme Architecture */
 @import './styles/themes/classic-theme.css';
-@import './styles/themes/botanical-theme.css';
+@import './styles/themes/lavender-rose-theme.css';
 
 /* Reset */
 *, *::before, *::after {
