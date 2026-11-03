@@ -943,7 +943,7 @@ async function run() {
 
   // Test 41: Appointment API strictly requires and stores DD-MM-YYYY in Asia/Kolkata
   await test('Appointment API: Stores DD-MM-YYYY and 12-hour AM/PM and rejects collision', async () => {
-    const uniqueYear = 2030 + (Date.now() % 500);
+    const uniqueYear = 2100 + Math.floor(Math.random() * 100000);
     const istBookingDate = `18-09-${uniqueYear}`;
     const istBookingTime = '11:00 AM';
 

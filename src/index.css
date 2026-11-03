@@ -1371,7 +1371,7 @@ button {
   margin-top: 1.5rem;
   display: flex;
   flex-direction: column;
-  justifyContent: center;
+  justify-content: center;
   align-items: center;
   text-align: center;
   gap: 0.45rem;
