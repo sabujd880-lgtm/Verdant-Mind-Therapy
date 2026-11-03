@@ -625,9 +625,10 @@ function App() {
         </div>
 
         <div className="container footer-bottom">
-          <p>© {new Date().getFullYear()} Verdant Mind Clinical Psychology. Encrypted Healthcare Portal.</p>
-          <div style={{ display: 'flex', gap: '1.5rem' }}>
+          <p className="footer-copyright-text">© {new Date().getFullYear()} Verdant Mind Clinical Psychology. Encrypted Healthcare Portal.</p>
+          <div className="footer-compliance-badges">
             <span>HIPAA & Healthcare Data Protection Standard</span>
+            <span>•</span>
             <span>AES-256 Cloud Encryption</span>
           </div>
         </div>
