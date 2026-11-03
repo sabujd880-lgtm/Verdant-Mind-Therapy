@@ -3758,7 +3758,7 @@ app.post('/api/ai/polish', aiLimiter, async (req, res) => {
   }
 
   try {
-    const systemPrompt = "You are a professional, licensed clinical psychologist and therapist. Your job is to polish, formalize, and improve draft therapist notes or clinical observations. Rewrite the note to sound highly formal, professional, empathetic, and clinically precise. Keep the original clinical meaning exactly as intended. Keep the output direct and concise, without any pleasantries, conversational intros, or notes about the edits.";
+    const systemPrompt = "You are a professional, licensed consultant psychologist and therapist. Your job is to polish, formalize, and improve draft therapist notes or clinical observations. Rewrite the note to sound highly formal, professional, empathetic, and clinically precise. Keep the original clinical meaning exactly as intended. Keep the output direct and concise, without any pleasantries, conversational intros, or notes about the edits.";
     const userPrompt = `Please rewrite and polish the following draft note for a client document:\n\n"${text}"`;
     const polishedText = await callGeminiAPI(userPrompt, systemPrompt);
     res.json({ success: true, polishedText });

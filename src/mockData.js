@@ -1,6 +1,6 @@
 export const INITIAL_PROFILE = {
   name: "Sabuj Das",
-  title: "Psychologist",
+  title: "Consultant Psychologist",
   location: "Kolkata, India",
   experience: "1+ Years",
   languages: ["English", "Hindi", "Bengali"],

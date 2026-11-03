@@ -943,8 +943,9 @@ async function run() {
 
   // Test 41: Appointment API strictly requires and stores DD-MM-YYYY in Asia/Kolkata
   await test('Appointment API: Stores DD-MM-YYYY and 12-hour AM/PM and rejects collision', async () => {
-    const uniqueYear = 2100 + Math.floor(Math.random() * 100000);
-    const istBookingDate = `18-09-${uniqueYear}`;
+    const uniqueYear = 2050 + Math.floor(Math.random() * 800);
+    const uniqueDay = String(10 + Math.floor(Math.random() * 18)).padStart(2, '0');
+    const istBookingDate = `${uniqueDay}-09-${uniqueYear}`;
     const istBookingTime = '11:00 AM';
 
     // 1. Book appointment with canonical DD-MM-YYYY
@@ -967,7 +968,7 @@ async function run() {
     assert.strictEqual(data.time, '11:00 AM');
     assert.ok(data.appointmentUtc, 'appointmentUtc must be populated');
     const storedUtc = new Date(data.appointmentUtc);
-    assert.strictEqual(storedUtc.toISOString(), `${uniqueYear}-09-18T05:30:00.000Z`);
+    assert.strictEqual(storedUtc.toISOString(), `${uniqueYear}-09-${uniqueDay}T05:30:00.000Z`);
 
     // 2. Reject duplicate booking attempt on same slot (even if sent in YYYY-MM-DD)
     const dupRes = await fetch(`${BASE_URL}/api/appointments`, {
@@ -977,7 +978,7 @@ async function run() {
         clientEmail: 'another_patient@example.com',
         clientName: 'Another Patient',
         clientPhone: '+91 98765 11111',
-        date: `${uniqueYear}-09-18`, // Same day in YYYY-MM-DD
+        date: `${uniqueYear}-09-${uniqueDay}`, // Same day in YYYY-MM-DD
         time: '11:00 AM',
         sessionMode: 'Audio Session',
         problemDescription: 'Duplicate conflict test'

@@ -596,7 +596,7 @@ function App() {
               <h3 style={{ margin: 0 }}>Verdant Mind</h3>
             </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--color-terracotta)', fontWeight: 600, marginBottom: '0.75rem' }}>
-              Sabuj Das | Clinical Psychologist
+              Sabuj Das | Consultant Psychologist
             </p>
             <p>
               Dedicated to offering evidence-based, compassionate cognitive counseling and dialectical therapy to heal, support, and transform lives.
@@ -634,7 +634,7 @@ function App() {
         </div>
 
         <div className="container footer-bottom">
-          <p className="footer-copyright-text">© {new Date().getFullYear()} Verdant Mind Clinical Psychology. Encrypted Healthcare Portal.</p>
+          <p className="footer-copyright-text">© {new Date().getFullYear()} Verdant Mind Counselling Portal. Encrypted Healthcare Portal.</p>
           <div className="footer-compliance-badges">
             <span>HIPAA & Healthcare Data Protection Standard</span>
             <span>•</span>

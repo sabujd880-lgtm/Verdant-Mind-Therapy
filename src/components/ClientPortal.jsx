@@ -419,7 +419,7 @@ export default function ClientPortal({
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid var(--color-slate)', paddingBottom: '1.25rem', marginBottom: '1.75rem' }}>
                   <div>
                     <h2 style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--color-slate-dark)', fontSize: '1.45rem', fontWeight: 700, margin: 0 }}>Verdant Mind</h2>
-                    <p style={{ color: 'var(--color-slate-light)', fontSize: '0.8rem', fontWeight: 500, margin: '0.1rem 0 0 0' }}>Sabuj Das | Psychologist</p>
+                    <p style={{ color: 'var(--color-slate-light)', fontSize: '0.8rem', fontWeight: 500, margin: '0.1rem 0 0 0' }}>Sabuj Das | Consultant Psychologist</p>
                     <p style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', margin: '0.2rem 0 0 0' }}>Specialization: ADHD, Anxiety, Depression & DBT</p>
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.74rem', color: 'var(--color-slate-light)', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
