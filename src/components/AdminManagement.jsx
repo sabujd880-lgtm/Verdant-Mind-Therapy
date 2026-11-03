@@ -1,9 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save, Trash2, Plus, Bell } from 'lucide-react';
+import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save, Trash2, Plus, Bell, Palette } from 'lucide-react';
+import { getActiveTheme, applyTheme, THEMES } from '../styles/theme-config.js';
 import { formatISTDateTimeWithZone, normalizeToISTDate } from '../utils/dateTime.js';
 
 export default function AdminManagement({ currentUser }) {
-  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' | 'audit' | 'assignments' | 'scheduling'
+  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' | 'audit' | 'assignments' | 'scheduling' | 'appearance'
+  const [currentTheme, setCurrentTheme] = useState(() => getActiveTheme());
+
+  useEffect(() => {
+    const handleThemeChange = (e) => {
+      if (e.detail?.theme) setCurrentTheme(e.detail.theme);
+    };
+    window.addEventListener('themeChanged', handleThemeChange);
+    return () => window.removeEventListener('themeChanged', handleThemeChange);
+  }, []);
   const [users, setUsers] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [schedConfig, setSchedConfig] = useState({
@@ -313,6 +323,14 @@ export default function AdminManagement({ currentUser }) {
             style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
           >
             <CalendarDays size={15} style={{ marginRight: '0.35rem' }} /> Practice Scheduling & IST
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeSubTab === 'appearance' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('appearance')}
+            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+          >
+            <Palette size={15} style={{ marginRight: '0.35rem' }} /> Brand Theme & Appearance
           </button>
         </div>
 
@@ -964,6 +982,225 @@ export default function AdminManagement({ currentUser }) {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* SUBTAB 5: BRAND THEME & APPEARANCE */}
+      {activeSubTab === 'appearance' && (
+        <div className="glass-card" style={{ padding: '2rem', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--color-slate-dark)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Palette size={18} style={{ color: 'var(--color-slate)' }} />
+                Brand Theme & Visual Identity Governance
+              </h4>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--color-slate-light)' }}>
+                Select and preview the authoritative brand theme applied across the public homepage, booking engine, client portal, and clinical administration.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-slate-light)' }}>Current Active:</span>
+              <span style={{
+                padding: '0.35rem 0.85rem',
+                borderRadius: '20px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                background: currentTheme === THEMES.BOTANICAL ? 'rgba(128, 80, 232, 0.15)' : 'rgba(15, 56, 61, 0.12)',
+                color: currentTheme === THEMES.BOTANICAL ? '#8050E8' : 'var(--color-slate)',
+                border: currentTheme === THEMES.BOTANICAL ? '1px solid rgba(128, 80, 232, 0.35)' : '1px solid var(--color-slate-20)'
+              }}>
+                {currentTheme === THEMES.BOTANICAL ? '🌿 Botanical Wellness' : '🌊 Classic Oceanic Teal'}
+              </span>
+            </div>
+          </div>
+
+          {/* Theme Selection Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+            
+            {/* THEME 1: BOTANICAL WELLNESS */}
+            <div style={{
+              borderRadius: 'var(--radius-md)',
+              border: currentTheme === THEMES.BOTANICAL ? '2px solid #8050E8' : '1px solid var(--color-slate-10)',
+              background: currentTheme === THEMES.BOTANICAL ? 'rgba(128, 80, 232, 0.04)' : '#FFFFFF',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              boxShadow: currentTheme === THEMES.BOTANICAL ? '0 10px 25px -5px rgba(128, 80, 232, 0.2)' : 'none',
+              transition: 'all 0.2s ease'
+            }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <h5 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#35264F' }}>
+                    🌿 Botanical Wellness
+                  </h5>
+                  {currentTheme === THEMES.BOTANICAL && (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#8050E8', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '12px' }}>
+                      ACTIVE
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: '0.84rem', color: '#674E8C', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+                  Contemporary mental wellness aesthetic blending therapeutic Lavender Purple with vitality Botanical Green and soothing Warm Ivory surfaces.
+                </p>
+
+                {/* Swatches */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#8050E8', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Lavender #8050E8</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#55B96A', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Botanical #55B96A</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#F8F6F1', border: '1px solid #E2DED5', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Warm Ivory #F8F6F1</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#F4EEFF', border: '1px solid #E4D8FA', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Soft Lav #F4EEFF</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#EFF7EE', border: '1px solid #DAEBD8', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Pale Sage #EFF7EE</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#35264F', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#35264F' }}>Deep Plum #35264F</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  applyTheme(THEMES.BOTANICAL);
+                  setCurrentTheme(THEMES.BOTANICAL);
+                }}
+                disabled={currentTheme === THEMES.BOTANICAL}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 1rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'none',
+                  background: currentTheme === THEMES.BOTANICAL ? 'rgba(128, 80, 232, 0.2)' : 'linear-gradient(135deg, #35264F 0%, #8050E8 100%)',
+                  color: currentTheme === THEMES.BOTANICAL ? '#8050E8' : '#FFFFFF',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: currentTheme === THEMES.BOTANICAL ? 'default' : 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {currentTheme === THEMES.BOTANICAL ? '✓ Currently Active Theme' : 'Apply Botanical Wellness Theme'}
+              </button>
+            </div>
+
+            {/* THEME 2: CLASSIC (PERMANENT ORIGINAL BACKUP) */}
+            <div style={{
+              borderRadius: 'var(--radius-md)',
+              border: currentTheme === THEMES.CLASSIC ? '2px solid #0F383D' : '1px solid var(--color-slate-10)',
+              background: currentTheme === THEMES.CLASSIC ? 'rgba(15, 56, 61, 0.04)' : '#FFFFFF',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              boxShadow: currentTheme === THEMES.CLASSIC ? '0 10px 25px -5px rgba(15, 56, 61, 0.2)' : 'none',
+              transition: 'all 0.2s ease'
+            }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <h5 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#0F383D' }}>
+                    🌊 Classic Oceanic Teal (Preserved Original)
+                  </h5>
+                  {currentTheme === THEMES.CLASSIC && (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#0F383D', color: '#fff', padding: '0.2rem 0.6rem', borderRadius: '12px' }}>
+                      ACTIVE
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: '0.84rem', color: '#2E6863', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+                  Original clinical identity featuring deep oceanic teal, warm copper terracotta accents, and calm alabaster ice white backgrounds.
+                </p>
+
+                {/* Swatches */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#0F383D', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Deep Teal #0F383D</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#D97736', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Terracotta #D97736</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#F4FAF8', border: '1px solid #D6E8E3', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Alabaster #F4FAF8</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#CBE6E3', border: '1px solid #B0D5D1', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Mint Sage #CBE6E3</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#2E6863', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Eucalyptus #2E6863</span>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', background: '#072226', borderRadius: '6px', marginBottom: '0.25rem' }}></div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#072226' }}>Midnight #072226</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  applyTheme(THEMES.CLASSIC);
+                  setCurrentTheme(THEMES.CLASSIC);
+                }}
+                disabled={currentTheme === THEMES.CLASSIC}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 1rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: 'none',
+                  background: currentTheme === THEMES.CLASSIC ? 'rgba(15, 56, 61, 0.2)' : 'linear-gradient(135deg, #072226 0%, #0F383D 100%)',
+                  color: currentTheme === THEMES.CLASSIC ? '#0F383D' : '#FFFFFF',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  cursor: currentTheme === THEMES.CLASSIC ? 'default' : 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {currentTheme === THEMES.CLASSIC ? '✓ Currently Active Theme' : 'Restore Classic Theme'}
+              </button>
+            </div>
+
+          </div>
+
+          {/* Rollback Safety & Architecture Info */}
+          <div style={{
+            background: 'var(--color-slate-05)',
+            border: '1px solid var(--color-slate-10)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '1rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--color-slate-dark)', marginBottom: '0.2rem' }}>
+                🛡️ Rollback Guarantee & Preservation Architecture
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-slate-light)', lineHeight: 1.4 }}>
+                The original theme is permanently archived in <code>src/styles/themes/classic-theme.css</code> and Git branch <code>theme-backup-classic</code>. Switching themes dynamically updates CSS variables with zero risk to clinical data, appointments, or user authentication.
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

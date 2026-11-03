@@ -403,22 +403,22 @@ export default function ClientPortal({
                 className="printable-doc-container"
                 style={{
                   background: '#FFFFFF',
-                  color: '#0F383D',
+                  color: 'var(--color-slate-dark)',
                   fontFamily: 'Inter, sans-serif',
                   padding: '2.5rem',
-                  border: '1px solid rgba(15, 56, 61, 0.1)',
+                  border: '1px solid var(--color-slate-10)',
                   position: 'relative'
                 }}
               >
                 {/* Print Title Watermark */}
-                <div style={{ position: 'absolute', top: '15px', right: '15px', border: '1px solid rgba(15, 56, 61, 0.2)', padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '4px', textTransform: 'uppercase', color: 'var(--color-slate-light)', fontWeight: 600 }}>
+                <div style={{ position: 'absolute', top: '15px', right: '15px', border: '1px solid var(--color-slate-20)', padding: '0.2rem 0.5rem', fontSize: '0.65rem', borderRadius: '4px', textTransform: 'uppercase', color: 'var(--color-slate-light)', fontWeight: 600 }}>
                   Client Copy
                 </div>
 
                 {/* CLINIC HEADER */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #0F383D', paddingBottom: '1.25rem', marginBottom: '1.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid var(--color-slate)', paddingBottom: '1.25rem', marginBottom: '1.75rem' }}>
                   <div>
-                    <h2 style={{ fontFamily: 'Outfit, sans-serif', color: '#1A2E28', fontSize: '1.45rem', fontWeight: 700, margin: 0 }}>Verdant Mind</h2>
+                    <h2 style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--color-slate-dark)', fontSize: '1.45rem', fontWeight: 700, margin: 0 }}>Verdant Mind</h2>
                     <p style={{ color: 'var(--color-slate-light)', fontSize: '0.8rem', fontWeight: 500, margin: '0.1rem 0 0 0' }}>Sabuj Das | Psychologist</p>
                     <p style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', margin: '0.2rem 0 0 0' }}>Specialization: ADHD, Anxiety, Depression & DBT</p>
                   </div>
@@ -438,8 +438,8 @@ export default function ClientPortal({
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
-                    color: '#1A2E28',
-                    borderBottom: '1px solid rgba(42, 71, 62, 0.15)',
+                    color: 'var(--color-slate-dark)',
+                    borderBottom: '1px solid var(--color-slate-20)',
                     display: 'inline-block',
                     paddingBottom: '0.25rem',
                     margin: 0
@@ -578,7 +578,7 @@ export default function ClientPortal({
                   </div>
                   
                   <div style={{ textAlign: 'center', width: '180px' }}>
-                    <div style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: '1.1rem', color: 'var(--color-slate-dark)', borderBottom: '1px solid #0F383D', paddingBottom: '0.1rem', marginBottom: '0.3rem', display: 'inline-block' }}>
+                    <div style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic', fontSize: '1.1rem', color: 'var(--color-slate-dark)', borderBottom: '1px solid var(--color-slate)', paddingBottom: '0.1rem', marginBottom: '0.3rem', display: 'inline-block' }}>
                       Sabuj Das
                     </div>
                     <div style={{ fontSize: '0.68rem', color: 'var(--color-slate-light)', fontWeight: 600 }}>Sabuj Das, Counsel Lic. #990231</div>

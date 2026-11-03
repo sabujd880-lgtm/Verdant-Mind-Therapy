@@ -1,0 +1,123 @@
+/**
+ * ============================================================================
+ * BOTANICAL WELLNESS THEME
+ * Project: Psychology Portfolio - Verdant Mind
+ * 
+ * Palette:
+ * - Primary: Lavender Purple (#8050E8)
+ * - Secondary: Botanical Green (#55B96A)
+ * - Background: Warm Ivory (#F8F6F1)
+ * - Supporting 1: Soft Lavender (#F4EEFF)
+ * - Supporting 2: Pale Sage (#EFF7EE)
+ * - Text / Contrast: Deep Plum (#35264F)
+ * ============================================================================
+ */
+
+:root[data-theme="botanical"] {
+  /* Core Brand Tokens */
+  --color-primary: #8050E8;           /* Lavender Purple */
+  --color-secondary: #55B96A;         /* Botanical Green */
+  --color-background: #F8F6F1;        /* Warm Ivory */
+  --color-soft-lavender: #F4EEFF;     /* Supporting Soft Lavender */
+  --color-pale-sage: #EFF7EE;         /* Supporting Pale Sage */
+  --color-deep-plum: #35264F;         /* Deep Plum Typography & Contrast */
+
+  /* Semantic System Mapping (harmonizes with existing layout components) */
+  --color-slate: #8050E8;             /* Primary Brand Accent (Lavender Purple) */
+  --color-slate-light: #674E8C;       /* Elegant Muted Plum (Subtitles, labels, secondary icons) */
+  --color-slate-dark: #35264F;        /* Deep Plum (Headings, primary buttons, high-contrast text) */
+  --color-terracotta: #55B96A;        /* Secondary Accent (Botanical Green for CTAs, highlights, badges) */
+  --color-terracotta-light: #88D89A;  /* Soft Botanical Green */
+  --color-sage: #EFF7EE;              /* Supporting Pale Sage (Cards, soft badges, tag fills) */
+  --color-cream: #F8F6F1;             /* Warm Ivory base (Containers, inner cards, subtle rows) */
+  --color-white: #FFFFFF;
+
+  /* Opacity Variants */
+  --color-slate-05: rgba(128, 80, 232, 0.05);   /* Very light soft lavender tint */
+  --color-slate-10: rgba(128, 80, 232, 0.10);   /* Gentle lavender border/background */
+  --color-slate-20: rgba(128, 80, 232, 0.20);   /* Distinct lavender border */
+  --color-slate-80: rgba(53, 38, 79, 0.80);     /* Deep Plum overlay text */
+  --color-terracotta-10: rgba(85, 185, 106, 0.12); /* Light botanical green pill */
+  --color-white-80: rgba(255, 255, 255, 0.85);
+
+  /* Botanical Linear Gradients */
+  --gradient-primary: linear-gradient(135deg, #35264F 0%, #8050E8 100%);
+  --gradient-accent: linear-gradient(135deg, #55B96A 0%, #76CF89 100%);
+  --gradient-background: linear-gradient(180deg, #F8F6F1 0%, #F4EEFF 50%, #EFF7EE 100%);
+  --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 238, 255, 0.65) 100%);
+
+  /* Status Colors (Harmonized with Botanical Palette) */
+  --color-pending: #D97E26;
+  --color-pending-bg: #FFF7EC;
+  --color-confirmed: #3F9A53;         /* Botanical Green Status */
+  --color-confirmed-bg: #EFF7EE;      /* Pale Sage Background */
+  --color-cancelled: #C94C4C;
+  --color-cancelled-bg: #FDF2F2;
+
+  /* Typography */
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Organic Plum-Tinted Soft Shadows */
+  --shadow-sm: 0 4px 12px rgba(53, 38, 79, 0.04);
+  --shadow-md: 0 12px 32px rgba(53, 38, 79, 0.08);
+  --shadow-lg: 0 20px 48px rgba(53, 38, 79, 0.13);
+  --shadow-glass: 0 8px 32px 0 rgba(128, 80, 232, 0.08);
+
+  /* Radius (Preserves existing layout geometry) */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 28px;
+  --radius-pill: 9999px;
+
+  /* Transitions */
+  --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Layout Spacing */
+  --container-width: 1200px;
+
+  /* Header Blur Background */
+  --header-bg: rgba(248, 246, 241, 0.90);
+  --header-border: rgba(128, 80, 232, 0.10);
+
+  /* Theme Metadata */
+  --theme-name: 'botanical';
+  --theme-label: 'Botanical Wellness';
+}
+
+/* ============================================================================
+ * DARK MODE SUPPORT (BOTANICAL THEME)
+ * When data-mode="dark" or user prefers dark mode
+ * ============================================================================
+ */
+:root[data-theme="botanical"][data-mode="dark"] {
+  --color-background: #1C1527;
+  --color-slate-dark: #F8F6F1;        /* High-contrast ivory text in dark mode */
+  --color-slate-light: #C7B8E0;       /* Muted lavender text */
+  --color-slate: #9D76F5;             /* Glowing lavender accent */
+  --color-terracotta: #55B96A;        /* Botanical green */
+  --color-terracotta-light: #76CF89;
+  --color-cream: #281F37;             /* Elevated dark plum cards */
+  --color-sage: #213327;              /* Deep dark sage */
+  --color-white: #281F37;
+  
+  --color-slate-05: rgba(157, 118, 245, 0.08);
+  --color-slate-10: rgba(157, 118, 245, 0.15);
+  --color-slate-20: rgba(157, 118, 245, 0.25);
+  --color-slate-80: rgba(248, 246, 241, 0.85);
+
+  --gradient-primary: linear-gradient(135deg, #9D76F5 0%, #55B96A 100%);
+  --gradient-accent: linear-gradient(135deg, #55B96A 0%, #76CF89 100%);
+  --gradient-background: linear-gradient(180deg, #161020 0%, #1C1527 50%, #201A2F 100%);
+  --gradient-card: linear-gradient(135deg, rgba(40, 31, 55, 0.95) 0%, rgba(30, 23, 42, 0.85) 100%);
+
+  --header-bg: rgba(22, 16, 32, 0.92);
+  --header-border: rgba(157, 118, 245, 0.15);
+
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.60);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.40);
+}

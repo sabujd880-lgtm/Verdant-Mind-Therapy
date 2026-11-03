@@ -563,7 +563,8 @@ async function run() {
   let createdAptId = '';
   await test('Client can book appointment and duplicate slot is rejected (409)', async () => {
     const validDay = String((Date.now() % 20) + 1).padStart(2, '0');
-    const testDate = `2027-11-${validDay}`;
+    const testYear = 2030 + (Math.floor(Date.now() / 1000) % 50);
+    const testDate = `${testYear}-11-${validDay}`;
     const testTime = `${(Date.now() % 4) + 1}:30 PM`;
     
     // 1. Initial Booking

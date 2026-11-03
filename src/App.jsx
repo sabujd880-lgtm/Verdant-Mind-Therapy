@@ -543,7 +543,7 @@ function App() {
                 type="button"
                 onClick={handleExtendSession}
                 style={{
-                  backgroundColor: '#0D9488',
+                  background: 'var(--gradient-primary)',
                   color: '#FFFFFF',
                   padding: '0.75rem 1.5rem',
                   borderRadius: '0.5rem',

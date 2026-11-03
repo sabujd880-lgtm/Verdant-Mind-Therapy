@@ -22,17 +22,17 @@ export default function LiveISTClock({ showIcon = true, className = '' }) {
         alignItems: 'center',
         gap: '0.45rem',
         padding: '0.3rem 0.75rem',
-        background: 'rgba(42, 71, 62, 0.06)',
-        border: '1px solid rgba(42, 71, 62, 0.15)',
+        background: 'var(--color-slate-05)',
+        border: '1px solid var(--color-slate-20)',
         borderRadius: '20px',
         fontSize: '0.78rem',
         fontWeight: 600,
-        color: '#1A2E28',
+        color: 'var(--color-slate-dark)',
         letterSpacing: '0.01em',
         userSelect: 'none'
       }}
     >
-      {showIcon && <Clock size={13} style={{ color: '#2A473E', flexShrink: 0 }} />}
+      {showIcon && <Clock size={13} style={{ color: 'var(--color-slate)', flexShrink: 0 }} />}
       <span>{clockDisplay}</span>
     </div>
   );

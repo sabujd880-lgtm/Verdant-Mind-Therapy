@@ -1,62 +1,8 @@
 /* Premium CSS Design System for Psychology Portfolio */
 
-:root {
-  /* Deep Teal & Eucalyptus Calm Palette */
-  --color-sage: #CBE6E3;             /* Soft Mint Ice / Light Eucalyptus Tint */
-  --color-cream: #F4FAF8;            /* Soft Alabaster / Calm Ice White */
-  --color-slate: #0F383D;            /* Deep Oceanic Teal */
-  --color-slate-light: #2E6863;      /* Eucalyptus Teal */
-  --color-slate-dark: #072226;       /* Midnight Deep Teal */
-  --color-terracotta: #D97736;       /* Copper Warmth Accent */
-  --color-terracotta-light: #F4BE9B; /* Soft Coral Warmth */
-  --color-white: #FFFFFF;
-  
-  /* Opacity Variants */
-  --color-slate-05: rgba(15, 56, 61, 0.05);
-  --color-slate-10: rgba(15, 56, 61, 0.1);
-  --color-slate-20: rgba(15, 56, 61, 0.2);
-  --color-slate-80: rgba(15, 56, 61, 0.8);
-  --color-terracotta-10: rgba(217, 119, 54, 0.1);
-  --color-white-80: rgba(255, 255, 255, 0.8);
-  
-  /* Premium Linear Gradients */
-  --gradient-primary: linear-gradient(135deg, var(--color-slate-dark) 0%, var(--color-slate) 100%);
-  --gradient-accent: linear-gradient(135deg, var(--color-terracotta) 0%, var(--color-terracotta-light) 100%);
-  --gradient-background: linear-gradient(180deg, #F4FAF8 0%, #E2F2EE 50%, #CBE6E3 100%);
-  --gradient-card: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(244, 250, 248, 0.65) 100%);
-  
-  /* Status Colors */
-  --color-pending: #D9822B;
-  --color-pending-bg: #FDF4E7;
-  --color-confirmed: #1D8A68;
-  --color-confirmed-bg: #E3F6EE;
-  --color-cancelled: #C94C4C;
-  --color-cancelled-bg: #FCEAEA;
-
-  /* Typography */
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
-
-  /* Shadows */
-  --shadow-sm: 0 4px 12px rgba(15, 56, 61, 0.04);
-  --shadow-md: 0 12px 32px rgba(15, 56, 61, 0.09);
-  --shadow-lg: 0 20px 48px rgba(15, 56, 61, 0.14);
-  --shadow-glass: 0 8px 32px 0 rgba(15, 56, 61, 0.08);
-
-  /* Radius */
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 28px;
-  --radius-pill: 9999px;
-
-  /* Transitions */
-  --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  
-  /* Spacing */
-  --container-width: 1200px;
-}
+/* Centralized Theme Architecture */
+@import './styles/themes/classic-theme.css';
+@import './styles/themes/botanical-theme.css';
 
 /* Reset */
 *, *::before, *::after {
