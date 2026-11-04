@@ -40,11 +40,17 @@ import {
 
 dotenv.config();
 
-// Ensure reliable DNS resolution for MongoDB Atlas SRV records across all environments (fixes Windows querySrv ECONNREFUSED)
-try {
-  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
-} catch (dnsErr) {
-  console.warn('DNS server configuration warning:', dnsErr.message);
+// Ensure reliable DNS resolution for MongoDB Atlas SRV records.
+// In Windows development, local router/ISP firewalls frequently cause querySrv ECONNREFUSED,
+// where public DNS (Google/Cloudflare) resolves SRV records reliably.
+// On Linux/Render containers, DO NOT override dns.setServers by default because it bypasses the container's
+// internal /etc/resolv.conf nameservers and may be blocked by container network firewall policies.
+if (process.platform === 'win32' || process.env.OVERRIDE_DNS === 'true') {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+  } catch (dnsErr) {
+    console.warn('DNS server configuration warning:', dnsErr.message);
+  }
 }
 
 // Load secrets from AWS Secrets Manager if configured
@@ -1590,21 +1596,63 @@ async function initializeThemeConfig() {
 const mongoOptions = {
   maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '50', 10),
   minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || '10', 10),
-  serverSelectionTimeoutMS: process.env.NODE_ENV === 'test' ? 1500 : 15000,
+  serverSelectionTimeoutMS: process.env.NODE_ENV === 'test' ? 1500 : 20000,
   socketTimeoutMS: 45000,
-  family: 4
+  connectTimeoutMS: 20000,
+  retryWrites: true,
+  w: 'majority'
 };
+
+async function connectToMongoWithRetry(uri, options, maxRetries = 3) {
+  let lastErr = null;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 1) {
+        console.log(`[MONGODB] Connection attempt ${attempt}/${maxRetries} to MongoDB Atlas...`);
+      }
+      await mongoose.connect(uri, options);
+      console.log(`Successfully connected to MongoDB Atlas (Pool: min=${options.minPoolSize}, max=${options.maxPoolSize}).`);
+      return true;
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[MONGODB WARN] Connection attempt ${attempt}/${maxRetries} failed: ${err.message}`);
+      if (attempt < maxRetries) {
+        const delayMs = attempt * 3000;
+        console.log(`[MONGODB] Retrying in ${delayMs / 1000}s...`);
+        await new Promise(res => setTimeout(res, delayMs));
+      }
+    }
+  }
+  throw lastErr;
+}
 
 if (process.env.MONGODB_URI && process.env.NODE_ENV !== 'test') {
   try {
-    await mongoose.connect(process.env.MONGODB_URI, mongoOptions);
-    console.log(`Successfully connected to MongoDB Atlas (Pool: min=${mongoOptions.minPoolSize}, max=${mongoOptions.maxPoolSize}).`);
+    await connectToMongoWithRetry(process.env.MONGODB_URI, mongoOptions, isProd ? 4 : 2);
     await initializeAvailability();
     await initializeSuperAdmin();
     await initializeThemeConfig();
     await initializeSecuritySettings();
   } catch (err) {
+    console.error('================================================================================');
     console.error('[FATAL] Error connecting to MongoDB Atlas:', err.message);
+    console.error('');
+    console.error('REQUIRED ACTIONS FOR MONGODB ATLAS:');
+    console.error('1. IP ACCESS LIST (WHITELIST) IN MONGODB ATLAS:');
+    console.error('   Render instances use dynamic egress IP addresses that change on every deploy.');
+    console.error('   -> Log in to MongoDB Atlas (https://cloud.mongodb.com/) -> Security -> Network Access.');
+    console.error('   -> Click "+ ADD IP ADDRESS" -> Select "ALLOW ACCESS FROM ANYWHERE" (0.0.0.0/0).');
+    console.error('   -> Click "Confirm" and wait 1-2 minutes until status shows "Active" (green).');
+    console.error('');
+    console.error('2. CLUSTER STATE (PAUSED CLUSTER):');
+    console.error('   Free tier (M0 Sandbox) clusters automatically pause after periods of inactivity.');
+    console.error('   -> In Atlas Dashboard -> Database -> Check if cluster is paused -> Click "Resume".');
+    console.error('');
+    console.error('3. MONGODB_URI FORMAT & CREDENTIAL ENCODING:');
+    console.error('   Verify credentials in the Render Dashboard -> Environment -> MONGODB_URI.');
+    console.error('   If the password has special characters (@, #, $, %, etc.), URL-encode them:');
+    console.error('   e.g. "@" -> "%40", "#" -> "%23", "$" -> "%24", "%" -> "%25", "!" -> "%21".');
+    console.error('================================================================================');
     if (isProd) {
       console.error('[FATAL] Database connection failed in production. Halting server process.');
       process.exit(1);
