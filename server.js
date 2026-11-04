@@ -1476,7 +1476,7 @@ async function initializeThemeConfig() {
 const mongoOptions = {
   maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '50', 10),
   minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || '10', 10),
-  serverSelectionTimeoutMS: process.env.NODE_ENV === 'test' ? 1500 : 5000,
+  serverSelectionTimeoutMS: process.env.NODE_ENV === 'test' ? 1500 : 15000,
   socketTimeoutMS: 45000,
   family: 4
 };
