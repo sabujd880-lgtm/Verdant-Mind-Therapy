@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mic, Upload, Play, Pause, Trash2, ShieldCheck, AlertCircle, CheckCircle2, Clock, FileAudio, Lock } from 'lucide-react';
 import { formatISTDate } from '../utils/dateTime.js';
+import { safeJson, getResponseError } from '../utils/api.js';
 
 export default function AudioRecordings({ appointments = [], currentUser }) {
   const [selectedAptId, setSelectedAptId] = useState('');
@@ -36,9 +37,12 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
     setStatusMsg({ type: '', text: '' });
     try {
       const res = await fetch(`/api/recordings/appointment/${selectedAptId}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Could not fetch session recordings.');
-      const data = await res.json();
-      setRecordings(data || []);
+      if (!res.ok) {
+        const errorText = await getResponseError(res, 'Could not fetch session recordings.');
+        throw new Error(errorText);
+      }
+      const data = await safeJson(res);
+      setRecordings(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
       setStatusMsg({ type: 'error', text: err.message });
@@ -92,9 +96,12 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
         body: formData
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to upload audio recording.');
+      if (!res.ok) {
+        const errorText = await getResponseError(res, 'Failed to upload audio recording.');
+        throw new Error(errorText);
+      }
 
+      await safeJson(res);
       setStatusMsg({ type: 'success', text: 'Audio recording securely encrypted and stored.' });
       setAudioFile(null);
       setRecordingTitle('');
@@ -111,8 +118,14 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
   const handlePlayRecording = async (recId) => {
     try {
       const res = await fetch(`/api/recordings/${recId}/signed-url`, { credentials: 'include' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate signed URL.');
+      if (!res.ok) {
+        const errorText = await getResponseError(res, 'Failed to generate signed URL.');
+        throw new Error(errorText);
+      }
+      const data = await safeJson(res);
+      if (!data?.url) {
+        throw new Error('Streaming URL not provided by server.');
+      }
 
       setActivePlaybackUrl(data.url);
       setActiveRecordingId(recId);
@@ -129,7 +142,10 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
         method: 'DELETE',
         credentials: 'include'
       });
-      if (!res.ok) throw new Error('Deletion failed.');
+      if (!res.ok) {
+        const errorText = await getResponseError(res, 'Deletion failed.');
+        throw new Error(errorText);
+      }
       setStatusMsg({ type: 'success', text: 'Recording securely removed.' });
       if (activeRecordingId === recId) {
         setActivePlaybackUrl('');

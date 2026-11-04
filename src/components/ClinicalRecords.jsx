@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Brain, AlertTriangle, CheckCircle2, User, Calendar, Save, Plus, ShieldCheck, Download, Trash2, Clock } from 'lucide-react';
 import { formatISTDate, formatISTDateTimeWithZone, normalizeToISTDate } from '../utils/dateTime.js';
+import { safeJson, getResponseError } from '../utils/api.js';
 
 export default function ClinicalRecords({ appointments = [], currentUser }) {
   const [activeSubTab, setActiveSubTab] = useState('case-history'); // 'case-history' | 'mse'
@@ -56,11 +57,11 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
         credentials: 'include'
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to export patient records.');
+        const errorText = await getResponseError(res, 'Failed to export patient records.');
+        throw new Error(errorText);
       }
-      const data = await res.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const data = await safeJson(res);
+      const blob = new Blob([JSON.stringify(data || {}, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -97,13 +98,13 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
         })
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to purge patient data.');
+        const errorText = await getResponseError(res, 'Failed to purge patient data.');
+        throw new Error(errorText);
       }
-      const data = await res.json();
+      const data = await safeJson(res);
       setShowPurgeModal(false);
       setPurgeConfirmText('');
-      setStatusMsg({ type: 'success', text: data.message || 'Patient data permanently erased.' });
+      setStatusMsg({ type: 'success', text: data?.message || 'Patient data permanently erased.' });
       setCaseHistory({
         presentingProblems: '',
         historyOfPresentIllness: '',
@@ -205,8 +206,8 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to save case history.');
+        const errorText = await getResponseError(res, 'Failed to save case history.');
+        throw new Error(errorText);
       }
 
       setStatusMsg({ type: 'success', text: 'Clinical Case History successfully saved and encrypted.' });
@@ -233,12 +234,14 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to log MSE record.');
+        const errorText = await getResponseError(res, 'Failed to log MSE record.');
+        throw new Error(errorText);
       }
 
-      const created = await res.json();
-      setMseList(prev => [created, ...prev]);
+      const created = await safeJson(res);
+      if (created) {
+        setMseList(prev => [created, ...prev]);
+      }
       setStatusMsg({ type: 'success', text: 'Mental Status Examination logged successfully.' });
       setNewMse({
         date: new Date().toISOString().split('T')[0],

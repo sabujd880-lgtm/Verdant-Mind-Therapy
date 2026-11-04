@@ -8,6 +8,7 @@ import ClientPortal from './components/ClientPortal';
 import { INITIAL_PROFILE } from './mockData';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import ReloadPrompt from './components/ReloadPrompt';
+import { safeJson } from './utils/api.js';
 
 function App() {
   const [activeView, setActiveView] = useState('client'); // 'client' | 'therapist' | 'client-portal'
@@ -52,9 +53,9 @@ function App() {
 
     if (authStatus === 'success') {
       fetch('/api/auth/me', { credentials: 'include' })
-        .then(res => res.json())
+        .then(res => safeJson(res))
         .then(data => {
-          if (data.authenticated && data.user) {
+          if (data && data.authenticated && data.user) {
             setCurrentUser(data.user);
             if (data.user.role === 'client') {
               setActiveView('client-portal');
@@ -76,9 +77,9 @@ function App() {
     } else {
       // Background session check with server
       fetch('/api/auth/me', { credentials: 'include' })
-        .then(res => res.json())
+        .then(res => safeJson(res))
         .then(data => {
-          if (data.authenticated && data.user) {
+          if (data && data.authenticated && data.user) {
             setCurrentUser(data.user);
           }
         })

@@ -6,6 +6,7 @@ import {
   RefreshCw, FilePlus
 } from 'lucide-react';
 import { formatISTDate } from '../utils/dateTime.js';
+import { safeJson, getResponseError } from '../utils/api.js';
 
 export default function PatientProfileManager({ currentUser, mode = 'directory', onProfileSelect }) {
   const isStudent = currentUser?.role === 'client';
@@ -74,14 +75,14 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
         limit: '10'
       });
 
-      const res = await fetch(`/api/profiles?${queryParams.toString()}`);
+      const res = await fetch(`/api/profiles?${queryParams.toString()}`, { credentials: 'include' });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to fetch profiles');
+        const errorText = await getResponseError(res, 'Failed to fetch profiles');
+        throw new Error(errorText);
       }
-      const data = await res.json();
-      setProfiles(data.profiles || []);
-      setPagination(data.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 });
+      const data = await safeJson(res);
+      setProfiles(data?.profiles || []);
+      setPagination(data?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 });
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -92,10 +93,10 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
   const fetchStats = async () => {
     if (mode === 'self' || isStudent) return;
     try {
-      const res = await fetch('/api/profiles/stats');
+      const res = await fetch('/api/profiles/stats', { credentials: 'include' });
       if (res.ok) {
-        const data = await res.json();
-        setStats(data);
+        const data = await safeJson(res);
+        if (data) setStats(data);
       }
     } catch {
       // stats fallback
@@ -107,14 +108,16 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
     setIsLoading(true);
     setErrorMsg('');
     try {
-      const res = await fetch('/api/profiles/me');
+      const res = await fetch('/api/profiles/me', { credentials: 'include' });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Could not load your profile');
+        const errorText = await getResponseError(res, 'Could not load your profile');
+        throw new Error(errorText);
       }
-      const data = await res.json();
-      setSelectedProfile(data);
-      loadAssociatedData(data.profileId);
+      const data = await safeJson(res);
+      if (data) {
+        setSelectedProfile(data);
+        loadAssociatedData(data.profileId);
+      }
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -125,11 +128,13 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
   const fetchCounsellors = async () => {
     if (!isAdmin) return;
     try {
-      const res = await fetch('/api/admin/users');
+      const res = await fetch('/api/admin/users', { credentials: 'include' });
       if (res.ok) {
-        const users = await res.json();
-        const clinicians = users.filter(u => ['Counsellor', 'Super Admin', 'Administrator', 'provider'].includes(u.role) && u.status === 'approved');
-        setCounsellorsList(clinicians);
+        const users = await safeJson(res);
+        if (Array.isArray(users)) {
+          const clinicians = users.filter(u => ['Counsellor', 'Super Admin', 'Administrator', 'provider'].includes(u.role) && u.status === 'approved');
+          setCounsellorsList(clinicians);
+        }
       }
     } catch {
       // silently fallback

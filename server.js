@@ -6390,6 +6390,11 @@ if (fs.existsSync(distPath)) {
   });
 }
 
+// Catch-all for undefined /api routes - guarantees JSON 404 instead of Express default HTML error
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found: ' + req.method + ' ' + req.originalUrl });
+});
+
 // Start listening on all network interfaces (0.0.0.0) for cloud/LAN access
 let serverInstance = null;
 if (process.env.NODE_ENV !== 'test') {

@@ -4,6 +4,7 @@ import {
   ShieldCheck, AlertTriangle, CheckCircle2, Lock, FileText, X, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 import { formatISTDateTimeWithZone } from '../utils/dateTime.js';
+import { safeJson, getResponseError } from '../utils/api.js';
 
 export default function AuditLogManager({ currentUser }) {
   const [logs, setLogs] = useState([]);
@@ -59,14 +60,14 @@ export default function AuditLogManager({ currentUser }) {
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
 
-      const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
+      const res = await fetch(`/api/admin/audit-logs?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to load audit logs');
+        const errorText = await getResponseError(res, 'Failed to load audit logs');
+        throw new Error(errorText);
       }
-      const data = await res.json();
-      setLogs(data.logs || []);
-      setPagination(data.pagination || { total: 0, page: 1, limit: 20, totalPages: 1 });
+      const data = await safeJson(res);
+      setLogs(data?.logs || []);
+      setPagination(data?.pagination || { total: 0, page: 1, limit: 20, totalPages: 1 });
       setPage(targetPage);
     } catch (err) {
       setErrorMsg(err.message);
@@ -83,9 +84,10 @@ export default function AuditLogManager({ currentUser }) {
     try {
       setExporting(true);
       setErrorMsg('');
-      const res = await fetch(`/api/admin/audit-logs/export?format=${format}`);
+      const res = await fetch(`/api/admin/audit-logs/export?format=${format}`, { credentials: 'include' });
       if (!res.ok) {
-        throw new Error('Audit export failed');
+        const errorText = await getResponseError(res, 'Audit export failed');
+        throw new Error(errorText);
       }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

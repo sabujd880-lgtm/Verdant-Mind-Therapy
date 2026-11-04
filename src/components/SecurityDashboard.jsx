@@ -5,6 +5,7 @@ import {
   Search, Filter, ChevronRight, UserX, Database, Eye, X
 } from 'lucide-react';
 import { formatISTDateTimeWithZone } from '../utils/dateTime.js';
+import { safeJson, getResponseError } from '../utils/api.js';
 
 export default function SecurityDashboard({ currentUser }) {
   const isSuperAdmin = currentUser && (currentUser.role === 'Super Admin' || currentUser.role === 'provider');
@@ -56,12 +57,12 @@ export default function SecurityDashboard({ currentUser }) {
     try {
       setLoading(true);
       setErrorMsg('');
-      const res = await fetch('/api/admin/security/overview');
+      const res = await fetch('/api/admin/security/overview', { credentials: 'include' });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to fetch security overview');
+        const errorText = await getResponseError(res, 'Failed to fetch security overview');
+        throw new Error(errorText);
       }
-      const data = await res.json();
+      const data = await safeJson(res);
       setOverview(data);
     } catch (err) {
       setErrorMsg(err.message);
@@ -82,14 +83,14 @@ export default function SecurityDashboard({ currentUser }) {
         severity: eventSeverityFilter,
         search: eventSearch
       });
-      const res = await fetch(`/api/admin/security/events?${params.toString()}`);
+      const res = await fetch(`/api/admin/security/events?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to fetch security events');
+        const errorText = await getResponseError(res, 'Failed to fetch security events');
+        throw new Error(errorText);
       }
-      const data = await res.json();
-      setEvents(data.events || []);
-      setEventPagination(data.pagination || { total: 0, page: 1, limit: 15, totalPages: 1 });
+      const data = await safeJson(res);
+      setEvents(data?.events || []);
+      setEventPagination(data?.pagination || { total: 0, page: 1, limit: 15, totalPages: 1 });
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -102,12 +103,12 @@ export default function SecurityDashboard({ currentUser }) {
     try {
       setLoading(true);
       setErrorMsg('');
-      const res = await fetch('/api/admin/security/sessions');
+      const res = await fetch('/api/admin/security/sessions', { credentials: 'include' });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to fetch active sessions');
+        const errorText = await getResponseError(res, 'Failed to fetch active sessions');
+        throw new Error(errorText);
       }
-      const data = await res.json();
+      const data = await safeJson(res);
       setSessions(Array.isArray(data) ? data : []);
     } catch (err) {
       setErrorMsg(err.message);
@@ -121,13 +122,13 @@ export default function SecurityDashboard({ currentUser }) {
     try {
       setLoading(true);
       setErrorMsg('');
-      const res = await fetch('/api/admin/security/settings');
+      const res = await fetch('/api/admin/security/settings', { credentials: 'include' });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to fetch security settings');
+        const errorText = await getResponseError(res, 'Failed to fetch security settings');
+        throw new Error(errorText);
       }
-      const data = await res.json();
-      setSettings(data);
+      const data = await safeJson(res);
+      setSettings(data || {});
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -156,6 +157,7 @@ export default function SecurityDashboard({ currentUser }) {
       const res = await fetch(`/api/admin/security/events/${selectedEvent.eventId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           status: eventResolutionStatus,
           resolutionNotes: eventResolutionNotes,
@@ -163,8 +165,8 @@ export default function SecurityDashboard({ currentUser }) {
         })
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update security event');
+        const errorText = await getResponseError(res, 'Failed to update security event');
+        throw new Error(errorText);
       }
       setSuccessMsg(`Security alert ${selectedEvent.eventId} marked as ${eventResolutionStatus}.`);
       setSelectedEvent(null);
@@ -186,11 +188,12 @@ export default function SecurityDashboard({ currentUser }) {
       setRevokingSessionId(sessionId);
       setErrorMsg('');
       const res = await fetch(`/api/admin/security/sessions/${encodeURIComponent(sessionId)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to revoke session');
+        const errorText = await getResponseError(res, 'Failed to revoke session');
+        throw new Error(errorText);
       }
       setSuccessMsg(`Session for ${userEmail} revoked immediately.`);
       fetchSessions();
@@ -214,14 +217,15 @@ export default function SecurityDashboard({ currentUser }) {
       const res = await fetch('/api/admin/security/sessions/revoke-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ targetEmail: bulkRevokeTarget.trim() })
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Bulk session revocation failed');
+        const errorText = await getResponseError(res, 'Bulk session revocation failed');
+        throw new Error(errorText);
       }
-      const data = await res.json();
-      setSuccessMsg(data.message || 'Sessions revoked.');
+      const data = await safeJson(res);
+      setSuccessMsg(data?.message || 'Sessions revoked.');
       setShowBulkRevokeModal(false);
       setBulkRevokeTarget('');
       fetchSessions();
@@ -245,14 +249,15 @@ export default function SecurityDashboard({ currentUser }) {
       const res = await fetch('/api/admin/security/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(settings)
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to update security settings');
+        const errorText = await getResponseError(res, 'Failed to update security settings');
+        throw new Error(errorText);
       }
-      const data = await res.json();
-      setSettings(data.settings);
+      const data = await safeJson(res);
+      setSettings(data?.settings || settings);
       setSuccessMsg('Security policies updated and recorded in tamper-resistant audit log.');
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err) {
