@@ -47,3 +47,4 @@ export async function getResponseError(response, defaultMsg = 'Request failed') 
 
   return `${defaultMsg} (${response.statusText || `Status ${response.status}`})`;
 }
+
