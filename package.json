@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "build:start": "npm run build && node server.js",
+    "start": "node --dns-result-order=ipv4first server.js",
+    "build:start": "npm run build && node --dns-result-order=ipv4first server.js",
     "dev": "concurrently \"vite\" \"node server.js\"",
     "vite": "vite",
     "server": "node server.js",
