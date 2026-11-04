@@ -7,7 +7,7 @@ services:
     runtime: node
     plan: standard # Or free
     region: singapore # Closest low-latency Render region to India/Mumbai
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: node server.js
     healthCheckPath: /api/health
     autoDeploy: true
