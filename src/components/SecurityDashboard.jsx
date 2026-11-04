@@ -1092,3 +1092,4 @@ export default function SecurityDashboard({ currentUser }) {
     </div>
   );
 }
+

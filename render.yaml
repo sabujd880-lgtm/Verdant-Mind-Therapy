@@ -19,6 +19,8 @@ services:
         value: 10000
       - key: FRONTEND_URL
         value: https://verdant-mind.onrender.com
+      - key: BACKEND_URL
+        value: https://verdant-mind.onrender.com
       - key: API_URL
         value: https://verdant-mind.onrender.com
       - key: GOOGLE_CALLBACK_URL

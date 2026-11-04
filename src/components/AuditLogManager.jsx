@@ -451,3 +451,4 @@ export default function AuditLogManager({ currentUser }) {
     </div>
   );
 }
+

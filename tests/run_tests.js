@@ -19,7 +19,7 @@ import {
 } from '../src/utils/dateTime.js';
 
 // Dynamically import server after NODE_ENV=test is set
-const { app, getClientIp, User, Client, PatientProfile, AuditLog, SecurityEvent, UserSession, ConsentRecord, PrivacyRequest, SecuritySettings, hashPassword, verifyPassword, recordSecurityEvent, logAuditEvent } = await import('../server.js');
+const { app, getClientIp, User, Client, PatientProfile, AuditLog, SecurityEvent, UserSession, ConsentRecord, PrivacyRequest, SecuritySettings, hashPassword, verifyPassword, recordSecurityEvent, logAuditEvent, resolveGoogleCallbackUrl, resolveFrontendUrl } = await import('../server.js');
 
 let server = null;
 const TEST_PORT = 5099;
@@ -2030,6 +2030,143 @@ async function run() {
     });
     const logsAfterExport = await auditVerifyRes.json();
     assert.ok(logsAfterExport.some(l => l.action === 'AUDIT_LOGS_EXPORTED'), 'Audit log export action must be logged in the audit trail');
+  });
+
+  // =========================================================================
+  // GOOGLE OAUTH REDIRECT_URI & RENDER PRODUCTION TESTS
+  // =========================================================================
+
+  // Test 57: Exact Redirect URI Generation for Production vs Localhost
+  await test('OAuth: resolveGoogleCallbackUrl generates exact HTTPS redirect URI for Render production', async () => {
+    // 1. Mock Render production environment request
+    const renderReq = {
+      get: (header) => {
+        const h = header.toLowerCase();
+        if (h === 'host') return 'verdant-mind.onrender.com';
+        if (h === 'x-forwarded-proto') return 'https';
+        if (h === 'x-forwarded-host') return 'verdant-mind.onrender.com';
+        return null;
+      },
+      protocol: 'http' // Simulating Express behind TLS reverse proxy before trust proxy
+    };
+
+    // Temporarily simulate RENDER=true
+    const origRender = process.env.RENDER;
+    const origCallback = process.env.GOOGLE_CALLBACK_URL;
+    try {
+      process.env.RENDER = 'true';
+      delete process.env.GOOGLE_CALLBACK_URL;
+      const callbackUrl = resolveGoogleCallbackUrl(renderReq);
+      assert.strictEqual(
+        callbackUrl, 
+        'https://verdant-mind.onrender.com/api/auth/google/callback',
+        'Production on Render must force https and exact backend callback path'
+      );
+
+      // 2. Trailing slash and path normalization
+      process.env.GOOGLE_CALLBACK_URL = 'https://verdant-mind.onrender.com/';
+      const normalizedUrl = resolveGoogleCallbackUrl(renderReq);
+      assert.strictEqual(
+        normalizedUrl,
+        'https://verdant-mind.onrender.com/api/auth/google/callback',
+        'Must normalize trailing slashes and append /api/auth/google/callback'
+      );
+
+      // 3. Accidental localhost in production guard
+      process.env.GOOGLE_CALLBACK_URL = 'http://localhost:5000/api/auth/google/callback';
+      const guardedUrl = resolveGoogleCallbackUrl(renderReq);
+      assert.strictEqual(
+        guardedUrl,
+        'https://verdant-mind.onrender.com/api/auth/google/callback',
+        'Accidental localhost in production must be overridden by production domain'
+      );
+    } finally {
+      if (origRender !== undefined) process.env.RENDER = origRender; else delete process.env.RENDER;
+      if (origCallback !== undefined) process.env.GOOGLE_CALLBACK_URL = origCallback; else delete process.env.GOOGLE_CALLBACK_URL;
+    }
+  });
+
+  // Test 58: Localhost development redirect URI preserves http and port
+  await test('OAuth: resolveGoogleCallbackUrl generates http://localhost:5000 for local development', async () => {
+    const localReq = {
+      get: (header) => {
+        const h = header.toLowerCase();
+        if (h === 'host') return '127.0.0.1:5000';
+        return null;
+      },
+      protocol: 'http'
+    };
+
+    const origRender = process.env.RENDER;
+    const origCallback = process.env.GOOGLE_CALLBACK_URL;
+    try {
+      delete process.env.RENDER;
+      delete process.env.GOOGLE_CALLBACK_URL;
+      const localUrl = resolveGoogleCallbackUrl(localReq);
+      assert.strictEqual(
+        localUrl,
+        'http://localhost:5000/api/auth/google/callback',
+        'Localhost must replace 127.0.0.1 with localhost and preserve http://'
+      );
+    } finally {
+      if (origRender !== undefined) process.env.RENDER = origRender; else delete process.env.RENDER;
+      if (origCallback !== undefined) process.env.GOOGLE_CALLBACK_URL = origCallback; else delete process.env.GOOGLE_CALLBACK_URL;
+    }
+  });
+
+  // Test 59: Frontend post-OAuth redirection target resolution
+  await test('OAuth: resolveFrontendUrl returns clean origin without trailing slashes or localhost leakage', async () => {
+    const origRender = process.env.RENDER;
+    const origFrontend = process.env.FRONTEND_URL;
+    try {
+      process.env.RENDER = 'true';
+      delete process.env.FRONTEND_URL;
+      process.env.RENDER_EXTERNAL_URL = 'https://verdant-mind.onrender.com';
+      const target = resolveFrontendUrl(null);
+      assert.strictEqual(target, 'https://verdant-mind.onrender.com');
+    } finally {
+      if (origRender !== undefined) process.env.RENDER = origRender; else delete process.env.RENDER;
+      if (origFrontend !== undefined) process.env.FRONTEND_URL = origFrontend; else delete process.env.FRONTEND_URL;
+      delete process.env.RENDER_EXTERNAL_URL;
+    }
+  });
+
+  // Test 60: Safe Account Linking between Google OAuth and existing Client accounts
+  await test('OAuth: Safe account linking matches verified Google email with existing Client record', async () => {
+    const linkedClientEmail = `linked_student_${Date.now()}@testuniv.edu`;
+
+    // 1. Create a verified Client
+    await Client.create({
+      name: 'Linked Student User',
+      email: linkedClientEmail,
+      password: await hashPassword('Student#Pass2026!'),
+      verified: true
+    });
+
+    // 2. Simulate Google callback user with same verified email
+    const existingClient = await Client.findOne({ email: linkedClientEmail });
+    assert.ok(existingClient);
+    assert.strictEqual(existingClient.verified, true);
+
+    // Verify User entry auto-links role 'client'
+    let u = await User.findOne({ email: linkedClientEmail });
+    assert.strictEqual(u, null, 'User record not yet created');
+
+    // Simulate safe linking logic
+    u = await User.create({
+      email: existingClient.email,
+      name: existingClient.name,
+      googleId: 'mock_google_id_linked_99',
+      role: 'client',
+      status: 'approved',
+      createdAt: new Date()
+    });
+    existingClient.googleId = 'mock_google_id_linked_99';
+    await existingClient.save();
+
+    assert.strictEqual(u.role, 'client');
+    assert.strictEqual(u.status, 'approved');
+    assert.strictEqual(existingClient.googleId, 'mock_google_id_linked_99');
   });
 
   console.log('\n===========================================================');

@@ -76,7 +76,7 @@ if (process.env.TRUST_PROXY !== undefined) {
     trustProxyConfig = tp; // CIDR string, comma-separated IPs, or predefined express presets
   }
 } else {
-  trustProxyConfig = isProd ? 1 : false;
+  trustProxyConfig = (isProd || process.env.RENDER === 'true') ? 1 : false;
 }
 app.set('trust proxy', trustProxyConfig);
 
@@ -1724,16 +1724,104 @@ const sendEmail = async ({ toEmail, toName, subject, htmlContent }) => {
 // PHASE 2: GOOGLE OAUTH 2.0 REST API ENDPOINTS
 // =========================================================================
 
+/**
+ * Resolves the authoritative Google OAuth 2.0 callback URL.
+ * Strictly eliminates protocol mismatches (forcing HTTPS on public domains),
+ * strips accidental trailing slashes/whitespace, avoids raw IP addresses,
+ * and guards against localhost callback URLs being accidentally dispatched in cloud/production environments.
+ */
+export function resolveGoogleCallbackUrl(req) {
+  const isCloudOrProd = isProd || process.env.RENDER === 'true';
+
+  // 1. Check explicit GOOGLE_CALLBACK_URL from environment
+  let envCallback = (process.env.GOOGLE_CALLBACK_URL || '').trim();
+  if (envCallback) {
+    // Guard against accidental deployment of localhost callback in production
+    if (isCloudOrProd && (envCallback.includes('localhost') || envCallback.includes('127.0.0.1'))) {
+      console.warn(`[OAUTH CONFIG WARNING] GOOGLE_CALLBACK_URL contains localhost in production (${envCallback}). Overriding with production domain callback.`);
+      envCallback = '';
+    } else {
+      let clean = envCallback.replace(/\/+$/, '');
+      if (!clean.endsWith('/api/auth/google/callback')) {
+        clean = `${clean}/api/auth/google/callback`;
+      }
+      return clean;
+    }
+  }
+
+  // 2. Check explicit BACKEND_URL, API_URL, or RENDER_EXTERNAL_URL
+  const envBackend = (process.env.BACKEND_URL || process.env.API_URL || process.env.RENDER_EXTERNAL_URL || '').trim();
+  if (envBackend) {
+    let clean = envBackend.replace(/\/+$/, '');
+    if (isCloudOrProd && clean.startsWith('http://') && !clean.includes('localhost') && !clean.includes('127.0.0.1')) {
+      clean = clean.replace(/^http:\/\//, 'https://');
+    }
+    if (!clean.endsWith('/api/auth/google/callback')) {
+      clean = `${clean}/api/auth/google/callback`;
+    }
+    return clean;
+  }
+
+  // 3. Dynamic resolution from incoming HTTP request headers
+  if (req) {
+    const rawHost = req.get('x-forwarded-host') || req.get('host') || 'localhost:5000';
+    const host = rawHost.split(',')[0].trim().replace(/^127\.0\.0\.1/, 'localhost');
+    const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+
+    let protocol = 'https';
+    if (isLocalhost && !isCloudOrProd) {
+      protocol = (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+    } else {
+      protocol = 'https';
+    }
+
+    return `${protocol}://${host}/api/auth/google/callback`;
+  }
+
+  // 4. Default fallback
+  return isCloudOrProd 
+    ? 'https://verdant-mind.onrender.com/api/auth/google/callback'
+    : 'http://localhost:5000/api/auth/google/callback';
+}
+
+/**
+ * Resolves the authoritative frontend redirect URL after OAuth callback.
+ */
+export function resolveFrontendUrl(req) {
+  const isCloudOrProd = isProd || process.env.RENDER === 'true';
+
+  let envFrontend = (process.env.FRONTEND_URL || '').trim();
+  if (envFrontend) {
+    if (isCloudOrProd && (envFrontend.includes('localhost') || envFrontend.includes('127.0.0.1'))) {
+      console.warn(`[OAUTH CONFIG WARNING] FRONTEND_URL contains localhost in production (${envFrontend}). Overriding with production domain.`);
+      envFrontend = '';
+    } else {
+      return envFrontend.replace(/\/+$/, '');
+    }
+  }
+
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL.trim().replace(/\/+$/, '');
+  }
+
+  if (req) {
+    const rawHost = req.get('x-forwarded-host') || req.get('host') || 'localhost:5000';
+    const host = rawHost.split(',')[0].trim().replace(/^127\.0\.0\.1/, 'localhost');
+    const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+    const protocol = isLocalhost && !isCloudOrProd 
+      ? (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim() 
+      : 'https';
+    return `${protocol}://${host}`;
+  }
+
+  return isCloudOrProd ? 'https://verdant-mind.onrender.com' : 'http://localhost:5173';
+}
+
 // 1. Initiate Google OAuth 2.0 Server-Side Flow
 app.get('/api/auth/google', (req, res) => {
-  const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
-  
-  // Resolve authoritative callback URL (strictly avoiding raw 127.0.0.1 which Google OAuth prohibits)
-  let callbackUrl = process.env.GOOGLE_CALLBACK_URL;
-  if (!callbackUrl) {
-    const host = (req.get('host') || 'localhost:5000').replace(/^127\.0\.0\.1/, 'localhost');
-    callbackUrl = `${req.protocol}://${host}/api/auth/google/callback`;
-  }
+  const frontendUrl = resolveFrontendUrl(req);
+  const callbackUrl = resolveGoogleCallbackUrl(req);
+  console.log(`[GOOGLE OAUTH INITIATE] Using redirect_uri: ${callbackUrl}`);
 
   // Cryptographic random state parameter for CSRF mitigation
   const state = crypto.randomBytes(24).toString('hex');
@@ -1762,7 +1850,7 @@ app.get('/api/auth/google', (req, res) => {
 
 // 2. Google OAuth 2.0 Authorization Callback
 app.get('/api/auth/google/callback', async (req, res) => {
-  const frontendUrl = process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+  const frontendUrl = resolveFrontendUrl(req);
   const { code, state, error } = req.query;
 
   if (error) {
@@ -1791,11 +1879,8 @@ app.get('/api/auth/google/callback', async (req, res) => {
         email_verified: true
       };
     } else {
-      let callbackUrl = process.env.GOOGLE_CALLBACK_URL;
-      if (!callbackUrl) {
-        const host = (req.get('host') || 'localhost:5000').replace(/^127\.0\.0\.1/, 'localhost');
-        callbackUrl = `${req.protocol}://${host}/api/auth/google/callback`;
-      }
+      const callbackUrl = resolveGoogleCallbackUrl(req);
+      console.log(`[GOOGLE OAUTH CALLBACK] Exchanging code with redirect_uri: ${callbackUrl}`);
 
       // Token Exchange
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -1839,6 +1924,9 @@ app.get('/api/auth/google/callback', async (req, res) => {
 
     let user = await User.findOne({ email: normalizedEmail });
 
+    // Check if user already exists as an approved Client (student/patient registration)
+    let existingClient = await Client.findOne({ email: normalizedEmail });
+
     // Bootstrap or Super Admin auto-provisioning
     if (normalizedEmail === bootstrapEmail || normalizedEmail === 'sabujd880@gmail.com') {
       if (!user) {
@@ -1859,6 +1947,27 @@ app.get('/api/auth/google/callback', async (req, res) => {
         user.googleId = googleUser.sub;
         if (googleUser.picture) user.picture = googleUser.picture;
         await user.save();
+      }
+    } else if (existingClient && existingClient.verified) {
+      // Safe Account Linking: Google account verified email matches existing verified client account
+      if (!user) {
+        user = await User.create({
+          email: existingClient.email,
+          name: existingClient.name || googleUser.name,
+          picture: googleUser.picture || '',
+          googleId: googleUser.sub,
+          role: 'client',
+          status: 'approved',
+          createdAt: new Date()
+        });
+      } else {
+        if (!user.googleId) user.googleId = googleUser.sub;
+        if (googleUser.picture) user.picture = googleUser.picture;
+        await user.save();
+      }
+      if (!existingClient.googleId) {
+        existingClient.googleId = googleUser.sub;
+        await existingClient.save();
       }
     }
 

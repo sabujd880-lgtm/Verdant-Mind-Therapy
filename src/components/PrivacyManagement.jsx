@@ -838,3 +838,4 @@ export default function PrivacyManagement({ currentUser, mode = 'client' }) {
     </div>
   );
 }
+
