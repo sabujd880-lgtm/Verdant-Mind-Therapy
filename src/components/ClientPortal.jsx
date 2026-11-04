@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { 
   Calendar, Clock, FileText, Receipt, Send, Inbox, 
-  MessageSquare, CheckCircle2, Eye, Printer, X, User
+  MessageSquare, CheckCircle2, Eye, Printer, X, User, Shield
 } from 'lucide-react';
 import PatientProfileManager from './PatientProfileManager.jsx';
+import PrivacyManagement from './PrivacyManagement.jsx';
 import { 
   formatISTDate, 
   formatISTTime, 
@@ -123,6 +124,13 @@ export default function ClientPortal({
           >
             <User size={15} style={{ marginRight: '0.35rem', verticalAlign: 'middle' }} />
             My Profile
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'privacy' ? 'active' : ''}`}
+            onClick={() => setActiveTab('privacy')}
+          >
+            <Shield size={15} style={{ marginRight: '0.35rem', verticalAlign: 'middle' }} />
+            Privacy & Consents
           </button>
         </div>
       </div>
@@ -603,6 +611,11 @@ export default function ClientPortal({
       {/* 4. STUDENT / PATIENT PROFILE TAB */}
       {activeTab === 'profile' && (
         <PatientProfileManager currentUser={currentUser} mode="self" />
+      )}
+
+      {/* 5. PRIVACY & CONSENT GOVERNANCE TAB */}
+      {activeTab === 'privacy' && (
+        <PrivacyManagement currentUser={currentUser} mode="client" />
       )}
 
     </div>

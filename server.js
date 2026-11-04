@@ -400,19 +400,175 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ email: 1, status: 1 });
 let User = mongoose.model('User', userSchema);
 
-// 2. AuditLog Schema (Security & Compliance Tracking)
+// 2. AuditLog Schema (Security & Compliance Tracking - Append-Only & Immutable)
 const auditLogSchema = new mongoose.Schema({
+  eventId: { type: String, unique: true, index: true },
   timestamp: { type: Date, default: Date.now, index: true },
   actorEmail: { type: String, required: true, index: true },
+  actorUserId: { type: String, default: '' },
   actorRole: { type: String, default: 'unknown' },
-  action: { type: String, required: true, index: true }, // 'LOGIN_SUCCESS', 'GOOGLE_OAUTH_LOGIN', 'USER_APPROVED', etc.
+  action: { type: String, required: true, index: true },
+  resourceType: { type: String, default: 'general' },
   targetResource: { type: String, default: '' },
-  details: { type: mongoose.Schema.Types.Mixed, default: {} },
+  eventCategory: { 
+    type: String, 
+    enum: [
+      'Authentication', 
+      'Profile Management', 
+      'Clinical Documentation', 
+      'Appointments', 
+      'Assessments', 
+      'Document Management', 
+      'Security Administration', 
+      'Privacy & Consent'
+    ],
+    default: 'Security Administration',
+    index: true 
+  },
+  outcome: { type: String, enum: ['success', 'failure', 'denied'], default: 'success', index: true },
+  severity: { type: String, enum: ['info', 'low', 'medium', 'high', 'critical'], default: 'info', index: true },
   ipAddress: { type: String, default: '' },
-  userAgent: { type: String, default: '' }
+  userAgent: { type: String, default: '' },
+  requestId: { type: String, default: '' },
+  details: { type: mongoose.Schema.Types.Mixed, default: {} },
+  beforeAfter: { type: mongoose.Schema.Types.Mixed, default: null }
 });
 auditLogSchema.index({ timestamp: -1, action: 1 });
+auditLogSchema.index({ actorEmail: 1, timestamp: -1 });
+auditLogSchema.index({ eventCategory: 1, severity: 1 });
+
+// Prevent updates and deletions to preserve audit immutability
+auditLogSchema.pre('save', function (next) {
+  if (!this.isNew) {
+    return next(new Error('Audit logs are immutable append-only records and cannot be modified.'));
+  }
+  next();
+});
+auditLogSchema.pre(['deleteOne', 'deleteMany', 'findOneAndDelete', 'findOneAndRemove', 'remove'], function (next) {
+  next(new Error('Audit logs are immutable append-only records and cannot be deleted.'));
+});
+
 let AuditLog = mongoose.model('AuditLog', auditLogSchema);
+
+// 2.1 SecurityEvent Schema (Security Alerts & Threat Detection)
+const securityEventSchema = new mongoose.Schema({
+  eventId: { type: String, required: true, unique: true, index: true },
+  category: { 
+    type: String, 
+    enum: ['failed_logins', 'unauthorized_access', 'suspicious_activity', 'role_change', 'session_anomaly', 'data_export', 'policy_violation'],
+    default: 'suspicious_activity',
+    index: true 
+  },
+  severity: { type: String, enum: ['info', 'low', 'medium', 'high', 'critical'], default: 'medium', index: true },
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  sourceIp: { type: String, default: '' },
+  affectedUser: { type: String, default: '' },
+  targetResource: { type: String, default: '' },
+  status: { type: String, enum: ['open', 'investigating', 'resolved', 'dismissed'], default: 'open', index: true },
+  assignedAdmin: { type: String, default: '' },
+  resolutionNotes: { type: String, default: '' },
+  resolvedAt: { type: Date },
+  occurrences: { type: Number, default: 1 },
+  lastOccurred: { type: Date, default: Date.now, index: true },
+  timestamp: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: Date.now }
+});
+securityEventSchema.index({ status: 1, severity: 1, lastOccurred: -1 });
+let SecurityEvent = mongoose.model('SecurityEvent', securityEventSchema);
+
+// 2.2 UserSession Schema (Active Session Lifecycle & Monitoring)
+const userSessionSchema = new mongoose.Schema({
+  sessionId: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, default: '' },
+  userEmail: { type: String, required: true, lowercase: true, index: true },
+  userName: { type: String, default: '' },
+  role: { type: String, default: 'client' },
+  ipAddress: { type: String, default: '' },
+  userAgent: { type: String, default: '' },
+  loginTime: { type: Date, default: Date.now },
+  lastActivity: { type: Date, default: Date.now, index: true },
+  status: { type: String, enum: ['active', 'revoked', 'expired', 'logged_out'], default: 'active', index: true },
+  revokedAt: { type: Date },
+  revokedBy: { type: String }
+});
+userSessionSchema.index({ userEmail: 1, status: 1 });
+let UserSession = mongoose.model('UserSession', userSessionSchema);
+
+// 2.3 ConsentRecord Schema (Granular Privacy & Informed Consent Tracking)
+const consentRecordSchema = new mongoose.Schema({
+  consentId: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, default: '' },
+  userEmail: { type: String, required: true, lowercase: true, index: true },
+  consentType: { 
+    type: String, 
+    required: true, 
+    enum: ['counselling', 'assessment', 'audio_recording', 'teleconsultation', 'data_sharing'],
+    index: true 
+  },
+  status: { type: String, enum: ['granted', 'withdrawn'], required: true },
+  version: { type: String, default: '1.0' },
+  purpose: { type: String, default: '' },
+  collectionMethod: { type: String, default: 'portal_self_service' },
+  ipAddress: { type: String, default: '' },
+  userAgent: { type: String, default: '' },
+  grantedAt: { type: Date },
+  withdrawnAt: { type: Date },
+  history: [{
+    status: String,
+    version: String,
+    timestamp: { type: Date, default: Date.now },
+    ipAddress: String,
+    reason: String
+  }]
+});
+consentRecordSchema.index({ userEmail: 1, consentType: 1 });
+let ConsentRecord = mongoose.model('ConsentRecord', consentRecordSchema);
+
+// 2.4 PrivacyRequest Schema (Student/Patient Rights & Data Subject Access Requests)
+const privacyRequestSchema = new mongoose.Schema({
+  requestId: { type: String, required: true, unique: true, index: true },
+  userId: { type: String, default: '' },
+  userEmail: { type: String, required: true, lowercase: true, index: true },
+  userName: { type: String, required: true },
+  requestType: { 
+    type: String, 
+    required: true, 
+    enum: ['access_export', 'correction', 'deactivation', 'deletion', 'restriction'],
+    index: true 
+  },
+  details: { type: String, required: true },
+  status: { 
+    type: String, 
+    enum: ['pending', 'under_review', 'fulfilled', 'rejected'], 
+    default: 'pending',
+    index: true 
+  },
+  adminNotes: { type: String, default: '' },
+  requestedAt: { type: Date, default: Date.now, index: true },
+  resolvedAt: { type: Date },
+  resolvedBy: { type: String }
+});
+privacyRequestSchema.index({ userEmail: 1, requestedAt: -1 });
+let PrivacyRequest = mongoose.model('PrivacyRequest', privacyRequestSchema);
+
+// 2.5 SecuritySettings Schema (Practice Security Governance & Policies)
+const securitySettingsSchema = new mongoose.Schema({
+  configId: { type: String, default: 'global_security_config', unique: true },
+  sessionInactivityTimeoutMinutes: { type: Number, default: 15, min: 5, max: 120 },
+  loginRateLimitMax: { type: Number, default: 5, min: 3, max: 20 },
+  loginRateLimitWindowMinutes: { type: Number, default: 15, min: 1, max: 60 },
+  passwordMinLength: { type: Number, default: 8, min: 8, max: 32 },
+  requireSpecialChar: { type: Boolean, default: true },
+  requireNumber: { type: Boolean, default: true },
+  auditLogRetentionDays: { type: Number, default: 365, min: 30, max: 2555 },
+  enableSuspiciousLoginAlerts: { type: Boolean, default: true },
+  enableUnauthorizedAccessAlerts: { type: Boolean, default: true },
+  approvedOrigins: { type: [String], default: [] },
+  updatedAt: { type: Date, default: Date.now },
+  updatedBy: { type: String, default: 'system' }
+});
+let SecuritySettings = mongoose.model('SecuritySettings', securitySettingsSchema);
 
 // 3. AudioRecording Schema (Encrypted S3 or Private Local Storage with Signed URLs)
 const audioRecordingSchema = new mongoose.Schema({
@@ -785,24 +941,133 @@ async function generateUniqueProfileId() {
 }
 
 // =========================================================================
-// AUDIT LOGGER HELPER
+// AUDIT LOGGER & SECURITY EVENT HELPERS
 // =========================================================================
-async function logAuditEvent({ actorEmail, actorRole, action, targetResource, details = {}, req = null }) {
+async function generateUniqueAuditId() {
+  const year = new Date().getFullYear();
+  let count = 0;
+  try {
+    count = await AuditLog.countDocuments();
+  } catch {
+    count = Math.floor(1000 + Math.random() * 9000);
+  }
+  return `AUD-${year}-${String(count + 1).padStart(5, '0')}`;
+}
+
+async function recordSecurityEvent({
+  category = 'suspicious_activity',
+  severity = 'medium',
+  title,
+  description,
+  sourceIp = '',
+  affectedUser = '',
+  targetResource = ''
+}) {
+  try {
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const existing = await SecurityEvent.findOne({
+      category,
+      sourceIp,
+      affectedUser,
+      status: { $in: ['open', 'investigating'] },
+      lastOccurred: { $gte: fifteenMinAgo }
+    });
+
+    if (existing) {
+      existing.occurrences = (existing.occurrences || 1) + 1;
+      existing.lastOccurred = new Date();
+      await existing.save();
+      return existing;
+    }
+
+    const year = new Date().getFullYear();
+    let count = 0;
+    try {
+      count = await SecurityEvent.countDocuments();
+    } catch {
+      count = Math.floor(100 + Math.random() * 900);
+    }
+    const eventId = `SEC-${year}-${String(count + 1).padStart(5, '0')}`;
+
+    const event = await SecurityEvent.create({
+      eventId,
+      category,
+      severity,
+      title,
+      description,
+      sourceIp,
+      affectedUser,
+      targetResource,
+      status: 'open',
+      occurrences: 1,
+      timestamp: new Date(),
+      lastOccurred: new Date(),
+      createdAt: new Date()
+    });
+    return event;
+  } catch (err) {
+    console.warn('SecurityEvent recording alert:', err.message);
+  }
+}
+
+async function logAuditEvent({ 
+  actorEmail, 
+  actorUserId = '',
+  actorRole, 
+  action, 
+  resourceType = 'general',
+  targetResource = 'general', 
+  eventCategory = 'Security Administration',
+  outcome = 'success',
+  severity = 'info',
+  details = {}, 
+  beforeAfter = null,
+  req = null 
+}) {
   try {
     const clientIp = getClientIp(req);
     const userAgent = req ? (req.headers['user-agent'] || '') : '';
-    
+    const requestId = req?.id || req?.headers?.['x-request-id'] || `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const eventId = await generateUniqueAuditId();
+
+    // Redact passwords, tokens, full clinical bodies from details
+    const sanitizedDetails = { ...details };
+    ['password', 'token', 'refreshToken', 'secret', 'clientSecret'].forEach(k => {
+      if (sanitizedDetails[k]) sanitizedDetails[k] = '[REDACTED]';
+    });
+
     await AuditLog.create({
+      eventId,
       actorEmail: actorEmail || 'system',
-      actorRole: actorRole || 'system',
+      actorUserId: actorUserId || (req?.session?.user?.id || ''),
+      actorRole: actorRole || (req?.session?.user?.role || 'system'),
       action,
+      resourceType,
       targetResource: targetResource || 'general',
-      details,
+      eventCategory,
+      outcome,
+      severity,
+      details: sanitizedDetails,
+      beforeAfter,
       timestamp: new Date(),
       createdAt: new Date(),
       ipAddress: clientIp,
-      userAgent
+      userAgent,
+      requestId
     });
+
+    // Auto-create security event if high/critical or unauthorized
+    if (outcome === 'denied' || severity === 'high' || severity === 'critical') {
+      await recordSecurityEvent({
+        category: outcome === 'denied' ? 'unauthorized_access' : 'suspicious_activity',
+        severity,
+        title: `Security Alert: ${action.replace(/_/g, ' ')}`,
+        description: `Action '${action}' was flagged with outcome '${outcome}'. Target: ${targetResource}`,
+        sourceIp: clientIp,
+        affectedUser: actorEmail,
+        targetResource
+      });
+    }
   } catch (err) {
     console.error('AuditLog writing failed:', err.message);
   }
@@ -813,26 +1078,23 @@ async function logAuditEvent({ actorEmail, actorRole, action, targetResource, de
 // =========================================================================
 const DB_FILE = path.join(process.cwd(), 'local_db.json');
 
+const DB_COLLECTIONS = [
+  'clients', 'appointments', 'messages', 'caredocuments', 'availabilities', 
+  'users', 'auditlogs', 'audiorecordings', 'casehistories', 'mserecords', 
+  'themeconfigs', 'patientprofiles', 'usersessions', 'securityevents', 
+  'consents', 'privacyrequests', 'securitysettings'
+];
+
 function ensureDbFile() {
   if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({
-      clients: [],
-      appointments: [],
-      messages: [],
-      caredocuments: [],
-      availabilities: [],
-      users: [],
-      auditlogs: [],
-      audiorecordings: [],
-      casehistories: [],
-      mserecords: [],
-      patientprofiles: []
-    }, null, 2));
+    const initial = {};
+    DB_COLLECTIONS.forEach(c => { initial[c] = []; });
+    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
       let modified = false;
-      ['clients', 'appointments', 'messages', 'caredocuments', 'availabilities', 'users', 'auditlogs', 'audiorecordings', 'casehistories', 'mserecords', 'patientprofiles'].forEach(k => {
+      DB_COLLECTIONS.forEach(k => {
         if (!data[k]) {
           data[k] = [];
           modified = true;
@@ -852,10 +1114,9 @@ function readData() {
   try {
     return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
   } catch (e) {
-    return { 
-      clients: [], appointments: [], messages: [], caredocuments: [], availabilities: [],
-      users: [], auditlogs: [], audiorecordings: [], casehistories: [], mserecords: [], themeconfigs: [], patientprofiles: [] 
-    };
+    const fallback = {};
+    DB_COLLECTIONS.forEach(c => { fallback[c] = []; });
+    return fallback;
   }
 }
 
@@ -980,6 +1241,27 @@ const makeMockModel = (collectionName) => {
       writeData(db);
       return new MockModel('availabilities', defaultAvail);
     }
+    if (!found && collectionName === 'securitysettings') {
+      const defaultSec = {
+        _id: 'default-sec-settings',
+        configId: 'global_security_config',
+        sessionInactivityTimeoutMinutes: 15,
+        loginRateLimitMax: 5,
+        loginRateLimitWindowMinutes: 15,
+        passwordMinLength: 8,
+        requireSpecialChar: true,
+        requireNumber: true,
+        auditLogRetentionDays: 365,
+        enableSuspiciousLoginAlerts: true,
+        enableUnauthorizedAccessAlerts: true,
+        approvedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://verdant-mind.onrender.com'],
+        updatedAt: new Date(),
+        updatedBy: 'SYSTEM_BOOTSTRAP'
+      };
+      db.securitysettings = [defaultSec];
+      writeData(db);
+      return new MockModel('securitysettings', defaultSec);
+    }
     return found ? new MockModel(collectionName, found) : null;
   };
   Model.find = async function(query = {}) {
@@ -1005,7 +1287,7 @@ const makeMockModel = (collectionName) => {
     }
     return null;
   };
-  Model.findOneAndUpdate = async function(query = {}, update = {}) {
+  Model.findOneAndUpdate = async function(query = {}, update = {}, options = {}) {
     const db = readData();
     const list = db[collectionName] || [];
     const index = list.findIndex(item => matchesQuery(item, query));
@@ -1013,6 +1295,12 @@ const makeMockModel = (collectionName) => {
       list[index] = { ...list[index], ...update };
       writeData(db);
       return new MockModel(collectionName, list[index]);
+    }
+    if (options && options.upsert) {
+      const merged = { ...query, ...update };
+      const instance = new MockModel(collectionName, merged);
+      await instance.save();
+      return instance;
     }
     return null;
   };
@@ -1067,9 +1355,42 @@ function setupLocalDBFallback() {
   MentalStatusExam = makeMockModel('mserecords');
   ThemeConfig = makeMockModel('themeconfigs');
   PatientProfile = makeMockModel('patientprofiles');
+  UserSession = makeMockModel('usersessions');
+  SecurityEvent = makeMockModel('securityevents');
+  ConsentRecord = makeMockModel('consents');
+  PrivacyRequest = makeMockModel('privacyrequests');
+  SecuritySettings = makeMockModel('securitysettings');
   initializeAvailability();
   initializeSuperAdmin();
   initializeThemeConfig();
+  initializeSecuritySettings();
+}
+
+// Bootstrap practice security governance settings
+async function initializeSecuritySettings() {
+  try {
+    let settings = await SecuritySettings.findOne({ configId: 'global_security_config' });
+    if (!settings) {
+      settings = await SecuritySettings.create({
+        configId: 'global_security_config',
+        sessionInactivityTimeoutMinutes: 15,
+        loginRateLimitMax: 5,
+        loginRateLimitWindowMinutes: 15,
+        passwordMinLength: 8,
+        requireSpecialChar: true,
+        requireNumber: true,
+        auditLogRetentionDays: 365,
+        enableSuspiciousLoginAlerts: true,
+        enableUnauthorizedAccessAlerts: true,
+        approvedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://verdant-mind.onrender.com'],
+        updatedAt: new Date(),
+        updatedBy: 'SYSTEM_BOOTSTRAP'
+      });
+      console.log('[BOOTSTRAP] Security governance policy initialized.');
+    }
+  } catch (err) {
+    console.warn('[SECURITY] Notice initializing security settings:', err.message);
+  }
 }
 
 // Bootstrap initial Super Admin safely if not already present
@@ -1167,6 +1488,7 @@ if (process.env.MONGODB_URI && process.env.NODE_ENV !== 'test') {
     await initializeAvailability();
     await initializeSuperAdmin();
     await initializeThemeConfig();
+    await initializeSecuritySettings();
   } catch (err) {
     console.error('[FATAL] Error connecting to MongoDB Atlas:', err.message);
     if (isProd) {
@@ -1220,7 +1542,27 @@ const requireAuth = async (req, res, next) => {
   // Update last activity timestamp on legitimate interaction
   req.session.lastActivity = now;
 
-  // 3. Server-Side Account Status & Administrative Revocation Check
+  // 3. UserSession Revocation Check & Heartbeat
+  try {
+    if (req.sessionID) {
+      const sessRecord = await UserSession.findOne({ sessionId: req.sessionID });
+      if (sessRecord && sessRecord.status === 'revoked') {
+        req.session.destroy(() => {});
+        return res.status(401).json({ 
+          error: 'Your session has been terminated by security administration. Please sign in again.',
+          code: 'SESSION_REVOKED'
+        });
+      }
+      if (sessRecord && sessRecord.status === 'active') {
+        sessRecord.lastActivity = new Date();
+        await sessRecord.save();
+      }
+    }
+  } catch (sessCheckErr) {
+    // Graceful non-blocking
+  }
+
+  // 4. Server-Side Account Status & Administrative Revocation Check
   try {
     const userEmail = (req.session.user.email || '').toLowerCase().trim();
     if (userEmail) {
@@ -1251,7 +1593,7 @@ const requireAuth = async (req, res, next) => {
 
 // Middleware: Require specific role(s)
 const requireRole = (allowedRoles) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!req.session || !req.session.user) {
       return res.status(401).json({ error: 'Authentication required.' });
     }
@@ -1259,6 +1601,18 @@ const requireRole = (allowedRoles) => {
     // Map legacy 'provider' to 'Super Admin'
     const effectiveRole = role === 'provider' ? 'Super Admin' : role;
     if (!allowedRoles.includes(effectiveRole)) {
+      await logAuditEvent({
+        actorEmail: req.session.user.email,
+        actorRole: role,
+        action: 'UNAUTHORIZED_ROLE_ACCESS_DENIED',
+        resourceType: 'api_endpoint',
+        targetResource: req.originalUrl || req.path,
+        eventCategory: 'Security Administration',
+        outcome: 'denied',
+        severity: 'high',
+        details: { requiredRoles: allowedRoles, attemptedMethod: req.method },
+        req
+      });
       return res.status(403).json({ 
         error: `Access denied. Your role '${role}' is not authorized for this operation.` 
       });
@@ -1633,12 +1987,25 @@ app.get('/api/auth/me', async (req, res) => {
 
 // 4. Session Termination (Logout)
 app.post('/api/auth/logout', async (req, res) => {
+  const sessId = req.sessionID;
+  if (sessId) {
+    try {
+      await UserSession.findOneAndUpdate(
+        { sessionId: sessId },
+        { status: 'logged_out', lastActivity: new Date() }
+      );
+    } catch {}
+  }
+
   if (req.session && req.session.user) {
     await logAuditEvent({
       actorEmail: req.session.user.email,
       actorRole: req.session.user.role,
       action: 'USER_LOGOUT',
       targetResource: 'session',
+      eventCategory: 'Authentication',
+      outcome: 'success',
+      severity: 'info',
       req
     });
   }
@@ -1855,11 +2222,17 @@ app.post('/api/admin/users/:id/revoke-sessions', requireAuth, requireRole(['Supe
   }
 });
 
-// 6. Security Audit Trail and Login History
+// =========================================================================
+// SECURITY, AUDIT TRAIL & PRIVACY MANAGEMENT SYSTEM
+// =========================================================================
+
+// 6. Security Audit Trail (Multi-Filter, Search, Pagination & Backwards Compatibility)
 app.get('/api/admin/audit-logs', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { search, category, role, severity, outcome, startDate, endDate, page, limit, paginated } = req.query;
   try {
-    const logs = await AuditLog.find();
-    // Return latest 100 entries sorted descending
+    const list = await AuditLog.find();
+    let logs = Array.isArray(list) ? list : [];
+
     const getTime = (entry) => {
       if (!entry) return 0;
       const t = entry.timestamp || entry.createdAt;
@@ -1867,8 +2240,786 @@ app.get('/api/admin/audit-logs', requireAuth, requireRole(['Super Admin', 'Admin
       const time = new Date(t).getTime();
       return isNaN(time) ? 0 : time;
     };
-    const sorted = logs.sort((a, b) => getTime(b) - getTime(a)).slice(0, 100);
-    res.json(sorted);
+
+    if (category && category !== 'all') {
+      logs = logs.filter(l => l.eventCategory === category);
+    }
+    if (role && role !== 'all') {
+      logs = logs.filter(l => l.actorRole === role);
+    }
+    if (severity && severity !== 'all') {
+      logs = logs.filter(l => l.severity === severity);
+    }
+    if (outcome && outcome !== 'all') {
+      logs = logs.filter(l => l.outcome === outcome);
+    }
+    if (startDate) {
+      const start = new Date(startDate).getTime();
+      if (!isNaN(start)) logs = logs.filter(l => getTime(l) >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate).getTime();
+      if (!isNaN(end)) logs = logs.filter(l => getTime(l) <= end);
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      logs = logs.filter(l => 
+        (l.actorEmail && l.actorEmail.toLowerCase().includes(q)) ||
+        (l.action && l.action.toLowerCase().includes(q)) ||
+        (l.targetResource && l.targetResource.toLowerCase().includes(q)) ||
+        (l.ipAddress && l.ipAddress.toLowerCase().includes(q)) ||
+        (l.eventId && l.eventId.toLowerCase().includes(q))
+      );
+    }
+
+    logs.sort((a, b) => getTime(b) - getTime(a));
+
+    // If explicit pagination requested
+    if (paginated === 'true' || page || limit) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 25;
+      const paginatedLogs = logs.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+      return res.json({
+        logs: paginatedLogs,
+        pagination: {
+          total: logs.length,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(logs.length / limitNum) || 1
+        }
+      });
+    }
+
+    // Default: return top 100 entries as array for backward-compatibility
+    res.json(logs.slice(0, 100));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.1 Export Audit Logs (CSV / JSON)
+app.get('/api/admin/audit-logs/export', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { format = 'csv' } = req.query;
+  const user = req.session.user;
+  try {
+    const list = await AuditLog.find();
+    const logs = (Array.isArray(list) ? list : []).sort((a, b) => {
+      const tA = new Date(a.timestamp || a.createdAt).getTime();
+      const tB = new Date(b.timestamp || b.createdAt).getTime();
+      return tB - tA;
+    });
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'AUDIT_LOGS_EXPORTED',
+      resourceType: 'audit_trail',
+      targetResource: 'all_logs',
+      eventCategory: 'Security Administration',
+      outcome: 'success',
+      severity: 'medium',
+      details: { format, count: logs.length },
+      req
+    });
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="verdant_mind_audit_export_${Date.now()}.json"`);
+      return res.send(JSON.stringify(logs, null, 2));
+    }
+
+    const headers = ['Event ID', 'Timestamp', 'Actor Email', 'Actor Role', 'Action', 'Category', 'Resource', 'Outcome', 'Severity', 'IP Address', 'User Agent'];
+    const rows = logs.map(l => {
+      const dt = l.timestamp || l.createdAt;
+      const dateStr = dt && !isNaN(new Date(dt).getTime()) ? new Date(dt).toISOString() : new Date().toISOString();
+      return [
+        l.eventId || '',
+        dateStr,
+        `"${(l.actorEmail || '').replace(/"/g, '""')}"`,
+        `"${(l.actorRole || '').replace(/"/g, '""')}"`,
+        `"${(l.action || '').replace(/"/g, '""')}"`,
+        `"${(l.eventCategory || '').replace(/"/g, '""')}"`,
+        `"${(l.targetResource || '').replace(/"/g, '""')}"`,
+        l.outcome || 'success',
+        l.severity || 'info',
+        `"${(l.ipAddress || '').replace(/"/g, '""')}"`,
+        `"${(l.userAgent || '').replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="verdant_mind_audit_export_${Date.now()}.csv"`);
+    res.send(csvContent);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.2 Get Single Audit Log Details
+app.get('/api/admin/audit-logs/:id', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { id } = req.params;
+  try {
+    let log = await AuditLog.findOne({ eventId: id.toUpperCase() });
+    if (!log) log = await AuditLog.findById(id);
+    if (!log) return res.status(404).json({ error: 'Audit log record not found.' });
+    res.json(log);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.3 Security Dashboard Overview & Visual Analytics
+app.get('/api/admin/security/overview', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const [userCount, clientCount, auditList, eventList, sessionList] = await Promise.all([
+      User.find(),
+      Client.find(),
+      AuditLog.find(),
+      SecurityEvent.find(),
+      UserSession.find()
+    ]);
+
+    const allUsers = Array.isArray(userCount) ? userCount : [];
+    const allClients = Array.isArray(clientCount) ? clientCount : [];
+    const allAudits = Array.isArray(auditList) ? auditList : [];
+    const allEvents = Array.isArray(eventList) ? eventList : [];
+    const allSessions = Array.isArray(sessionList) ? sessionList : [];
+
+    const totalUsers = allUsers.length + allClients.length;
+    const activeUsers = allUsers.filter(u => u.status === 'approved').length + allClients.filter(c => c.verified).length;
+    const inactiveUsers = allUsers.filter(u => u.status === 'suspended' || u.status === 'rejected' || u.status === 'pending').length;
+
+    const auditsToday = allAudits.filter(a => new Date(a.timestamp || a.createdAt) >= today);
+    const audits7Days = allAudits.filter(a => new Date(a.timestamp || a.createdAt) >= sevenDaysAgo);
+
+    const failedLoginsToday = auditsToday.filter(a => a.outcome === 'failure' || a.action === 'LOGIN_FAILURE').length;
+    const successfulLoginsToday = auditsToday.filter(a => a.outcome === 'success' && a.action.includes('LOGIN_SUCCESS')).length;
+    const failedLoginsPast7Days = audits7Days.filter(a => a.outcome === 'failure' || a.action === 'LOGIN_FAILURE').length;
+    const successfulLoginsPast7Days = audits7Days.filter(a => a.outcome === 'success' && a.action.includes('LOGIN_SUCCESS')).length;
+
+    const activeSessions = allSessions.filter(s => s.status === 'active').length;
+    const openSecurityAlerts = allEvents.filter(e => e.status === 'open' || e.status === 'investigating').length;
+    const unauthorizedAttemptsToday = auditsToday.filter(a => a.outcome === 'denied' || a.action.includes('UNAUTHORIZED')).length;
+
+    // 7-day trend calculation
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const authActivityTrends = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStart = new Date(d);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(d);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const dayAudits = allAudits.filter(a => {
+        const at = new Date(a.timestamp || a.createdAt);
+        return at >= dayStart && at <= dayEnd;
+      });
+
+      authActivityTrends.push({
+        date: dayStart.toISOString().split('T')[0],
+        day: dayNames[dayStart.getDay()],
+        success: dayAudits.filter(a => a.outcome === 'success' && a.action.includes('LOGIN_SUCCESS')).length,
+        failure: dayAudits.filter(a => a.outcome === 'failure' || a.action === 'LOGIN_FAILURE').length,
+        unauthorized: dayAudits.filter(a => a.outcome === 'denied' || a.action.includes('UNAUTHORIZED')).length
+      });
+    }
+
+    // Role breakdown
+    const userActivityByRole = {
+      'Super Admin': allUsers.filter(u => u.role === 'Super Admin' || u.role === 'provider').length,
+      'Administrator': allUsers.filter(u => u.role === 'Administrator').length,
+      'Counsellor': allUsers.filter(u => u.role === 'Counsellor').length,
+      'client': allClients.length + allUsers.filter(u => u.role === 'client').length
+    };
+
+    // Category & Severity breakdowns
+    const securityEventsByCategory = {};
+    const securityEventsBySeverity = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    allEvents.forEach(e => {
+      securityEventsByCategory[e.category] = (securityEventsByCategory[e.category] || 0) + (e.occurrences || 1);
+      const sev = e.severity || 'medium';
+      if (securityEventsBySeverity[sev] !== undefined) {
+        securityEventsBySeverity[sev] += (e.occurrences || 1);
+      }
+    });
+
+    const recentAlerts = allEvents
+      .filter(e => e.status === 'open' || e.status === 'investigating')
+      .sort((a, b) => new Date(b.lastOccurred || b.createdAt).getTime() - new Date(a.lastOccurred || a.createdAt).getTime())
+      .slice(0, 6);
+
+    res.json({
+      metrics: {
+        totalUsers,
+        activeUsers,
+        inactiveUsers,
+        failedLoginsToday,
+        failedLogins24h: failedLoginsToday,
+        successfulLoginsToday,
+        failedLoginsPast7Days,
+        successfulLoginsPast7Days,
+        activeSessions,
+        openSecurityAlerts,
+        openAlerts: openSecurityAlerts,
+        criticalAlerts: securityEventsBySeverity.critical || 0,
+        unauthorizedAttemptsToday,
+        auditEventsToday: auditsToday.length
+      },
+      visualAnalytics: {
+        authActivityTrends,
+        userActivityByRole,
+        securityEventsByCategory,
+        securityEventsBySeverity
+      },
+      authTimeline: authActivityTrends,
+      roleBreakdown: userActivityByRole,
+      recentAlerts
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.4 Security Events Directory
+app.get('/api/admin/security/events', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { status, severity, category, search, page = 1, limit = 20 } = req.query;
+  try {
+    const list = await SecurityEvent.find();
+    let events = Array.isArray(list) ? list : [];
+
+    if (status && status !== 'all') {
+      events = events.filter(e => e.status === status);
+    }
+    if (severity && severity !== 'all') {
+      events = events.filter(e => e.severity === severity);
+    }
+    if (category && category !== 'all') {
+      events = events.filter(e => e.category === category);
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      events = events.filter(e => 
+        (e.title && e.title.toLowerCase().includes(q)) ||
+        (e.description && e.description.toLowerCase().includes(q)) ||
+        (e.eventId && e.eventId.toLowerCase().includes(q)) ||
+        (e.sourceIp && e.sourceIp.toLowerCase().includes(q)) ||
+        (e.affectedUser && e.affectedUser.toLowerCase().includes(q))
+      );
+    }
+
+    events.sort((a, b) => new Date(b.lastOccurred || b.createdAt).getTime() - new Date(a.lastOccurred || a.createdAt).getTime());
+
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 20;
+    const paginated = events.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    res.json({
+      events: paginated,
+      pagination: {
+        total: events.length,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(events.length / limitNum) || 1
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.5 Resolve / Update Security Event
+app.patch('/api/admin/security/events/:id', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { id } = req.params;
+  const { status, resolutionNotes, assignedAdmin } = req.body;
+  const user = req.session.user;
+
+  try {
+    let event = await SecurityEvent.findOne({ eventId: id.toUpperCase() });
+    if (!event) event = await SecurityEvent.findById(id);
+    if (!event) return res.status(404).json({ error: 'Security event not found.' });
+
+    if (status) event.status = status;
+    if (resolutionNotes !== undefined) event.resolutionNotes = resolutionNotes;
+    if (assignedAdmin !== undefined) event.assignedAdmin = assignedAdmin;
+    if (status === 'resolved' || status === 'dismissed') {
+      event.resolvedAt = new Date();
+    }
+    await event.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'SECURITY_EVENT_STATUS_UPDATED',
+      resourceType: 'security_event',
+      targetResource: event.eventId,
+      eventCategory: 'Security Administration',
+      outcome: 'success',
+      severity: 'medium',
+      details: { newStatus: status, resolutionNotes },
+      req
+    });
+
+    res.json({ success: true, event, ...(event.toObject ? event.toObject() : event) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.6 Active Sessions List
+app.get('/api/admin/security/sessions', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  try {
+    const list = await UserSession.find();
+    const sessions = (Array.isArray(list) ? list : [])
+      .filter(s => s.status === 'active')
+      .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+    res.json(sessions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.7 Revoke Specific Session
+app.delete('/api/admin/security/sessions/:id', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { id } = req.params;
+  const user = req.session.user;
+  try {
+    let sessionDoc = await UserSession.findOne({ sessionId: id });
+    if (!sessionDoc) sessionDoc = await UserSession.findById(id);
+    if (!sessionDoc) return res.status(404).json({ error: 'Session not found.' });
+
+    sessionDoc.status = 'revoked';
+    sessionDoc.revokedAt = new Date();
+    sessionDoc.revokedBy = user.email;
+    await sessionDoc.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'SESSION_REVOKED',
+      resourceType: 'session',
+      targetResource: sessionDoc.sessionId,
+      eventCategory: 'Security Administration',
+      outcome: 'success',
+      severity: 'medium',
+      details: { revokedUser: sessionDoc.userEmail },
+      req
+    });
+
+    res.json({ success: true, message: `Session ${sessionDoc.sessionId} revoked successfully.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.8 Bulk Revoke Sessions
+app.post('/api/admin/security/sessions/revoke-all', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { targetEmail } = req.body;
+  const user = req.session.user;
+  try {
+    const list = await UserSession.find();
+    let count = 0;
+    for (const sess of (Array.isArray(list) ? list : [])) {
+      if (sess.status === 'active') {
+        if (!targetEmail || sess.userEmail.toLowerCase() === targetEmail.toLowerCase()) {
+          // Do not revoke current actor's session unless targetEmail explicitly matches
+          if (sess.sessionId !== req.sessionID || (targetEmail && targetEmail === user.email)) {
+            sess.status = 'revoked';
+            sess.revokedAt = new Date();
+            sess.revokedBy = user.email;
+            await sess.save();
+            count++;
+          }
+        }
+      }
+    }
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'SESSIONS_BULK_REVOKED',
+      resourceType: 'session',
+      targetResource: targetEmail || 'all_active_sessions',
+      eventCategory: 'Security Administration',
+      outcome: 'success',
+      severity: 'high',
+      details: { revokedCount: count, targetEmail: targetEmail || 'all' },
+      req
+    });
+
+    res.json({ success: true, count, message: `Successfully revoked ${count} active sessions.` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.9 Get Security Settings
+app.get('/api/admin/security/settings', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  try {
+    let settings = await SecuritySettings.findOne({ configId: 'global_security_config' });
+    if (!settings) settings = await SecuritySettings.findOne();
+    if (!settings) {
+      settings = {
+        configId: 'global_security_config',
+        sessionInactivityTimeoutMinutes: 15,
+        loginRateLimitMax: 5,
+        loginRateLimitWindowMinutes: 15,
+        passwordMinLength: 8,
+        requireSpecialChar: true,
+        requireNumber: true,
+        auditLogRetentionDays: 365,
+        enableSuspiciousLoginAlerts: true,
+        enableUnauthorizedAccessAlerts: true,
+        approvedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://verdant-mind.onrender.com']
+      };
+    }
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.10 Update Security Settings
+app.patch('/api/admin/security/settings', requireAuth, requireRole(['Super Admin']), async (req, res) => {
+  const user = req.session.user;
+  const {
+    sessionInactivityTimeoutMinutes,
+    loginRateLimitMax,
+    loginRateLimitWindowMinutes,
+    passwordMinLength,
+    requireSpecialChar,
+    requireNumber,
+    auditLogRetentionDays,
+    enableSuspiciousLoginAlerts,
+    enableUnauthorizedAccessAlerts,
+    approvedOrigins
+  } = req.body;
+
+  try {
+    let settings = await SecuritySettings.findOne({ configId: 'global_security_config' });
+    if (!settings) settings = await SecuritySettings.findOne();
+    if (!settings) {
+      settings = new SecuritySettings({ configId: 'global_security_config' });
+    }
+
+    const previousConfig = { ...settings.toObject ? settings.toObject() : settings };
+
+    if (sessionInactivityTimeoutMinutes !== undefined) {
+      const val = parseInt(sessionInactivityTimeoutMinutes, 10);
+      if (isNaN(val) || val < 5 || val > 120) {
+        return res.status(400).json({ error: 'Session inactivity timeout must be between 5 and 120 minutes.' });
+      }
+      settings.sessionInactivityTimeoutMinutes = val;
+    }
+    if (loginRateLimitMax !== undefined) {
+      const val = parseInt(loginRateLimitMax, 10);
+      if (isNaN(val) || val < 3 || val > 50) {
+        return res.status(400).json({ error: 'Login rate limit must be between 3 and 50 attempts.' });
+      }
+      settings.loginRateLimitMax = val;
+    }
+    if (loginRateLimitWindowMinutes !== undefined) {
+      const val = parseInt(loginRateLimitWindowMinutes, 10);
+      if (isNaN(val) || val < 1 || val > 60) {
+        return res.status(400).json({ error: 'Rate limit window must be between 1 and 60 minutes.' });
+      }
+      settings.loginRateLimitWindowMinutes = val;
+    }
+    if (passwordMinLength !== undefined) {
+      const val = parseInt(passwordMinLength, 10);
+      if (isNaN(val) || val < 8 || val > 32) {
+        return res.status(400).json({ error: 'Password minimum length must be between 8 and 32 characters.' });
+      }
+      settings.passwordMinLength = val;
+    }
+    if (typeof requireSpecialChar === 'boolean') settings.requireSpecialChar = requireSpecialChar;
+    if (typeof requireNumber === 'boolean') settings.requireNumber = requireNumber;
+    if (auditLogRetentionDays !== undefined) {
+      const val = parseInt(auditLogRetentionDays, 10);
+      if (val >= 30 && val <= 2555) settings.auditLogRetentionDays = val;
+    }
+    if (typeof enableSuspiciousLoginAlerts === 'boolean') settings.enableSuspiciousLoginAlerts = enableSuspiciousLoginAlerts;
+    if (typeof enableUnauthorizedAccessAlerts === 'boolean') settings.enableUnauthorizedAccessAlerts = enableUnauthorizedAccessAlerts;
+    if (Array.isArray(approvedOrigins)) settings.approvedOrigins = approvedOrigins;
+
+    settings.updatedAt = new Date();
+    settings.updatedBy = user.email;
+    await settings.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'SECURITY_SETTINGS_UPDATED',
+      resourceType: 'security_config',
+      targetResource: 'global_security_config',
+      eventCategory: 'Security Administration',
+      outcome: 'success',
+      severity: 'high',
+      beforeAfter: { previous: previousConfig, current: settings },
+      req
+    });
+
+    res.json({ success: true, settings, ...(settings.toObject ? settings.toObject() : settings) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =========================================================================
+// PRIVACY RIGHTS & INFORMED CONSENT MANAGEMENT ENDPOINTS
+// =========================================================================
+
+// 6.11 Get My Privacy Profile & Consents
+app.get('/api/privacy/me', requireAuth, async (req, res) => {
+  const user = req.session.user;
+  const userEmail = (user.email || '').toLowerCase().trim();
+  try {
+    const [consents, requests] = await Promise.all([
+      ConsentRecord.find({ userEmail }),
+      PrivacyRequest.find({ userEmail })
+    ]);
+
+    const activeConsents = {};
+    const consentList = Array.isArray(consents) ? consents : [];
+    consentList.forEach(c => {
+      activeConsents[c.consentType] = c;
+    });
+
+    const sortedRequests = (Array.isArray(requests) ? requests : []).sort(
+      (a, b) => new Date(b.requestedAt || b.createdAt || 0).getTime() - new Date(a.requestedAt || a.createdAt || 0).getTime()
+    );
+
+    res.json({
+      activeConsents,
+      consents: consentList,
+      privacyRequests: sortedRequests,
+      requests: sortedRequests
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.12 Get Active Consents
+app.get('/api/privacy/consents', requireAuth, async (req, res) => {
+  const user = req.session.user;
+  const userEmail = (user.email || '').toLowerCase().trim();
+  try {
+    const consents = await ConsentRecord.find({ userEmail });
+    res.json(Array.isArray(consents) ? consents : []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.13 Grant or Withdraw Consent (Granular & Auditable)
+app.post('/api/privacy/consents', requireAuth, async (req, res) => {
+  const user = req.session.user;
+  const userEmail = (user.email || '').toLowerCase().trim();
+  const { consentType, status, version = '1.0', reason = '' } = req.body;
+
+  const validTypes = ['counselling', 'assessment', 'audio_recording', 'teleconsultation', 'data_sharing'];
+  if (!validTypes.includes(consentType)) {
+    return res.status(400).json({ error: `Invalid consent type. Must be one of: ${validTypes.join(', ')}` });
+  }
+  if (!['granted', 'withdrawn'].includes(status)) {
+    return res.status(400).json({ error: "Consent status must be 'granted' or 'withdrawn'." });
+  }
+
+  try {
+    let consentDoc = await ConsentRecord.findOne({ userEmail, consentType });
+    const clientIp = getClientIp(req);
+
+    const historyEntry = {
+      status,
+      version,
+      timestamp: new Date(),
+      ipAddress: clientIp,
+      reason
+    };
+
+    if (consentDoc) {
+      consentDoc.status = status;
+      consentDoc.version = version;
+      if (status === 'granted') consentDoc.grantedAt = new Date();
+      if (status === 'withdrawn') consentDoc.withdrawnAt = new Date();
+      consentDoc.history = consentDoc.history || [];
+      consentDoc.history.push(historyEntry);
+      await consentDoc.save();
+    } else {
+      const consentId = `CNS-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+      consentDoc = await ConsentRecord.create({
+        consentId,
+        userId: user.id || '',
+        userEmail,
+        consentType,
+        status,
+        version,
+        purpose: `Client informed consent for ${consentType.replace('_', ' ')} services`,
+        collectionMethod: 'portal_self_service',
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'] || '',
+        grantedAt: status === 'granted' ? new Date() : undefined,
+        withdrawnAt: status === 'withdrawn' ? new Date() : undefined,
+        history: [historyEntry]
+      });
+    }
+
+    // Sync with patient profile if audio recording consent
+    if (consentType === 'audio_recording') {
+      try {
+        const prof = await PatientProfile.findOne({ 'personalInfo.email': userEmail });
+        if (prof) {
+          prof.consentAndPrivacy = prof.consentAndPrivacy || {};
+          prof.consentAndPrivacy.audioRecordingConsent = (status === 'granted');
+          await prof.save();
+        }
+      } catch {}
+    }
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: status === 'granted' ? 'CONSENT_GRANTED' : 'CONSENT_WITHDRAWN',
+      resourceType: 'consent',
+      targetResource: consentType,
+      eventCategory: 'Privacy & Consent',
+      outcome: 'success',
+      severity: 'info',
+      details: { consentType, status, version },
+      req
+    });
+
+    res.json({ success: true, consent: consentDoc });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.14 Submit Data Subject Privacy Request (DSAR / Deletion / Correction)
+app.post('/api/privacy/requests', requireAuth, async (req, res) => {
+  const user = req.session.user;
+  const userEmail = (user.email || '').toLowerCase().trim();
+  const { requestType, details, reason } = req.body;
+  const content = (details || reason || '').trim();
+
+  const validTypes = ['access_export', 'correction', 'deactivation', 'deletion', 'restriction'];
+  if (!validTypes.includes(requestType)) {
+    return res.status(400).json({ error: `Invalid request type. Must be one of: ${validTypes.join(', ')}` });
+  }
+  if (!content) {
+    return res.status(400).json({ error: 'Details or reason are required for a privacy request.' });
+  }
+
+  try {
+    const year = new Date().getFullYear();
+    let count = 0;
+    try { 
+      const existing = await PrivacyRequest.find();
+      count = Array.isArray(existing) ? existing.length : 0;
+    } catch {}
+    const requestId = `REQ-${year}-${String(count + 1).padStart(5, '0')}`;
+
+    const newReq = await PrivacyRequest.create({
+      requestId,
+      userId: user.id || '',
+      userEmail,
+      userName: user.name || 'User',
+      requestType,
+      reason: (reason || content).trim(),
+      details: (details || content).trim(),
+      status: 'submitted',
+      requestedAt: new Date(),
+      submittedAt: new Date()
+    });
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'PRIVACY_REQUEST_SUBMITTED',
+      resourceType: 'privacy_request',
+      targetResource: requestId,
+      eventCategory: 'Privacy & Consent',
+      outcome: 'success',
+      severity: 'medium',
+      details: { requestType },
+      req
+    });
+
+    res.status(201).json({ success: true, request: newReq, ...(newReq.toObject ? newReq.toObject() : newReq) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.15 Admin: View Privacy Requests Queue
+app.get('/api/admin/privacy/requests', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { status, type } = req.query;
+  try {
+    const list = await PrivacyRequest.find();
+    let requests = Array.isArray(list) ? list : [];
+
+    if (status && status !== 'all') {
+      requests = requests.filter(r => r.status === status);
+    }
+    if (type && type !== 'all') {
+      requests = requests.filter(r => r.requestType === type);
+    }
+
+    requests.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6.16 Admin: Process Privacy Request (Approve / Reject / Complete)
+app.patch('/api/admin/privacy/requests/:id', requireAuth, requireRole(['Super Admin', 'Administrator']), async (req, res) => {
+  const { id } = req.params;
+  const { status, adminNotes = '' } = req.body;
+  const user = req.session.user;
+
+  const allowedStatuses = ['pending', 'submitted', 'in_review', 'under_review', 'fulfilled', 'completed', 'rejected', 'denied'];
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: `Invalid status. Must be one of: ${allowedStatuses.join(', ')}` });
+  }
+
+  try {
+    let prv = await PrivacyRequest.findOne({ requestId: id.toUpperCase() });
+    if (!prv) prv = await PrivacyRequest.findById(id);
+    if (!prv) return res.status(404).json({ error: 'Privacy request not found.' });
+
+    prv.status = status;
+    prv.adminNotes = adminNotes;
+    if (status === 'fulfilled' || status === 'completed' || status === 'rejected' || status === 'denied') {
+      prv.resolvedAt = new Date();
+      prv.resolvedBy = user.email;
+    }
+    await prv.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'PRIVACY_REQUEST_PROCESSED',
+      resourceType: 'privacy_request',
+      targetResource: prv.requestId,
+      eventCategory: 'Privacy & Consent',
+      outcome: 'success',
+      severity: 'medium',
+      details: { newStatus: status, adminNotes },
+      req
+    });
+
+    res.json({ success: true, request: prv, ...(prv.toObject ? prv.toObject() : prv) });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -3490,6 +4641,17 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
       const isMatch = safeStringCompare(password, expectedPassword) || safeStringCompare(password, 'SabujCare#2026!');
       
       if (!isMatch) {
+        await logAuditEvent({
+          actorEmail: normalizedEmail,
+          actorRole: 'Super Admin',
+          action: 'LOGIN_FAILURE',
+          targetResource: 'auth',
+          eventCategory: 'Authentication',
+          outcome: 'failure',
+          severity: 'low',
+          details: { reason: 'Incorrect provider password' },
+          req
+        });
         return res.status(400).json({ error: 'Incorrect Provider Security Password.' });
       }
 
@@ -3521,11 +4683,35 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
         req.session.lastActivity = Date.now();
         req.session.authTime = Date.now();
 
+        try {
+          await UserSession.findOneAndUpdate(
+            { sessionId: req.sessionID },
+            {
+              sessionId: req.sessionID,
+              userId: superAdmin._id || superAdmin.id,
+              userEmail: providerAltEmail,
+              userName: 'Sabuj Das',
+              role: 'Super Admin',
+              ipAddress: getClientIp(req),
+              userAgent: req.headers['user-agent'] || '',
+              loginTime: new Date(),
+              lastActivity: new Date(),
+              status: 'active'
+            },
+            { upsert: true }
+          );
+        } catch (sessErr) {
+          console.warn('Session recording alert:', sessErr.message);
+        }
+
         await logAuditEvent({
           actorEmail: providerAltEmail,
           actorRole: 'Super Admin',
           action: 'CREDENTIAL_LOGIN_SUCCESS',
           targetResource: 'auth',
+          eventCategory: 'Authentication',
+          outcome: 'success',
+          severity: 'info',
           req
         });
 
@@ -3560,6 +4746,17 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
       }
 
       if (!verifyPassword(password, staffUser.password)) {
+        await logAuditEvent({
+          actorEmail: normalizedEmail,
+          actorRole: staffUser.role,
+          action: 'LOGIN_FAILURE',
+          targetResource: 'auth',
+          eventCategory: 'Authentication',
+          outcome: 'failure',
+          severity: 'low',
+          details: { reason: 'Incorrect staff credentials' },
+          req
+        });
         return res.status(400).json({ error: 'Incorrect credentials.' });
       }
 
@@ -3583,11 +4780,35 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
         req.session.lastActivity = Date.now();
         req.session.authTime = Date.now();
 
+        try {
+          await UserSession.findOneAndUpdate(
+            { sessionId: req.sessionID },
+            {
+              sessionId: req.sessionID,
+              userId: staffUser._id || staffUser.id,
+              userEmail: staffUser.email,
+              userName: staffUser.name,
+              role: staffUser.role,
+              ipAddress: getClientIp(req),
+              userAgent: req.headers['user-agent'] || '',
+              loginTime: new Date(),
+              lastActivity: new Date(),
+              status: 'active'
+            },
+            { upsert: true }
+          );
+        } catch (sessErr) {
+          console.warn('Session recording alert:', sessErr.message);
+        }
+
         await logAuditEvent({
           actorEmail: staffUser.email,
           actorRole: staffUser.role,
           action: 'STAFF_LOGIN_SUCCESS',
           targetResource: 'auth',
+          eventCategory: 'Authentication',
+          outcome: 'success',
+          severity: 'info',
           req
         });
 
@@ -3605,10 +4826,32 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
     }
 
     if (!client) {
+      await logAuditEvent({
+        actorEmail: normalizedEmail,
+        actorRole: 'unknown',
+        action: 'LOGIN_FAILURE',
+        targetResource: 'auth',
+        eventCategory: 'Authentication',
+        outcome: 'failure',
+        severity: 'low',
+        details: { reason: 'Account not found' },
+        req
+      });
       return res.status(400).json({ error: 'No account registered under this email.' });
     }
 
     if (!verifyPassword(password, client.password)) {
+      await logAuditEvent({
+        actorEmail: normalizedEmail,
+        actorRole: 'client',
+        action: 'LOGIN_FAILURE',
+        targetResource: 'auth',
+        eventCategory: 'Authentication',
+        outcome: 'failure',
+        severity: 'low',
+        details: { reason: 'Incorrect client credentials' },
+        req
+      });
       return res.status(400).json({ error: 'Incorrect credentials.' });
     }
 
@@ -3643,11 +4886,35 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
       req.session.lastActivity = Date.now();
       req.session.authTime = Date.now();
 
+      try {
+        await UserSession.findOneAndUpdate(
+          { sessionId: req.sessionID },
+          {
+            sessionId: req.sessionID,
+            userId: client._id || client.id,
+            userEmail: client.email,
+            userName: client.name,
+            role: 'client',
+            ipAddress: getClientIp(req),
+            userAgent: req.headers['user-agent'] || '',
+            loginTime: new Date(),
+            lastActivity: new Date(),
+            status: 'active'
+          },
+          { upsert: true }
+        );
+      } catch (sessErr) {
+        console.warn('Session recording alert:', sessErr.message);
+      }
+
       await logAuditEvent({
         actorEmail: client.email,
         actorRole: 'client',
         action: 'CLIENT_LOGIN_SUCCESS',
         targetResource: 'auth',
+        eventCategory: 'Authentication',
+        outcome: 'success',
+        severity: 'info',
         req
       });
 
@@ -5022,4 +6289,20 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-export { app, serverInstance, User, Client, PatientProfile, hashPassword, verifyPassword };
+export { 
+  app, 
+  serverInstance, 
+  User, 
+  Client, 
+  PatientProfile, 
+  AuditLog, 
+  SecurityEvent, 
+  UserSession, 
+  ConsentRecord, 
+  PrivacyRequest, 
+  SecuritySettings, 
+  hashPassword, 
+  verifyPassword, 
+  recordSecurityEvent, 
+  logAuditEvent 
+};

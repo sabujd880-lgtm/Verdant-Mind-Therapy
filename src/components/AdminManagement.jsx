@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save, Trash2, Plus, Bell, Palette, Sun, Moon, Contact } from 'lucide-react';
 import PatientProfileManager from './PatientProfileManager.jsx';
+import SecurityDashboard from './SecurityDashboard.jsx';
+import AuditLogManager from './AuditLogManager.jsx';
+import PrivacyManagement from './PrivacyManagement.jsx';
 import { getActiveTheme, getActiveMode, applyTheme, THEMES, THEME_MODES } from '../styles/theme-config.js';
 import { formatISTDateTimeWithZone, normalizeToISTDate } from '../utils/dateTime.js';
 
@@ -353,7 +356,7 @@ export default function AdminManagement({ currentUser }) {
     <div className="admin-management-module">
       {/* Subtab Navigation */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-slate-10)', paddingBottom: '0.75rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             type="button"
             className={`tab-btn ${activeSubTab === 'users' ? 'active' : ''}`}
@@ -372,11 +375,11 @@ export default function AdminManagement({ currentUser }) {
           </button>
           <button
             type="button"
-            className={`tab-btn ${activeSubTab === 'assignments' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('assignments')}
+            className={`tab-btn ${activeSubTab === 'security' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('security')}
             style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
           >
-            <Shield size={15} style={{ marginRight: '0.35rem' }} /> Counsellor Assignments
+            <Shield size={15} style={{ marginRight: '0.35rem' }} /> Security Operations & Telemetry
           </button>
           <button
             type="button"
@@ -384,7 +387,23 @@ export default function AdminManagement({ currentUser }) {
             onClick={() => setActiveSubTab('audit')}
             style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
           >
-            <Clock size={15} style={{ marginRight: '0.35rem' }} /> Security Audit Logs
+            <Clock size={15} style={{ marginRight: '0.35rem' }} /> Tamper-Resistant Audit Trail
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeSubTab === 'privacy' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('privacy')}
+            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+          >
+            <Lock size={15} style={{ marginRight: '0.35rem' }} /> Privacy & Data Rights (DSAR)
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeSubTab === 'assignments' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('assignments')}
+            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+          >
+            <Shield size={15} style={{ marginRight: '0.35rem' }} /> Counsellor Assignments
           </button>
           <button
             type="button"
@@ -685,66 +704,19 @@ export default function AdminManagement({ currentUser }) {
         </div>
       )}
 
-      {/* TAB 3: AUDIT TRAIL & LOGIN HISTORY */}
-      {activeSubTab === 'audit' && (
-        <div className="glass-card" style={{ overflowX: 'auto', borderRadius: 'var(--radius-sm)' }}>
-          <div style={{ padding: '1rem', borderBottom: '1px solid var(--color-slate-10)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--color-slate-dark)' }}>
-              Security & Authentication Audit Trail (Latest 100 Events)
-            </h4>
-            <button
-              type="button"
-              onClick={fetchAuditLogs}
-              style={{ background: 'none', border: '1px solid var(--color-slate-10)', padding: '0.3rem 0.75rem', borderRadius: '4px', cursor: 'pointer', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-            >
-              <RefreshCw size={12} /> Refresh Logs
-            </button>
-          </div>
+      {/* TAB: SECURITY OPERATIONS & TELEMETRY */}
+      {activeSubTab === 'security' && (
+        <SecurityDashboard currentUser={currentUser} />
+      )}
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
-            <thead>
-              <tr style={{ background: 'rgba(42,71,62,0.06)', borderBottom: '1px solid var(--color-slate-10)' }}>
-                <th style={{ padding: '0.65rem 0.85rem' }}>Timestamp</th>
-                <th style={{ padding: '0.65rem 0.85rem' }}>Actor</th>
-                <th style={{ padding: '0.65rem 0.85rem' }}>Action Event</th>
-                <th style={{ padding: '0.65rem 0.85rem' }}>Target Resource</th>
-                <th style={{ padding: '0.65rem 0.85rem' }}>IP & Agent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditLogs.length === 0 ? (
-                <tr>
-                  <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-slate-light)' }}>
-                    No audit records recorded yet.
-                  </td>
-                </tr>
-              ) : (
-                auditLogs.map((log, i) => (
-                  <tr key={log._id || log.id || i} style={{ borderBottom: '1px solid var(--color-slate-05)' }}>
-                    <td style={{ padding: '0.65rem 0.85rem', color: 'var(--color-slate-light)', whiteSpace: 'nowrap' }}>
-                      {formatISTDateTimeWithZone(log.timestamp)}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <strong style={{ color: 'var(--color-slate-dark)' }}>{log.actorEmail}</strong>
-                      <span style={{ fontSize: '0.7rem', display: 'block', color: 'var(--color-slate-light)' }}>({log.actorRole})</span>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <code style={{ background: 'rgba(42,71,62,0.08)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, color: 'var(--color-primary-forest)' }}>
-                        {log.action}
-                      </code>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem', color: 'var(--color-slate-dark)' }}>
-                      {log.targetResource || 'system'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.75rem', color: 'var(--color-slate-light)' }}>
-                      {log.ipAddress || 'internal'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* TAB: AUDIT TRAIL & TAMPER-RESISTANT LOGS */}
+      {activeSubTab === 'audit' && (
+        <AuditLogManager currentUser={currentUser} />
+      )}
+
+      {/* TAB: PRIVACY GOVERNANCE & DATA RIGHTS (DSAR) */}
+      {activeSubTab === 'privacy' && (
+        <PrivacyManagement currentUser={currentUser} mode="admin" />
       )}
 
       {/* TAB 4: PRACTICE SCHEDULING & IST GOVERNANCE */}
