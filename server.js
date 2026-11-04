@@ -327,6 +327,46 @@ function isValidAudioMagicBytes(filePath) {
 }
 
 // =========================================================================
+// CRYPTOGRAPHIC PASSWORD SECURITY (scrypt + constant-time comparison)
+// =========================================================================
+function hashPassword(password) {
+  if (!password) throw new Error('Password cannot be empty');
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKey = crypto.scryptSync(password, salt, 64);
+  return `scrypt:${salt}:${derivedKey.toString('hex')}`;
+}
+
+function safeStringCompare(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function verifyPassword(password, storedHash) {
+  if (!storedHash || !password) return false;
+  
+  if (storedHash.startsWith('scrypt:')) {
+    const parts = storedHash.split(':');
+    if (parts.length !== 3) return false;
+    const salt = parts[1];
+    const key = parts[2];
+    const derivedKey = crypto.scryptSync(password, salt, 64);
+    const keyBuffer = Buffer.from(key, 'hex');
+    if (derivedKey.length !== keyBuffer.length) return false;
+    return crypto.timingSafeEqual(derivedKey, keyBuffer);
+  }
+  
+  // Legacy plaintext fallback for backwards compatibility with existing accounts
+  return safeStringCompare(password, storedHash);
+}
+
+function isLegacyPlaintext(storedHash) {
+  return typeof storedHash === 'string' && !storedHash.startsWith('scrypt:');
+}
+
+// =========================================================================
 // DATABASE SCHEMAS & MODELS
 // =========================================================================
 
@@ -335,6 +375,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, index: true },
   name: { type: String, required: true },
   picture: { type: String, default: '' },
+  password: { type: String }, // Optional hashed password for staff/admin email login
   googleId: { type: String, sparse: true, index: true },
   role: { 
     type: String, 
@@ -694,6 +735,11 @@ function matchesQuery(item, query = {}) {
     if (key === '$or') continue;
     const qVal = query[key];
     const iVal = item[key];
+
+    if (qVal instanceof RegExp) {
+      if (!qVal.test(String(iVal || ''))) return false;
+      continue;
+    }
 
     if (qVal && typeof qVal === 'object' && !Array.isArray(qVal) && !(qVal instanceof RegExp)) {
       if ('$ne' in qVal) {
@@ -1408,7 +1454,12 @@ app.post('/api/auth/logout', async (req, res) => {
     if (err) {
       return res.status(500).json({ error: 'Could not log out cleanly.' });
     }
-    res.clearCookie('counselling_portal_sid');
+    res.clearCookie('counselling_portal_sid', {
+      path: '/',
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax'
+    });
     res.json({ success: true, message: 'Logged out successfully.' });
   });
 });
@@ -2280,10 +2331,22 @@ app.get('/api/clients/:email',
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, name, phone, ageGroup } = req.body;
   try {
-    const existing = await Client.findOne({ email });
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    if (!normalizedEmail || !password || !name) {
+      return res.status(400).json({ error: 'Full name, email address, and password are required.' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    let existing = await Client.findOne({ email: normalizedEmail });
+    if (!existing) {
+      existing = await Client.findOne({ email: new RegExp('^' + normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiration
+    const hashedPassword = hashPassword(password);
 
     if (existing) {
       if (existing.verified) {
@@ -2291,15 +2354,21 @@ app.post('/api/auth/register', async (req, res) => {
       }
       existing.otpCode = otp;
       existing.otpExpires = expires;
-      existing.name = name;
-      existing.phone = phone;
-      existing.ageGroup = ageGroup;
-      existing.password = password;
+      existing.name = (name || '').trim();
+      existing.phone = (phone || '').trim();
+      existing.ageGroup = ageGroup || 'Adult (18-59)';
+      existing.password = hashedPassword;
       await existing.save();
     } else {
       await Client.create({
-        email, password, name, phone, ageGroup,
-        verified: false, otpCode: otp, otpExpires: expires
+        email: normalizedEmail,
+        password: hashedPassword,
+        name: (name || '').trim(),
+        phone: (phone || '').trim(),
+        ageGroup: ageGroup || 'Adult (18-59)',
+        verified: false,
+        otpCode: otp,
+        otpExpires: expires
       });
     }
 
@@ -2317,10 +2386,10 @@ app.post('/api/auth/register', async (req, res) => {
       </div>
     `;
 
-    console.log(`[DEV OTP] Registration OTP for ${email}: ${otp}`);
+    console.log(`[DEV OTP] Registration OTP for ${normalizedEmail}: ${otp}`);
 
     await sendEmail({
-      toEmail: email,
+      toEmail: normalizedEmail,
       toName: name,
       subject: 'Verification OTP Code - Verdant Mind',
       htmlContent: emailHtml
@@ -2340,12 +2409,16 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/verify-otp', loginBruteForceLimiter, async (req, res) => {
   const { email, otp } = req.body;
   try {
-    const client = await Client.findOne({ email });
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    let client = await Client.findOne({ email: normalizedEmail });
+    if (!client) {
+      client = await Client.findOne({ email: new RegExp('^' + normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
+    }
     if (!client) {
       return res.status(400).json({ error: 'Client account matching email could not be located.' });
     }
 
-    if (client.otpCode !== otp || new Date(client.otpExpires) < new Date()) {
+    if (client.otpCode !== (otp || '').trim() || new Date(client.otpExpires) < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired verification OTP code.' });
     }
 
@@ -2366,27 +2439,36 @@ app.post('/api/auth/verify-otp', loginBruteForceLimiter, async (req, res) => {
       });
     }
 
-    // Establish session with inactivity and lifetime tracking
-    req.session.user = {
-      email: client.email,
-      name: client.name,
-      role: 'client',
-      phone: client.phone,
-      ageGroup: client.ageGroup
-    };
-    req.session.createdAt = Date.now();
-    req.session.lastActivity = Date.now();
-    req.session.authTime = Date.now();
+    // Regenerate session to prevent session fixation
+    req.session.regenerate((regErr) => {
+      if (regErr) {
+        console.error('Session regenerate error on OTP verify:', regErr);
+        return res.status(500).json({ error: 'Session establishment failed.' });
+      }
 
-    res.json({
-      success: true,
-      user: {
+      req.session.user = {
+        id: client._id || client.id,
         email: client.email,
         name: client.name,
+        role: 'client',
         phone: client.phone,
-        ageGroup: client.ageGroup,
-        role: 'client'
-      }
+        ageGroup: client.ageGroup
+      };
+      req.session.createdAt = Date.now();
+      req.session.lastActivity = Date.now();
+      req.session.authTime = Date.now();
+
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error('Session save error on OTP verify:', saveErr);
+          return res.status(500).json({ error: 'Session save failed.' });
+        }
+
+        res.json({
+          success: true,
+          user: req.session.user
+        });
+      });
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -2397,7 +2479,11 @@ app.post('/api/auth/verify-otp', loginBruteForceLimiter, async (req, res) => {
 app.post('/api/auth/forgot-password', passwordResetLimiter, async (req, res) => {
   const { email } = req.body;
   try {
-    const client = await Client.findOne({ email });
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    let client = await Client.findOne({ email: normalizedEmail });
+    if (!client) {
+      client = await Client.findOne({ email: new RegExp('^' + normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
+    }
     if (!client || !client.verified) {
       return res.status(400).json({ error: 'No active, verified client account exists with this email.' });
     }
@@ -2421,10 +2507,10 @@ app.post('/api/auth/forgot-password', passwordResetLimiter, async (req, res) => 
       </div>
     `;
 
-    console.log(`[DEV OTP] Forgot Password Reset OTP for ${email}: ${resetOtp}`);
+    console.log(`[DEV OTP] Forgot Password Reset OTP for ${normalizedEmail}: ${resetOtp}`);
 
     await sendEmail({
-      toEmail: email,
+      toEmail: normalizedEmail,
       toName: client.name,
       subject: 'Password Recovery OTP - Verdant Mind',
       htmlContent: emailHtml
@@ -2444,16 +2530,24 @@ app.post('/api/auth/forgot-password', passwordResetLimiter, async (req, res) => 
 app.post('/api/auth/reset-password', passwordResetLimiter, async (req, res) => {
   const { email, otp, newPassword } = req.body;
   try {
-    const client = await Client.findOne({ email });
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+
+    let client = await Client.findOne({ email: normalizedEmail });
+    if (!client) {
+      client = await Client.findOne({ email: new RegExp('^' + normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
+    }
     if (!client) {
       return res.status(400).json({ error: 'Client account matching email could not be located.' });
     }
 
-    if (client.resetOtpCode !== otp || new Date(client.resetOtpExpires) < new Date()) {
+    if (client.resetOtpCode !== (otp || '').trim() || new Date(client.resetOtpExpires) < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired recovery reset OTP code.' });
     }
 
-    client.password = newPassword;
+    client.password = hashPassword(newPassword);
     client.resetOtpCode = undefined;
     client.resetOtpExpires = undefined;
     await client.save();
@@ -2464,7 +2558,7 @@ app.post('/api/auth/reset-password', passwordResetLimiter, async (req, res) => {
   }
 });
 
-// 5. Account Sign In (Provider vs Client) - Sets session cookie securely
+// 5. Account Sign In (Provider vs Staff vs Client) - Sets session cookie securely
 app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -2473,9 +2567,16 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
     const providerPhone = (process.env.PROVIDER_PHONE || '9547691433').trim();
     const providerAltEmail = 'sabujd880@gmail.com';
 
+    if (!normalizedEmail || !password) {
+      return res.status(400).json({ error: 'Email/phone and password are required.' });
+    }
+
+    // A. Provider / Super Admin Primary Credentials
     if (normalizedEmail === providerEmail || normalizedEmail === providerPhone || normalizedEmail === providerAltEmail) {
       const expectedPassword = process.env.PROVIDER_PASSWORD || 'SabujCare#2026!';
-      if (password && password !== expectedPassword && password !== 'SabujCare#2026!') {
+      const isMatch = safeStringCompare(password, expectedPassword) || safeStringCompare(password, 'SabujCare#2026!');
+      
+      if (!isMatch) {
         return res.status(400).json({ error: 'Incorrect Provider Security Password.' });
       }
 
@@ -2491,41 +2592,110 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
         });
       }
 
-      // Establish session with inactivity and lifetime timestamps
-      req.session.user = {
-        id: superAdmin._id || superAdmin.id,
-        email: providerAltEmail,
-        name: 'Sabuj Das',
-        role: 'Super Admin'
-      };
-      req.session.createdAt = Date.now();
-      req.session.lastActivity = Date.now();
-      req.session.authTime = Date.now();
+      return req.session.regenerate(async (regErr) => {
+        if (regErr) {
+          console.error('Session regenerate error:', regErr);
+          return res.status(500).json({ error: 'Session establishment failed.' });
+        }
 
-      await logAuditEvent({
-        actorEmail: providerAltEmail,
-        actorRole: 'Super Admin',
-        action: 'CREDENTIAL_LOGIN_SUCCESS',
-        targetResource: 'auth',
-        req
-      });
-
-      return res.json({
-        user: {
+        req.session.user = {
+          id: superAdmin._id || superAdmin.id,
           email: providerAltEmail,
           name: 'Sabuj Das',
           role: 'Super Admin'
-        }
+        };
+        req.session.createdAt = Date.now();
+        req.session.lastActivity = Date.now();
+        req.session.authTime = Date.now();
+
+        await logAuditEvent({
+          actorEmail: providerAltEmail,
+          actorRole: 'Super Admin',
+          action: 'CREDENTIAL_LOGIN_SUCCESS',
+          targetResource: 'auth',
+          req
+        });
+
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error('Session save error on provider login:', saveErr);
+            return res.status(500).json({ error: 'Session persistence failed.' });
+          }
+
+          return res.json({
+            user: {
+              email: providerAltEmail,
+              name: 'Sabuj Das',
+              role: 'Super Admin'
+            }
+          });
+        });
       });
     }
 
-    // Check if client portal user
-    const client = await Client.findOne({ email: normalizedEmail });
+    // B. Staff User (Administrator, Counsellor, Viewer) with password
+    let staffUser = await User.findOne({ email: normalizedEmail });
+    if (staffUser && staffUser.password) {
+      if (staffUser.status === 'pending') {
+        return res.status(403).json({ error: 'Your account is pending administrator approval.' });
+      }
+      if (staffUser.status === 'suspended') {
+        return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+      }
+      if (staffUser.status === 'rejected') {
+        return res.status(403).json({ error: 'Your account registration was rejected.' });
+      }
+
+      if (!verifyPassword(password, staffUser.password)) {
+        return res.status(400).json({ error: 'Incorrect credentials.' });
+      }
+
+      // Upgrade legacy plaintext password if applicable
+      if (isLegacyPlaintext(staffUser.password)) {
+        staffUser.password = hashPassword(password);
+        await staffUser.save();
+      }
+
+      return req.session.regenerate(async (regErr) => {
+        if (regErr) return res.status(500).json({ error: 'Session establishment failed.' });
+
+        req.session.user = {
+          id: staffUser._id || staffUser.id,
+          email: staffUser.email,
+          name: staffUser.name,
+          role: staffUser.role,
+          assignedClients: staffUser.assignedClients || []
+        };
+        req.session.createdAt = Date.now();
+        req.session.lastActivity = Date.now();
+        req.session.authTime = Date.now();
+
+        await logAuditEvent({
+          actorEmail: staffUser.email,
+          actorRole: staffUser.role,
+          action: 'STAFF_LOGIN_SUCCESS',
+          targetResource: 'auth',
+          req
+        });
+
+        req.session.save((saveErr) => {
+          if (saveErr) return res.status(500).json({ error: 'Session persistence failed.' });
+          return res.json({ user: req.session.user });
+        });
+      });
+    }
+
+    // C. Client Portal User
+    let client = await Client.findOne({ email: normalizedEmail });
+    if (!client) {
+      client = await Client.findOne({ email: new RegExp('^' + normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
+    }
+
     if (!client) {
       return res.status(400).json({ error: 'No account registered under this email.' });
     }
 
-    if (client.password !== password) {
+    if (!verifyPassword(password, client.password)) {
       return res.status(400).json({ error: 'Incorrect credentials.' });
     }
 
@@ -2536,34 +2706,54 @@ app.post('/api/auth/login', loginBruteForceLimiter, async (req, res) => {
       });
     }
 
-    // Establish session with inactivity and lifetime timestamps
-    req.session.user = {
-      email: client.email,
-      name: client.name,
-      role: 'client',
-      phone: client.phone,
-      ageGroup: client.ageGroup
-    };
-    req.session.createdAt = Date.now();
-    req.session.lastActivity = Date.now();
-    req.session.authTime = Date.now();
+    // Transparently upgrade legacy plaintext password to scrypt hash
+    if (isLegacyPlaintext(client.password)) {
+      client.password = hashPassword(password);
+      await client.save();
+    }
 
-    await logAuditEvent({
-      actorEmail: client.email,
-      actorRole: 'client',
-      action: 'CLIENT_LOGIN_SUCCESS',
-      targetResource: 'auth',
-      req
-    });
+    return req.session.regenerate(async (regErr) => {
+      if (regErr) {
+        console.error('Session regenerate error on client login:', regErr);
+        return res.status(500).json({ error: 'Session establishment failed.' });
+      }
 
-    res.json({
-      user: {
+      req.session.user = {
+        id: client._id || client.id,
         email: client.email,
         name: client.name,
+        role: 'client',
         phone: client.phone,
-        ageGroup: client.ageGroup,
-        role: 'client'
-      }
+        ageGroup: client.ageGroup
+      };
+      req.session.createdAt = Date.now();
+      req.session.lastActivity = Date.now();
+      req.session.authTime = Date.now();
+
+      await logAuditEvent({
+        actorEmail: client.email,
+        actorRole: 'client',
+        action: 'CLIENT_LOGIN_SUCCESS',
+        targetResource: 'auth',
+        req
+      });
+
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error('Session save error on client login:', saveErr);
+          return res.status(500).json({ error: 'Session persistence failed.' });
+        }
+
+        return res.json({
+          user: {
+            email: client.email,
+            name: client.name,
+            phone: client.phone,
+            ageGroup: client.ageGroup,
+            role: 'client'
+          }
+        });
+      });
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -3919,4 +4109,4 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-export { app, serverInstance };
+export { app, serverInstance, User, Client, hashPassword, verifyPassword };

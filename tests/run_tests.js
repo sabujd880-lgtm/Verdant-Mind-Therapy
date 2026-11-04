@@ -19,7 +19,7 @@ import {
 } from '../src/utils/dateTime.js';
 
 // Dynamically import server after NODE_ENV=test is set
-const { app, getClientIp } = await import('../server.js');
+const { app, getClientIp, User, Client, hashPassword, verifyPassword } = await import('../server.js');
 
 let server = null;
 const TEST_PORT = 5099;
@@ -370,6 +370,106 @@ async function run() {
       headers: { Cookie: sessionCookie }
     });
     assert.strictEqual(meRes.status, 401);
+  });
+
+  // Test 17B: Client Registration, Password Hashing, OTP Verification & Login
+  let clientSessionCookie = '';
+  const testClientEmail = `client_${Date.now()}@example.com`;
+  const testClientPass = 'SecureClientPass#2026';
+
+  await test('Client registration, scrypt password hashing, and OTP verification flow', async () => {
+    // 1. Register Client
+    const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testClientEmail,
+        password: testClientPass,
+        name: 'Test Client Person',
+        phone: '9876543210',
+        ageGroup: 'Adult (18-59)'
+      })
+    });
+    assert.strictEqual(regRes.status, 200);
+    const regData = await regRes.json();
+    assert.strictEqual(regData.success, true);
+
+    // 2. Locate OTP code (devOtp or direct model query)
+    const clientRecord = await Client.findOne({ email: testClientEmail.toLowerCase() });
+    assert.ok(clientRecord, 'Client record must exist in DB');
+    assert.ok(clientRecord.password.startsWith('scrypt:'), 'Password must be stored as scrypt hash, never plaintext');
+    assert.strictEqual(clientRecord.verified, false);
+    const otpCode = clientRecord.otpCode;
+    assert.ok(otpCode, 'OTP code must be generated');
+
+    // 3. Verify OTP
+    const verifyRes = await fetch(`${BASE_URL}/api/auth/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testClientEmail,
+        otp: otpCode
+      })
+    });
+    assert.strictEqual(verifyRes.status, 200);
+    const verifyCookieHeader = verifyRes.headers.get('set-cookie');
+    assert.ok(verifyCookieHeader, 'Set-Cookie expected on OTP verification');
+    clientSessionCookie = verifyCookieHeader.split(';')[0];
+
+    // 4. Client Login with wrong password rejected
+    const badLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testClientEmail,
+        password: 'WrongPassword#999'
+      })
+    });
+    assert.strictEqual(badLoginRes.status, 400);
+
+    // 5. Client Login with correct password succeeds
+    const goodLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testClientEmail,
+        password: testClientPass
+      })
+    });
+    assert.strictEqual(goodLoginRes.status, 200);
+    const goodLoginData = await goodLoginRes.json();
+    assert.strictEqual(goodLoginData.user.role, 'client');
+    clientSessionCookie = goodLoginRes.headers.get('set-cookie').split(';')[0];
+
+    // 6. Role-Based Security: Client must be forbidden from accessing admin endpoints
+    const forbiddenAdminRes = await fetch(`${BASE_URL}/api/admin/users`, {
+      headers: { Cookie: clientSessionCookie }
+    });
+    assert.strictEqual(forbiddenAdminRes.status, 403, 'Client role must be blocked from admin endpoints with 403');
+
+    // 7. Legacy Plaintext Password Transparent Upgrade Verification
+    const legacyEmail = `legacy_${Date.now()}@example.com`;
+    const legacyPass = 'LegacyPlaintextPass#2026';
+    await Client.create({
+      email: legacyEmail,
+      password: legacyPass, // Unhashed legacy entry
+      name: 'Legacy Patient',
+      phone: '9123456789',
+      ageGroup: 'Adult (18-59)',
+      verified: true
+    });
+
+    // Login with legacy credentials
+    const legacyLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: legacyEmail, password: legacyPass })
+    });
+    assert.strictEqual(legacyLoginRes.status, 200, 'Legacy account must be able to log in seamlessly');
+    
+    // Verify password was automatically upgraded to scrypt hash in the database
+    const upgradedClient = await Client.findOne({ email: legacyEmail });
+    assert.ok(upgradedClient.password.startsWith('scrypt:'), 'Legacy plaintext password must be upgraded to scrypt upon first login');
   });
 
   // Test 18: IP Spoofing Resistance & Proxy Trust Configuration
