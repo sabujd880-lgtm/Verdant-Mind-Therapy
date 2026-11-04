@@ -87,8 +87,8 @@ export default function ClientPortal({
     <div className="container client-portal-container" style={{ padding: '3rem 2rem 6rem' }}>
       
       {/* Title / User Greeting header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', borderBottom: '1px solid rgba(42,71,62,0.1)', paddingBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.25rem', marginBottom: '2.5rem', borderBottom: '1px solid rgba(42,71,62,0.1)', paddingBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1 1 300px' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid rgba(42, 71, 62, 0.15)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
@@ -99,7 +99,7 @@ export default function ClientPortal({
           </div>
         </div>
         
-        <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(42,71,62,0.05)', padding: '0.25rem', borderRadius: 'var(--radius-sm)' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', background: 'rgba(42,71,62,0.05)', padding: '0.25rem', borderRadius: 'var(--radius-sm)' }}>
           <button 
             className={`tab-btn ${activeTab === 'sessions' ? 'active' : ''}`}
             onClick={() => setActiveTab('sessions')}

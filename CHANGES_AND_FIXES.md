@@ -119,3 +119,38 @@ This document details every specific technical issue diagnosed, the underlying r
 - **Fix Implemented:** Generated a unique `testIp` per run and filtered the paginated API query with `?search=${encodeURIComponent(testIp)}`, ensuring the assertion checks only the alert created in that specific test cycle.
 - **Test Performed:** Executed `node tests/run_tests.js`.
 - **Verification Result:** 81 / 81 tests passed with 0 failures.
+
+---
+
+### 12. Therapist Dashboard Tabs Squished Inside Title Row & Unmovable Scroll
+
+- **Issue Diagnosed:** In `src/components/TherapistDashboard.jsx`, `.dashboard-tabs` was nested directly inside `.dashboard-title-row`. Because `.dashboard-title-row` was a flex container (`display: flex; justify-content: space-between`), the welcome text on the left was squished into a narrow column of pixels causing words to wrap into vertical slivers (e.g. `, view` and `nage` visible behind tabs). Furthermore, the tabs bar was cut off at the right edge, and with `scrollbar-width: none` plus `display: none` on webkit scrollbars, desktop mouse users could not scroll, move, or drag the tabs horizontally.
+- **Root Cause:** Flexbox container squeezing title children against a wide tab list, combined with hidden scrollbars and absence of mouse wheel redirection, drag listeners, or navigation scroll buttons.
+- **Files Modified:** `src/components/TherapistDashboard.jsx`, `src/index.css`, `src/components/ClientPortal.jsx`.
+- **Fix Implemented:**
+  1. Extracted `.dashboard-tabs` outside of `.dashboard-title-row` into its own full-width `.dashboard-tabs-wrapper`.
+  2. Gave the header title row full width so greeting text never wraps awkwardly.
+  3. Added left and right `<ChevronLeft />` and `<ChevronRight />` scroll navigation buttons with disabled state detection.
+  4. Implemented vertical mouse wheel redirection to horizontal scroll on the tabs bar.
+  5. Implemented smooth mouse drag-to-scroll (grab and pan) functionality.
+  6. Provided a sleek 4px custom scrollbar indicator on desktop so users can visually monitor and drag position.
+  7. Added active tab auto-scrolling into view when selected.
+  8. Added responsive wrapping to `ClientPortal.jsx` greeting/tabs header to prevent similar issues.
+- **Test Performed:** Verified production build `npm run build` and automated test suite `node tests/run_tests.js`.
+- **Verification Result:** Clean compilation; tabs are fully scrollable, draggable, and accessible across desktop, tablet, and mobile; header text never squishes.
+
+---
+
+### 13. Input Text Bar and Dropdown Overflow in Document Composer
+
+- **Issue Diagnosed:** In `activeTab === 'documents'` ("1. Document Composer"), input fields (e.g., "Amount Charged (INR)" and "Payment Status" select) crossed over the right border of the glass card container into the gap between panels.
+- **Root Cause:** In CSS Grid, tracks defined with `1.2fr 1fr` defaulted to `min-width: auto`. Form inputs lacked explicit `width: 100%`, `min-width: 0`, and `box-sizing: border-box`. The inputs exceeded the card's inner available width (374px), spilling out past the container border.
+- **Files Modified:** `src/components/TherapistDashboard.jsx`, `src/index.css`.
+- **Fix Implemented:**
+  1. Defined responsive `.document-tab-grid` with `minmax(360px, 440px) minmax(0, 1fr)` on desktop and `1fr` stacked on screens `<= 992px`.
+  2. Added `.doc-form-panel` CSS rules enforcing `box-sizing: border-box`, `width: 100%`, and `overflow: hidden`.
+  3. Added `.doc-form-row-2col` using `minmax(0, 1fr) minmax(0, 1fr)` so sub-grid columns strictly respect container width.
+  4. Added `box-sizing: border-box`, `min-width: 0`, `max-width: 100%`, and `width: 100%` across all inputs, selects, and textareas in Document Composer, Message Composer, and Reschedule modals.
+- **Test Performed:** Tested with `npm run build` and full test suite `node tests/run_tests.js`.
+- **Verification Result:** Zero overflow; input boxes and dropdowns remain strictly bounded within card borders.
+

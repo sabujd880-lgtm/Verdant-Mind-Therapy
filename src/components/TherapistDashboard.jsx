@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Check, X, Eye, Calendar, Clock, Plus, Trash2, 
   Video, PhoneCall, MessageSquare, BookOpen, AlertCircle,
@@ -91,6 +91,97 @@ export default function TherapistDashboard({
   const [reportHomework, setReportHomework] = useState('1. Keep a 5-day sleep journal.\n2. Practice 10 minutes of box breathing daily during lunch breaks.');
   const [receiptVerified, setReceiptVerified] = useState(false);
   const [polishingField, setPolishingField] = useState(null);
+
+  // Tab Navigation Bar Refs & Handlers (smooth scroll, drag, wheel, and navigation buttons)
+  const tabsRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const isDraggingTabs = useRef(false);
+  const dragStartX = useRef(0);
+  const dragScrollLeft = useRef(0);
+  const hasDragged = useRef(false);
+
+  const checkTabsScroll = () => {
+    if (tabsRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tabsRef.current;
+      setCanScrollLeft(scrollLeft > 6);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 6);
+    }
+  };
+
+  useEffect(() => {
+    checkTabsScroll();
+    const handleResize = () => checkTabsScroll();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(checkTabsScroll, 120);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
+
+  const handleTabsScroll = (direction) => {
+    if (tabsRef.current) {
+      const scrollAmount = 260;
+      tabsRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+      setTimeout(checkTabsScroll, 320);
+    }
+  };
+
+  const handleTabsWheel = (e) => {
+    if (tabsRef.current) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        if (tabsRef.current.scrollWidth > tabsRef.current.clientWidth) {
+          e.preventDefault();
+          tabsRef.current.scrollLeft += e.deltaY;
+          checkTabsScroll();
+        }
+      }
+    }
+  };
+
+  const handleTabsMouseDown = (e) => {
+    if (!tabsRef.current || e.button !== 0) return;
+    isDraggingTabs.current = true;
+    hasDragged.current = false;
+    dragStartX.current = e.pageX - tabsRef.current.offsetLeft;
+    dragScrollLeft.current = tabsRef.current.scrollLeft;
+  };
+
+  const handleTabsMouseMove = (e) => {
+    if (!isDraggingTabs.current || !tabsRef.current) return;
+    const x = e.pageX - tabsRef.current.offsetLeft;
+    const walk = (x - dragStartX.current);
+    if (Math.abs(walk) > 4) {
+      hasDragged.current = true;
+      e.preventDefault();
+      tabsRef.current.scrollLeft = dragScrollLeft.current - walk;
+      checkTabsScroll();
+    }
+  };
+
+  const handleTabsMouseUpOrLeave = () => {
+    isDraggingTabs.current = false;
+  };
+
+  const handleSelectTab = (tabId, e) => {
+    if (hasDragged.current) {
+      hasDragged.current = false;
+      return;
+    }
+    setActiveTab(tabId);
+    if (tabId === 'messages' && messages.length > 0 && !selectedMsgId) {
+      setSelectedMsgId(messages[0].id);
+    }
+    if (e && e.currentTarget) {
+      e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+    setTimeout(checkTabsScroll, 200);
+  };
 
   // Simulated Email SMTP Sending States
   const [sendingState, setSendingState] = useState('idle'); // 'idle' | 'compiling' | 'smtp' | 'sending' | 'success'
@@ -369,78 +460,115 @@ export default function TherapistDashboard({
   return (
     <div className="container dashboard-container">
       
-      {/* Title & Tab switch */}
-      <div className="dashboard-title-row">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      {/* 1. Header Title Row */}
+      <div className="dashboard-title-row" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid rgba(42, 71, 62, 0.15)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-          <div>
-            <h2>Therapist Control Panel</h2>
-            <p style={{ color: 'var(--color-slate-light)' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ margin: 0, fontSize: '1.9rem', color: 'var(--color-slate-dark)' }}>Therapist Control Panel</h2>
+            <p style={{ color: 'var(--color-slate-light)', margin: '0.25rem 0 0', lineHeight: 1.45, fontSize: '0.95rem' }}>
               Welcome back, Sabuj Das. Manage your schedule, view inbox messages, compile clinical reports, and manage shift hours.
             </p>
           </div>
         </div>
-        
-        <div className="dashboard-tabs">
+      </div>
+      
+      {/* 2. Top Navigation Tabs Bar with full horizontal scroll and controls */}
+      <div className="dashboard-tabs-wrapper">
+        <button 
+          type="button" 
+          className="tabs-nav-btn tabs-nav-left"
+          onClick={() => handleTabsScroll('left')}
+          disabled={!canScrollLeft}
+          title="Scroll tabs left"
+          aria-label="Scroll tabs left"
+        >
+          <ChevronLeft size={18} />
+        </button>
+
+        <div 
+          className="dashboard-tabs"
+          ref={tabsRef}
+          onScroll={checkTabsScroll}
+          onWheel={handleTabsWheel}
+          onMouseDown={handleTabsMouseDown}
+          onMouseMove={handleTabsMouseMove}
+          onMouseUp={handleTabsMouseUpOrLeave}
+          onMouseLeave={handleTabsMouseUpOrLeave}
+        >
           <button 
+            type="button"
             className={`tab-btn ${activeTab === 'appointments' ? 'active' : ''}`}
-            onClick={() => setActiveTab('appointments')}
+            onClick={(e) => handleSelectTab('appointments', e)}
           >
             Appointments & Inquiries
           </button>
           <button 
+            type="button"
             className={`tab-btn ${activeTab === 'profiles' ? 'active' : ''}`}
-            onClick={() => setActiveTab('profiles')}
+            onClick={(e) => handleSelectTab('profiles', e)}
           >
             Patient Profiles
           </button>
           <button 
+            type="button"
             className={`tab-btn ${activeTab === 'messages' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('messages');
-              if (messages.length > 0 && !selectedMsgId) {
-                setSelectedMsgId(messages[0].id);
-              }
-            }}
+            onClick={(e) => handleSelectTab('messages', e)}
           >
             Message Portal {unreadMessagesCount > 0 && <span className="tab-badge-count">{unreadMessagesCount}</span>}
           </button>
           <button 
+            type="button"
             className={`tab-btn ${activeTab === 'documents' ? 'active' : ''}`}
-            onClick={() => setActiveTab('documents')}
+            onClick={(e) => handleSelectTab('documents', e)}
           >
             Document Center
           </button>
           <button 
+            type="button"
             className={`tab-btn ${activeTab === 'clinical-records' ? 'active' : ''}`}
-            onClick={() => setActiveTab('clinical-records')}
+            onClick={(e) => handleSelectTab('clinical-records', e)}
           >
             Clinical Records & MSE
           </button>
           <button 
+            type="button"
             className={`tab-btn ${activeTab === 'recordings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('recordings')}
+            onClick={(e) => handleSelectTab('recordings', e)}
           >
             Session Recordings
           </button>
           <button 
+            type="button"
             className={`tab-btn ${activeTab === 'availability' ? 'active' : ''}`}
-            onClick={() => setActiveTab('availability')}
+            onClick={(e) => handleSelectTab('availability', e)}
           >
             Availability Settings
           </button>
           {(currentUser?.role === 'Super Admin' || currentUser?.role === 'Administrator' || currentUser?.role === 'provider') && (
             <button 
+              type="button"
               className={`tab-btn ${activeTab === 'admin' ? 'active' : ''}`}
-              onClick={() => setActiveTab('admin')}
+              onClick={(e) => handleSelectTab('admin', e)}
               style={{ fontWeight: 600, borderLeft: '2px solid var(--color-slate-light)' }}
             >
               Admin Governance
             </button>
           )}
         </div>
+
+        <button 
+          type="button" 
+          className="tabs-nav-btn tabs-nav-right"
+          onClick={() => handleTabsScroll('right')}
+          disabled={!canScrollRight}
+          title="Scroll tabs right"
+          aria-label="Scroll tabs right"
+        >
+          <ChevronRight size={18} />
+        </button>
       </div>
 
       {/* Metric summary counters */}
@@ -1054,8 +1182,8 @@ export default function TherapistDashboard({
                   </div>
                 ) : (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '1rem', width: '100%', boxSizing: 'border-box' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Recipient Email Address *</label>
                         <input 
                           type="email" 
@@ -1063,22 +1191,22 @@ export default function TherapistDashboard({
                           placeholder="e.g. client@example.com"
                           value={composeData.toEmail}
                           onChange={e => setComposeData({...composeData, toEmail: e.target.value})}
-                          style={{ padding: '0.65rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
+                          style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.65rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
                         />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Recipient Full Name</label>
                         <input 
                           type="text" 
                           placeholder="e.g. John Doe"
                           value={composeData.toName}
                           onChange={e => setComposeData({...composeData, toName: e.target.value})}
-                          style={{ padding: '0.65rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
+                          style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.65rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
                         />
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%', boxSizing: 'border-box' }}>
                       <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Subject *</label>
                       <input 
                         type="text" 
@@ -1086,11 +1214,11 @@ export default function TherapistDashboard({
                         placeholder="e.g., Session materials & exercises follow up"
                         value={composeData.subject}
                         onChange={e => setComposeData({...composeData, subject: e.target.value})}
-                        style={{ padding: '0.65rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.65rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', outline: 'none' }}
                       />
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, width: '100%', boxSizing: 'border-box' }}>
                       <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Message Text *</label>
                       <textarea 
                         required
@@ -1098,7 +1226,7 @@ export default function TherapistDashboard({
                         placeholder="Write your email letter here..."
                         value={composeData.messageText}
                         onChange={e => setComposeData({...composeData, messageText: e.target.value})}
-                        style={{ padding: '0.65rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', outline: 'none', resize: 'none', flex: 1 }}
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.65rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', outline: 'none', resize: 'none', flex: 1 }}
                       ></textarea>
                     </div>
 
@@ -1205,23 +1333,23 @@ export default function TherapistDashboard({
 
       {/* 3. Document Generator Tab */}
       {activeTab === 'documents' && (
-        <div className="document-tab-grid" style={{ display: 'grid', gridTemplateColumns: '430px 1fr', gap: '1.5rem' }}>
+        <div className="document-tab-grid">
           
           {/* Left Panel: Document Creator Form */}
-          <div className="glass-card doc-form-panel" style={{ padding: '1.75rem' }}>
+          <div className="glass-card doc-form-panel" style={{ padding: '1.75rem', boxSizing: 'border-box', width: '100%', overflow: 'hidden' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <FileText size={20} />
               1. Document Composer
             </h3>
 
             {/* Select Client Dropdown */}
-            <div className="settings-group" style={{ marginBottom: '1rem' }}>
+            <div className="settings-group" style={{ marginBottom: '1rem', width: '100%', boxSizing: 'border-box' }}>
               <label htmlFor="doc-client" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem' }}>Select Target Consultation Client:</label>
               <select
                 id="doc-client"
                 value={selectedAptIdForDoc}
                 onChange={(e) => setSelectedAptIdForDoc(e.target.value)}
-                style={{ width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)', outline: 'none' }}
+                style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)', outline: 'none' }}
               >
                 {appointments.length === 0 ? (
                   <option value="">No clients available</option>
@@ -1234,14 +1362,14 @@ export default function TherapistDashboard({
             </div>
 
             {/* Document Type Selector */}
-            <div className="settings-group" style={{ marginBottom: '1.5rem' }}>
+            <div className="settings-group" style={{ marginBottom: '1.5rem', width: '100%', boxSizing: 'border-box' }}>
               <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Select Document Template:</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.5rem', width: '100%', boxSizing: 'border-box' }}>
                 <button
                   type="button"
                   className={`tab-btn ${docType === 'receipt' ? 'active' : ''}`}
                   onClick={() => { setDocType('receipt'); setReceiptVerified(false); }}
-                  style={{ fontSize: '0.8rem', padding: '0.6rem 0.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', border: '1px solid var(--color-slate-10)' }}
+                  style={{ fontSize: '0.8rem', padding: '0.6rem 0.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', border: '1px solid var(--color-slate-10)', width: '100%', boxSizing: 'border-box', minWidth: 0 }}
                 >
                   <Receipt size={16} />
                   Receipt
@@ -1250,7 +1378,7 @@ export default function TherapistDashboard({
                   type="button"
                   className={`tab-btn ${docType === 'prescription' ? 'active' : ''}`}
                   onClick={() => { setDocType('prescription'); setReceiptVerified(false); }}
-                  style={{ fontSize: '0.8rem', padding: '0.6rem 0.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', border: '1px solid var(--color-slate-10)' }}
+                  style={{ fontSize: '0.8rem', padding: '0.6rem 0.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', border: '1px solid var(--color-slate-10)', width: '100%', boxSizing: 'border-box', minWidth: 0 }}
                 >
                   <FileText size={16} />
                   Therapeutic Plan
@@ -1259,7 +1387,7 @@ export default function TherapistDashboard({
                   type="button"
                   className={`tab-btn ${docType === 'report' ? 'active' : ''}`}
                   onClick={() => { setDocType('report'); setReceiptVerified(false); }}
-                  style={{ fontSize: '0.8rem', padding: '0.6rem 0.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', border: '1px solid var(--color-slate-10)' }}
+                  style={{ fontSize: '0.8rem', padding: '0.6rem 0.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', border: '1px solid var(--color-slate-10)', width: '100%', boxSizing: 'border-box', minWidth: 0 }}
                 >
                   <Clipboard size={16} />
                   Clinical Report
@@ -1273,44 +1401,44 @@ export default function TherapistDashboard({
             
             {/* TYPE A: PAYMENT RECEIPT FIELDS */}
             {docType === 'receipt' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', boxSizing: 'border-box' }}>
+                <div className="doc-form-row-2col">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 }}>
                     <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-slate-dark)' }}>Receipt Invoice No.</label>
                     <input 
                       type="text"
                       value={invoiceNo}
                       onChange={e => { setInvoiceNo(e.target.value); setReceiptVerified(false); }}
-                      style={{ padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', outline: 'none', background: '#fff', transition: 'border-color 0.2s' }}
+                      style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', outline: 'none', background: '#fff', transition: 'border-color 0.2s' }}
                     />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 }}>
                     <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-slate-dark)' }}>Amount Charged (INR)</label>
                     <input 
                       type="number"
                       value={receiptAmount}
                       onChange={e => { setReceiptAmount(e.target.value); setReceiptVerified(false); }}
-                      style={{ padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', outline: 'none', background: '#fff', transition: 'border-color 0.2s' }}
+                      style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', outline: 'none', background: '#fff', transition: 'border-color 0.2s' }}
                     />
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                <div className="doc-form-row-2col">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 }}>
                     <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-slate-dark)' }}>Payment Method</label>
                     <input 
                       type="text"
                       value={paymentMethod}
                       onChange={e => { setPaymentMethod(e.target.value); setReceiptVerified(false); }}
-                      style={{ padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', outline: 'none', background: '#fff', transition: 'border-color 0.2s' }}
+                      style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', outline: 'none', background: '#fff', transition: 'border-color 0.2s' }}
                     />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 }}>
                     <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-slate-dark)' }}>Payment Status</label>
                     <select
                       value={paymentStatus}
                       onChange={e => { setPaymentStatus(e.target.value); setReceiptVerified(false); }}
-                      style={{ padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', outline: 'none', background: '#fff', cursor: 'pointer' }}
+                      style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', outline: 'none', background: '#fff', cursor: 'pointer' }}
                     >
                       <option value="Paid">Paid / Confirmed</option>
                       <option value="Refunded">Refunded</option>
@@ -1319,13 +1447,13 @@ export default function TherapistDashboard({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', width: '100%', boxSizing: 'border-box' }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-slate-dark)' }}>Services Rendered Description</label>
                   <textarea 
                     rows="3"
                     value={receiptServices}
                     onChange={e => { setReceiptServices(e.target.value); setReceiptVerified(false); }}
-                    style={{ padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', resize: 'none', outline: 'none', background: '#fff', lineHeight: '1.4' }}
+                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.6rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.88rem', resize: 'none', outline: 'none', background: '#fff', lineHeight: '1.4' }}
                   ></textarea>
                 </div>
 
@@ -1339,14 +1467,16 @@ export default function TherapistDashboard({
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '0.65rem',
-                  transition: 'all 0.2s ease-in-out'
+                  transition: 'all 0.2s ease-in-out',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}>
                   <input 
                     type="checkbox" 
                     id="receipt-verify-chk"
                     checked={receiptVerified}
                     onChange={e => setReceiptVerified(e.target.checked)}
-                    style={{ marginTop: '0.2rem', width: '15px', height: '15px', cursor: 'pointer' }}
+                    style={{ marginTop: '0.2rem', width: '15px', height: '15px', cursor: 'pointer', flexShrink: 0 }}
                   />
                   <label htmlFor="receipt-verify-chk" style={{ fontSize: '0.78rem', color: 'var(--color-slate-dark)', cursor: 'pointer', lineHeight: '1.45', userSelect: 'none' }}>
                     <strong style={{ color: receiptVerified ? 'var(--color-confirmed)' : 'var(--color-terracotta)', display: 'block', marginBottom: '0.15rem' }}>
@@ -1360,8 +1490,8 @@ export default function TherapistDashboard({
 
             {/* TYPE B: CLINICAL THERAPEUTIC PLAN FIELDS */}
             {docType === 'prescription' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Clinical Indications / Diagnosis</label>
                     <button 
@@ -1377,11 +1507,11 @@ export default function TherapistDashboard({
                     type="text"
                     value={prescDiagnosis}
                     onChange={e => setPrescDiagnosis(e.target.value)}
-                    style={{ padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
+                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
                   />
                 </div>
 
-                <div style={{ border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', background: 'rgba(255,255,255,0.4)' }}>
+                <div style={{ border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', background: 'rgba(255,255,255,0.4)', width: '100%', boxSizing: 'border-box' }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, display: 'block', marginBottom: '0.4rem', color: 'var(--color-slate-dark)' }}>Therapeutic Recommendations / Techniques Plan:</label>
                   
                   {prescItems.length === 0 ? (
@@ -1402,35 +1532,35 @@ export default function TherapistDashboard({
                   )}
 
                   {/* Add item sub-form */}
-                  <div style={{ borderTop: '1px solid var(--color-slate-10)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ borderTop: '1px solid var(--color-slate-10)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', boxSizing: 'border-box' }}>
                     <input 
                       type="text" 
                       placeholder="Therapeutic Exercise / Recommended Action (CBT/DBT)"
                       value={newItemName}
                       onChange={e => setNewItemName(e.target.value)}
-                      style={{ padding: '0.4rem', fontSize: '0.8rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px' }}
+                      style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.4rem', fontSize: '0.8rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px' }}
                     />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', boxSizing: 'border-box' }}>
                       <input 
                         type="text" 
                         placeholder="Technique Focus / Instructions (e.g. 5-sec inhale)"
                         value={newItemDose}
                         onChange={e => setNewItemDose(e.target.value)}
-                        style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px', outline: 'none' }}
                       />
                       <input 
                         type="text" 
                         placeholder="Practice Frequency (e.g. Twice Daily)"
                         value={newItemFreq}
                         onChange={e => setNewItemFreq(e.target.value)}
-                        style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px', outline: 'none' }}
                       />
                       <input 
                         type="text" 
                         placeholder="Target Duration (e.g. 21 Days)"
                         value={newItemDuration}
                         onChange={e => setNewItemDuration(e.target.value)}
-                        style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px', outline: 'none' }}
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid var(--color-slate-10)', borderRadius: '4px', outline: 'none' }}
                       />
                     </div>
                     <button type="button" className="premium-btn" style={{ padding: '0.4rem', fontSize: '0.8rem', borderRadius: '4px' }} onClick={handleAddPrescItem}>
@@ -1439,7 +1569,7 @@ export default function TherapistDashboard({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Adherence Plan / Next Session Focus</label>
                     <button 
@@ -1455,7 +1585,7 @@ export default function TherapistDashboard({
                     type="text"
                     value={prescRefills}
                     onChange={e => setPrescRefills(e.target.value)}
-                    style={{ padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
+                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}
                   />
                 </div>
               </div>
@@ -1463,8 +1593,8 @@ export default function TherapistDashboard({
 
             {/* TYPE C: CLINICAL REPORT FIELDS */}
             {docType === 'report' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Diagnosis & Clinical Summary</label>
                     <button 
@@ -1480,11 +1610,11 @@ export default function TherapistDashboard({
                     rows="3"
                     value={reportSummary}
                     onChange={e => setReportSummary(e.target.value)}
-                    style={{ padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', resize: 'none' }}
+                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', resize: 'none' }}
                   ></textarea>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Behavioral & Clinical Observations</label>
                     <button 
@@ -1500,11 +1630,11 @@ export default function TherapistDashboard({
                     rows="3"
                     value={reportObservations}
                     onChange={e => setReportObservations(e.target.value)}
-                    style={{ padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', resize: 'none' }}
+                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', resize: 'none' }}
                   ></textarea>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Recommended Homework & Action Plan</label>
                     <button 
@@ -1520,13 +1650,13 @@ export default function TherapistDashboard({
                     rows="3"
                     value={reportHomework}
                     onChange={e => setReportHomework(e.target.value)}
-                    style={{ padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', resize: 'none' }}
+                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem', resize: 'none' }}
                   ></textarea>
                 </div>
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '0.75rem', marginTop: '1.5rem', width: '100%', boxSizing: 'border-box' }}>
               <button 
                 type="button" 
                 className="premium-btn-outline" 
@@ -2122,15 +2252,15 @@ export default function TherapistDashboard({
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '0.75rem', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ minWidth: 0 }}>
                   <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
                     New Time Slot (IST) *:
                   </label>
                   <select
                     value={rescheduleForm.time}
                     onChange={(e) => setRescheduleForm(prev => ({ ...prev, time: e.target.value }))}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', background: '#fff' }}
+                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', background: '#fff' }}
                   >
                     {['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM', '06:00 PM'].map(t => (
                       <option key={t} value={t}>{t}</option>
@@ -2138,14 +2268,14 @@ export default function TherapistDashboard({
                   </select>
                 </div>
 
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.3rem' }}>
                     Duration (Minutes):
                   </label>
                   <select
                     value={rescheduleForm.durationMinutes}
                     onChange={(e) => setRescheduleForm(prev => ({ ...prev, durationMinutes: Number(e.target.value) }))}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', background: '#fff' }}
+                    style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', background: '#fff' }}
                   >
                     <option value={30}>30 Minutes</option>
                     <option value={45}>45 Minutes</option>

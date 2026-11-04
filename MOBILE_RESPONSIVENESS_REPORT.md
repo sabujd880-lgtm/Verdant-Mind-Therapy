@@ -86,3 +86,15 @@ A comprehensive responsive architecture was designed, implemented, and verified 
 - Full multi-column dashboard grids (`1.2fr 0.8fr` or `repeat(4, 1fr)`).
 - Mobile toggles and mobile card views are strictly hidden via CSS `@media (min-width: 769px) { display: none !important; }`.
 - Desktop visual integrity and UX are completely preserved.
+
+---
+
+## 5. Dashboard Navigation Tabs & Form Inputs Responsiveness
+
+| Component | Element / Section | Responsive Behavior & Fixes Implemented | Breakpoints |
+| :--- | :--- | :--- | :--- |
+| [`TherapistDashboard.jsx`](file:///c:/Users/CUAPDC03/Downloads/Sabujdas880/psychology-portfolio/src/components/TherapistDashboard.jsx) | `.dashboard-tabs-wrapper` & `.dashboard-tabs` | Separated from title row to full-width container; added `<ChevronLeft>` / `<ChevronRight>` scroll buttons, mouse wheel horizontal redirection, mouse drag-to-scroll, and sleek custom scrollbar | 320px, 480px, 768px, 1024px+ |
+| [`TherapistDashboard.jsx`](file:///c:/Users/CUAPDC03/Downloads/Sabujdas880/psychology-portfolio/src/components/TherapistDashboard.jsx) | `Document Composer` (Receipt / Plan / Report) | Replaced rigid 430px column with responsive `.document-tab-grid` (stacks to 1fr at $\le 992\text{px}$); replaced fixed grid with `.doc-form-row-2col` using `minmax(0, 1fr)`; enforced `box-sizing: border-box` and `width: 100%` on all inputs to prevent border crossing | 320px, 480px, 768px, 992px |
+| [`ClientPortal.jsx`](file:///c:/Users/CUAPDC03/Downloads/Sabujdas880/psychology-portfolio/src/components/ClientPortal.jsx) | Header greeting & tabs | Added `flex-wrap: wrap; gap: 1.25rem;` to prevent greeting squeeze on medium/small viewports | 320px, 768px, 992px |
+
+
