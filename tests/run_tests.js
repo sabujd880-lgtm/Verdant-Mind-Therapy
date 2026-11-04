@@ -1765,27 +1765,28 @@ async function run() {
   // Test 51: Security Threat Alerts Directory & Resolution Lifecycle
   await test('Security: Threat alerts directory supports pagination, filters, and resolution workflow', async () => {
     // 1. Create a security event directly using recordSecurityEvent service
+    const testIp = '198.51.100.' + ((Date.now() % 200) + 10);
     await recordSecurityEvent({
       category: 'brute_force',
       severity: 'high',
       status: 'open',
       title: 'Suspicious Brute Force Probe Detected',
-      description: 'Multiple failed attempts from IP 198.51.100.22',
-      sourceIp: '198.51.100.22',
+      description: `Multiple failed attempts from IP ${testIp}`,
+      sourceIp: testIp,
       occurrences: 4
     });
 
     // 2. Fetch paginated list
-    const listRes = await fetch(`${BASE_URL}/api/admin/security/events?status=open&severity=high&page=1&limit=10`, {
+    const listRes = await fetch(`${BASE_URL}/api/admin/security/events?search=${encodeURIComponent(testIp)}&page=1&limit=10`, {
       headers: { Cookie: adminSessionCookie }
     });
     assert.strictEqual(listRes.status, 200);
     const listData = await listRes.json();
     assert.ok(Array.isArray(listData.events));
     assert.ok(listData.pagination);
-    assert.ok(listData.events.some(e => e.eventId === 'SEC-TEST-ALERT-01' || e.title.includes('Suspicious')));
+    assert.ok(listData.events.some(e => e.sourceIp === testIp || e.title.includes('Suspicious')));
 
-    const targetEvent = listData.events.find(e => e.eventId === 'SEC-TEST-ALERT-01') || listData.events[0];
+    const targetEvent = listData.events.find(e => e.sourceIp === testIp) || listData.events[0];
     const eventDbId = targetEvent._id || targetEvent.id;
 
     // 3. Admin transitions alert to 'investigating' with resolution notes

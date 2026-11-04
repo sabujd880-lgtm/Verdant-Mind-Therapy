@@ -3406,6 +3406,9 @@ app.post('/api/recordings/upload',
         storageKey = s3Key;
       } else {
         // Fallback: Save to private server storage
+        if (isProd) {
+          console.warn('[STORAGE ALERT] Audio recording saved to local filesystem in production mode. Render containers have ephemeral storage. Configure AWS S3 credentials (AWS_S3_BUCKET, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) to ensure persistent healthcare compliance storage.');
+        }
         const filePath = path.join(RECORDINGS_DIR, sanitizedFilename);
         if (tempFilePath) {
           fs.copyFileSync(tempFilePath, filePath);
