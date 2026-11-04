@@ -58,6 +58,7 @@ export default function AdminManagement({ currentUser }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [mobileUserView, setMobileUserView] = useState('cards'); // 'cards' | 'table' for mobile screens
 
   // Add User Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -464,15 +465,181 @@ export default function AdminManagement({ currentUser }) {
             />
           </div>
 
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: 'var(--radius-sm)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+          {/* Segmented View Switcher on Mobile (<768px) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div className="table-scroll-hint" style={{ margin: 0 }}>
+              {mobileUserView === 'table' ? 'Scroll horizontally to view all columns ⇄' : 'Viewing responsive cards'}
+            </div>
+            <div className="table-view-toggle">
+              <button
+                type="button"
+                className={`table-view-toggle-btn ${mobileUserView === 'cards' ? 'active' : ''}`}
+                onClick={() => setMobileUserView('cards')}
+              >
+                Cards View
+              </button>
+              <button
+                type="button"
+                className={`table-view-toggle-btn ${mobileUserView === 'table' ? 'active' : ''}`}
+                onClick={() => setMobileUserView('table')}
+              >
+                Table View
+              </button>
+            </div>
+          </div>
+
+          {/* MOBILE CARDS VIEW */}
+          {mobileUserView === 'cards' && (
+            <div className="mobile-only-card-view mobile-card-list">
+              {filteredUsers.length === 0 ? (
+                <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-slate-light)' }}>
+                  No matching user accounts found.
+                </div>
+              ) : (
+                filteredUsers.map(user => {
+                  const isSelf = user.email.toLowerCase() === (currentUser?.email || '').toLowerCase();
+                  const isSuper = user.role === 'Super Admin';
+
+                  return (
+                    <div key={user._id || user.id} className="mobile-record-card">
+                      <div className="mobile-card-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          {user.picture ? (
+                            <img src={user.picture} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+                          ) : (
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--color-slate-10)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, color: 'var(--color-slate-dark)' }}>
+                              {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                            </div>
+                          )}
+                          <div>
+                            <div className="mobile-card-title">
+                              {user.name} {isSelf && <span style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)', fontWeight: 500 }}>(You)</span>}
+                            </div>
+                            <div className="mobile-card-subtitle">{user.email}</div>
+                          </div>
+                        </div>
+                        <span style={{
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          textTransform: 'capitalize',
+                          background: 
+                            user.status === 'approved' ? 'rgba(74,140,112,0.15)' :
+                            user.status === 'pending' ? 'rgba(223,155,52,0.15)' :
+                            user.status === 'suspended' ? 'rgba(201,93,93,0.15)' : 'rgba(100,100,100,0.1)',
+                          color: 
+                            user.status === 'approved' ? '#2A5D48' :
+                            user.status === 'pending' ? '#B8761E' :
+                            user.status === 'suspended' ? '#C95D5D' : '#555'
+                        }}>
+                          {user.status || 'approved'}
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-grid">
+                        <div className="mobile-card-field">
+                          <span className="mobile-field-label">Assigned Role</span>
+                          <div style={{ marginTop: '0.2rem' }}>
+                            <select
+                              value={user.role}
+                              disabled={isSelf || (!isSuperAdmin && isSuper)}
+                              onChange={(e) => handleRoleChange(user._id || user.id, e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '0.4rem 0.5rem',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-slate-20)',
+                                fontSize: '0.82rem',
+                                background: '#fff',
+                                cursor: isSelf ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              {isSuperAdmin && <option value="Super Admin">Super Admin</option>}
+                              <option value="Administrator">Administrator</option>
+                              <option value="Counsellor">Counsellor</option>
+                              <option value="Viewer">Viewer</option>
+                              <option value="client">Client</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="mobile-card-field">
+                          <span className="mobile-field-label">Last Login</span>
+                          <span className="mobile-field-value" style={{ fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                            {user.lastLoginAt ? formatISTDateTimeWithZone(user.lastLoginAt) : 'Never'}
+                            {user.lastLoginIp && <div style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)' }}>IP: {user.lastLoginIp}</div>}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mobile-card-actions">
+                        {user.status === 'pending' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(user._id || user.id, 'approved')}
+                              style={{ background: '#E8F5E9', color: '#2E7D32', border: '1px solid #A5D6A7', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.76rem', cursor: 'pointer' }}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStatusChange(user._id || user.id, 'rejected')}
+                              style={{ background: '#FFEBEE', color: '#C62828', border: '1px solid #FFCDD2', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.76rem', cursor: 'pointer' }}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+
+                        {user.status === 'approved' && !isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(user._id || user.id, 'suspended')}
+                            style={{ background: '#FFF3E0', color: '#E65100', border: '1px solid #FFE0B2', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.76rem', cursor: 'pointer' }}
+                          >
+                            Suspend
+                          </button>
+                        )}
+
+                        {user.status === 'suspended' && !isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusChange(user._id || user.id, 'approved')}
+                            style={{ background: '#E8F5E9', color: '#2E7D32', border: '1px solid #A5D6A7', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.76rem', cursor: 'pointer' }}
+                          >
+                            Reactivate
+                          </button>
+                        )}
+
+                        {!isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeSessions(user._id || user.id, user.email)}
+                            style={{ background: '#F5F5F5', color: '#616161', border: '1px solid #E0E0E0', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.76rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                          >
+                            <Lock size={12} /> Invalidate
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* DESKTOP & SCROLLABLE TABLE VIEW */}
+          <div className={`desktop-table-container glass-card responsive-table-wrapper ${mobileUserView === 'cards' ? 'mobile-hidden' : ''}`} style={{ margin: 0 }}>
+            <table className="responsive-table" style={{ borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(42,71,62,0.06)', borderBottom: '1px solid var(--color-slate-10)', color: 'var(--color-slate-dark)' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>User / Email</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Role</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Last Login</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
+                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>User / Email</th>
+                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Role</th>
+                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Status</th>
+                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Last Login</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -559,7 +726,7 @@ export default function AdminManagement({ currentUser }) {
 
                         {/* Action Buttons */}
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', flexWrap: 'wrap' }}>
                             {user.status === 'pending' && (
                               <>
                                 <button
@@ -1148,7 +1315,7 @@ export default function AdminManagement({ currentUser }) {
           </div>
 
           {/* Theme Selection Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem', marginBottom: '1.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem', marginBottom: '1.75rem' }}>
             
             {/* THEME 1: OFFICIAL LAVENDER + DUSTY ROSE */}
             <div style={{
@@ -1339,14 +1506,14 @@ export default function AdminManagement({ currentUser }) {
             <h5 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-slate-dark)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Clock size={16} /> Theme Modification Audit History
             </h5>
-            <div style={{ overflowX: 'auto', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+            <div className="responsive-table-wrapper" style={{ margin: 0, border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
+              <table className="responsive-table" style={{ width: '100%', minWidth: '550px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--color-slate-05)', textAlign: 'left', borderBottom: '1px solid var(--color-slate-10)' }}>
-                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>IST Timestamp</th>
-                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>Theme</th>
-                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>Mode</th>
-                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>Updated By</th>
+                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600, whiteSpace: 'nowrap' }}>IST Timestamp</th>
+                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600, whiteSpace: 'nowrap' }}>Theme</th>
+                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600, whiteSpace: 'nowrap' }}>Mode</th>
+                    <th style={{ padding: '0.6rem 0.85rem', color: 'var(--color-slate-dark)', fontWeight: 600, whiteSpace: 'nowrap' }}>Updated By</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -168,6 +168,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [mobileDirectoryView, setMobileDirectoryView] = useState('cards'); // 'cards' | 'table' on mobile screens
 
   // Single Profile View & Modals
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -958,21 +959,21 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                   <p style={{ margin: 0, fontSize: '0.88rem' }}>No consultation sessions on record.</p>
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <div className="responsive-table-wrapper" style={{ margin: 0 }}>
+                  <table className="responsive-table" style={{ width: '100%', minWidth: '480px', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                     <thead>
                       <tr style={{ background: 'var(--color-slate-05)', borderBottom: '1px solid var(--color-slate-20)', textAlign: 'left' }}>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Date</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Time (IST)</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Type</th>
-                        <th style={{ padding: '0.6rem 0.75rem' }}>Status</th>
+                        <th style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap' }}>Date</th>
+                        <th style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap' }}>Time (IST)</th>
+                        <th style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap' }}>Type</th>
+                        <th style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap' }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {profileAppointments.map(apt => (
                         <tr key={apt._id || apt.id} style={{ borderBottom: '1px solid var(--color-slate-10)' }}>
-                          <td style={{ padding: '0.6rem 0.75rem' }}>{apt.date}</td>
-                          <td style={{ padding: '0.6rem 0.75rem' }}>{apt.time}</td>
+                          <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap' }}>{apt.date}</td>
+                          <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap' }}>{apt.time}</td>
                           <td style={{ padding: '0.6rem 0.75rem' }}>{apt.type}</td>
                           <td style={{ padding: '0.6rem 0.75rem' }}>
                             <span style={{ padding: '0.2rem 0.5rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 600, background: apt.status === 'Confirmed' ? '#E8F5E9' : '#FFF8E1', color: apt.status === 'Confirmed' ? '#2E7D32' : '#F57F17' }}>
@@ -1104,7 +1105,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
           {/* Search, Filter & Actions Bar */}
           <div className="card" style={{ padding: '1.25rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-              <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.5rem', flex: '1 1 360px' }}>
+              <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.5rem', flex: '1 1 min(100%, 360px)', maxWidth: '100%' }}>
                 <div style={{ position: 'relative', width: '100%' }}>
                   <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-slate)' }} />
                   <input 
@@ -1166,8 +1167,8 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
             </div>
           </div>
 
-          {/* Patient Directory Data Table */}
-          <div className="card" style={{ padding: '1rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)', overflowX: 'auto' }}>
+          {/* Patient Directory Data Table & Mobile Cards */}
+          <div className="card" style={{ padding: '1rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)' }}>
             {isLoading ? (
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-slate)' }}>
                 <RefreshCw size={24} className="spin" style={{ marginBottom: '0.5rem' }} />
@@ -1181,100 +1182,226 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
               </div>
             ) : (
               <>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--color-slate-05)', borderBottom: '2px solid var(--color-slate-20)', textAlign: 'left' }}>
-                      <th style={{ padding: '0.75rem 0.85rem' }}>Profile ID</th>
-                      <th style={{ padding: '0.75rem 0.85rem' }}>Patient / Service User</th>
-                      <th style={{ padding: '0.75rem 0.85rem' }}>Category</th>
-                      <th style={{ padding: '0.75rem 0.85rem' }}>Contact & Location</th>
-                      <th style={{ padding: '0.75rem 0.85rem' }}>Assigned Practitioner</th>
-                      <th style={{ padding: '0.75rem 0.85rem' }}>Status</th>
-                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                {/* Segmented View Switcher on Mobile (<768px) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div className="table-scroll-hint" style={{ margin: 0 }}>
+                    {mobileDirectoryView === 'table' ? 'Scroll horizontally to view all columns ⇄' : 'Viewing responsive cards'}
+                  </div>
+                  <div className="table-view-toggle">
+                    <button
+                      type="button"
+                      className={`table-view-toggle-btn ${mobileDirectoryView === 'cards' ? 'active' : ''}`}
+                      onClick={() => setMobileDirectoryView('cards')}
+                    >
+                      Cards View
+                    </button>
+                    <button
+                      type="button"
+                      className={`table-view-toggle-btn ${mobileDirectoryView === 'table' ? 'active' : ''}`}
+                      onClick={() => setMobileDirectoryView('table')}
+                    >
+                      Table View
+                    </button>
+                  </div>
+                </div>
+
+                {/* MOBILE CARDS VIEW */}
+                {mobileDirectoryView === 'cards' && (
+                  <div className="mobile-only-card-view mobile-card-list">
                     {profiles.map(p => (
-                      <tr key={p._id || p.profileId} style={{ borderBottom: '1px solid var(--color-slate-10)' }}>
-                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 600 }}>
-                          <span style={{ color: 'var(--color-primary)' }}>{p.profileId}</span>
-                        </td>
-                        <td style={{ padding: '0.75rem 0.85rem' }}>
-                          <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{p.personalInfo?.fullName}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-slate)' }}>
-                            {p.personalInfo?.email}
-                            {p.personalInfo?.age ? ` • ${p.personalInfo.age} yrs` : ''}
+                      <div key={p._id || p.profileId} className="mobile-record-card">
+                        <div className="mobile-card-header">
+                          <div>
+                            <div className="mobile-card-title">{p.personalInfo?.fullName || 'Unnamed Record'}</div>
+                            <div className="mobile-card-subtitle" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
+                              {p.profileId} {p.personalInfo?.age ? `• ${p.personalInfo.age} yrs` : ''}
+                            </div>
                           </div>
-                        </td>
-                        <td style={{ padding: '0.75rem 0.85rem' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: '10px', background: '#E0F2F1', color: '#00695C' }}>
-                            {p.category || 'General Patient'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.75rem 0.85rem' }}>
-                          <div style={{ fontSize: '0.82rem' }}>{p.personalInfo?.phone || '—'}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-slate)' }}>
-                            {[p.personalInfo?.city, p.personalInfo?.state].filter(Boolean).join(', ') || (p.personalInfo?.occupation || '—')}
-                          </div>
-                        </td>
-                        <td style={{ padding: '0.75rem 0.85rem' }}>
-                          {p.assignedProvider?.providerName ? (
-                            <span style={{ color: 'var(--color-slate-dark)', fontWeight: 500 }}>{p.assignedProvider.providerName}</span>
-                          ) : (
-                            <span style={{ color: 'var(--color-slate)', fontStyle: 'italic', fontSize: '0.8rem' }}>Unassigned</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '0.75rem 0.85rem' }}>
-                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, ...getStatusBadgeStyle(p.profileStatus) }}>
+                          <span style={{ padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 600, ...getStatusBadgeStyle(p.profileStatus) }}>
                             {p.profileStatus?.replace('_', ' ').toUpperCase()}
                           </span>
-                        </td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-                            <button 
-                              type="button" 
-                              onClick={() => handleOpenProfileDetails(p)}
-                              title="View Clinical Profile"
-                              style={{ padding: '0.35rem 0.6rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem' }}
-                            >
-                              <Eye size={13} /> View
-                            </button>
+                        </div>
 
-                            <button 
-                              type="button" 
-                              onClick={() => handleOpenEditModal(p)}
-                              title="Edit Record"
-                              style={{ padding: '0.35rem 0.6rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem' }}
-                            >
-                              <Edit3 size={13} />
-                            </button>
-
-                            {isAdmin && (
-                              <>
-                                <button 
-                                  type="button" 
-                                  onClick={() => { setAssignTarget(p); setSelectedProviderEmail(p.assignedProvider?.providerEmail || ''); setShowAssignModal(true); }}
-                                  title="Assign Practitioner"
-                                  style={{ padding: '0.35rem 0.6rem', background: 'var(--color-primary-05)', border: '1px solid var(--color-primary-20)', color: 'var(--color-primary)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.78rem' }}
-                                >
-                                  Assign
-                                </button>
-                                <button 
-                                  type="button" 
-                                  onClick={() => { setStatusChangeTarget(p); setNewStatus(p.profileStatus); setShowStatusModal(true); }}
-                                  title="Change Status"
-                                  style={{ padding: '0.35rem 0.6rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.78rem' }}
-                                >
-                                  Status
-                                </button>
-                              </>
-                            )}
+                        <div className="mobile-card-grid">
+                          <div className="mobile-card-field">
+                            <span className="mobile-field-label">Category</span>
+                            <span className="mobile-field-value">
+                              <span style={{ fontSize: '0.74rem', fontWeight: 600, padding: '0.15rem 0.45rem', borderRadius: '8px', background: '#E0F2F1', color: '#00695C', display: 'inline-block' }}>
+                                {p.category || 'General Patient'}
+                              </span>
+                            </span>
                           </div>
-                        </td>
-                      </tr>
+
+                          <div className="mobile-card-field">
+                            <span className="mobile-field-label">Assigned Practitioner</span>
+                            <span className="mobile-field-value">
+                              {p.assignedProvider?.providerName ? (
+                                <span style={{ fontWeight: 500, color: 'var(--color-slate-dark)' }}>{p.assignedProvider.providerName}</span>
+                              ) : (
+                                <span style={{ color: 'var(--color-slate-light)', fontStyle: 'italic', fontSize: '0.8rem' }}>Unassigned</span>
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="mobile-card-field">
+                            <span className="mobile-field-label">Contact</span>
+                            <span className="mobile-field-value">
+                              <div>{p.personalInfo?.email || '—'}</div>
+                              <div style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)' }}>{p.personalInfo?.phone || '—'}</div>
+                            </span>
+                          </div>
+
+                          <div className="mobile-card-field">
+                            <span className="mobile-field-label">Location & Role</span>
+                            <span className="mobile-field-value">
+                              {[p.personalInfo?.city, p.personalInfo?.state].filter(Boolean).join(', ') || '—'}
+                              {p.personalInfo?.occupation ? ` • ${p.personalInfo.occupation}` : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mobile-card-actions">
+                          <button 
+                            type="button" 
+                            onClick={() => handleOpenProfileDetails(p)}
+                            title="View Clinical Profile"
+                            style={{ padding: '0.35rem 0.65rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.76rem' }}
+                          >
+                            <Eye size={13} /> View
+                          </button>
+
+                          <button 
+                            type="button" 
+                            onClick={() => handleOpenEditModal(p)}
+                            title="Edit Record"
+                            style={{ padding: '0.35rem 0.65rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.76rem' }}
+                          >
+                            <Edit3 size={13} /> Edit
+                          </button>
+
+                          {isAdmin && (
+                            <>
+                              <button 
+                                type="button" 
+                                onClick={() => { setAssignTarget(p); setSelectedProviderEmail(p.assignedProvider?.providerEmail || ''); setShowAssignModal(true); }}
+                                title="Assign Practitioner"
+                                style={{ padding: '0.35rem 0.65rem', background: 'var(--color-primary-05)', border: '1px solid var(--color-primary-20)', color: 'var(--color-primary)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.76rem' }}
+                              >
+                                Assign
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => { setStatusChangeTarget(p); setNewStatus(p.profileStatus); setShowStatusModal(true); }}
+                                title="Change Status"
+                                style={{ padding: '0.35rem 0.65rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.76rem' }}
+                              >
+                                Status
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                )}
+
+                {/* DESKTOP & SCROLLABLE TABLE VIEW */}
+                <div className={`desktop-table-container responsive-table-wrapper ${mobileDirectoryView === 'cards' ? 'mobile-hidden' : ''}`} style={{ margin: 0 }}>
+                  <table className="responsive-table responsive-table-wide" style={{ borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--color-slate-05)', borderBottom: '2px solid var(--color-slate-20)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>Profile ID</th>
+                        <th style={{ padding: '0.75rem 0.85rem' }}>Patient / Service User</th>
+                        <th style={{ padding: '0.75rem 0.85rem' }}>Category</th>
+                        <th style={{ padding: '0.75rem 0.85rem' }}>Contact & Location</th>
+                        <th style={{ padding: '0.75rem 0.85rem' }}>Assigned Practitioner</th>
+                        <th style={{ padding: '0.75rem 0.85rem' }}>Status</th>
+                        <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {profiles.map(p => (
+                        <tr key={p._id || p.profileId} style={{ borderBottom: '1px solid var(--color-slate-10)' }}>
+                          <td style={{ padding: '0.75rem 0.85rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            <span style={{ color: 'var(--color-primary)' }}>{p.profileId}</span>
+                          </td>
+                          <td style={{ padding: '0.75rem 0.85rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{p.personalInfo?.fullName}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-slate)' }}>
+                              {p.personalInfo?.email}
+                              {p.personalInfo?.age ? ` • ${p.personalInfo.age} yrs` : ''}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem 0.85rem' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: '10px', background: '#E0F2F1', color: '#00695C' }}>
+                              {p.category || 'General Patient'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem 0.85rem' }}>
+                            <div style={{ fontSize: '0.82rem' }}>{p.personalInfo?.phone || '—'}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--color-slate)' }}>
+                              {[p.personalInfo?.city, p.personalInfo?.state].filter(Boolean).join(', ') || (p.personalInfo?.occupation || '—')}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem 0.85rem' }}>
+                            {p.assignedProvider?.providerName ? (
+                              <span style={{ color: 'var(--color-slate-dark)', fontWeight: 500 }}>{p.assignedProvider.providerName}</span>
+                            ) : (
+                              <span style={{ color: 'var(--color-slate)', fontStyle: 'italic', fontSize: '0.8rem' }}>Unassigned</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '0.75rem 0.85rem' }}>
+                            <span style={{ padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, ...getStatusBadgeStyle(p.profileStatus) }}>
+                              {p.profileStatus?.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                              <button 
+                                type="button" 
+                                onClick={() => handleOpenProfileDetails(p)}
+                                title="View Clinical Profile"
+                                style={{ padding: '0.35rem 0.6rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem' }}
+                              >
+                                <Eye size={13} /> View
+                              </button>
+
+                              <button 
+                                type="button" 
+                                onClick={() => handleOpenEditModal(p)}
+                                title="Edit Record"
+                                style={{ padding: '0.35rem 0.6rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem' }}
+                              >
+                                <Edit3 size={13} />
+                              </button>
+
+                              {isAdmin && (
+                                <>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => { setAssignTarget(p); setSelectedProviderEmail(p.assignedProvider?.providerEmail || ''); setShowAssignModal(true); }}
+                                    title="Assign Practitioner"
+                                    style={{ padding: '0.35rem 0.6rem', background: 'var(--color-primary-05)', border: '1px solid var(--color-primary-20)', color: 'var(--color-primary)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.78rem' }}
+                                  >
+                                    Assign
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => { setStatusChangeTarget(p); setNewStatus(p.profileStatus); setShowStatusModal(true); }}
+                                    title="Change Status"
+                                    style={{ padding: '0.35rem 0.6rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.78rem' }}
+                                  >
+                                    Status
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
                 {/* Pagination Controls */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-slate-10)', fontSize: '0.82rem' }}>
@@ -1541,26 +1668,28 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                   {profileAppointments.length === 0 ? (
                     <p style={{ color: 'var(--color-slate)' }}>No appointment records found for this patient.</p>
                   ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ background: 'var(--color-slate-05)', borderBottom: '1px solid var(--color-slate-20)', textAlign: 'left' }}>
-                          <th style={{ padding: '0.5rem' }}>Date</th>
-                          <th style={{ padding: '0.5rem' }}>Time</th>
-                          <th style={{ padding: '0.5rem' }}>Type</th>
-                          <th style={{ padding: '0.5rem' }}>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {profileAppointments.map(a => (
-                          <tr key={a._id || a.id} style={{ borderBottom: '1px solid var(--color-slate-10)' }}>
-                            <td style={{ padding: '0.5rem' }}>{a.date}</td>
-                            <td style={{ padding: '0.5rem' }}>{a.time}</td>
-                            <td style={{ padding: '0.5rem' }}>{a.type}</td>
-                            <td style={{ padding: '0.5rem' }}>{a.status}</td>
+                    <div className="responsive-table-wrapper" style={{ margin: 0 }}>
+                      <table className="responsive-table" style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--color-slate-05)', borderBottom: '1px solid var(--color-slate-20)', textAlign: 'left' }}>
+                            <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Date</th>
+                            <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Time</th>
+                            <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Type</th>
+                            <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Status</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {profileAppointments.map(a => (
+                            <tr key={a._id || a.id} style={{ borderBottom: '1px solid var(--color-slate-10)' }}>
+                              <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>{a.date}</td>
+                              <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>{a.time}</td>
+                              <td style={{ padding: '0.5rem' }}>{a.type}</td>
+                              <td style={{ padding: '0.5rem' }}>{a.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
               )}
@@ -1593,26 +1722,28 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                   {(selectedProfile.documents || []).length === 0 ? (
                     <p style={{ color: 'var(--color-slate)' }}>No documents attached to this profile.</p>
                   ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ background: 'var(--color-slate-05)', borderBottom: '1px solid var(--color-slate-20)', textAlign: 'left' }}>
-                          <th style={{ padding: '0.5rem' }}>Title</th>
-                          <th style={{ padding: '0.5rem' }}>Category</th>
-                          <th style={{ padding: '0.5rem' }}>Uploaded Date</th>
-                          <th style={{ padding: '0.5rem' }}>Uploaded By</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedProfile.documents.map(d => (
-                          <tr key={d.docId || d._id} style={{ borderBottom: '1px solid var(--color-slate-10)' }}>
-                            <td style={{ padding: '0.5rem', fontWeight: 600 }}>{d.title}</td>
-                            <td style={{ padding: '0.5rem' }}>{d.category}</td>
-                            <td style={{ padding: '0.5rem' }}>{formatISTDate(d.uploadedAt)}</td>
-                            <td style={{ padding: '0.5rem' }}>{d.uploadedBy}</td>
+                    <div className="responsive-table-wrapper" style={{ margin: 0 }}>
+                      <table className="responsive-table" style={{ width: '100%', minWidth: '480px', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'var(--color-slate-05)', borderBottom: '1px solid var(--color-slate-20)', textAlign: 'left' }}>
+                            <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Title</th>
+                            <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Category</th>
+                            <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Uploaded Date</th>
+                            <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Uploaded By</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {selectedProfile.documents.map(d => (
+                            <tr key={d.docId || d._id} style={{ borderBottom: '1px solid var(--color-slate-10)' }}>
+                              <td style={{ padding: '0.5rem', fontWeight: 600 }}>{d.title}</td>
+                              <td style={{ padding: '0.5rem' }}>{d.category}</td>
+                              <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>{formatISTDate(d.uploadedAt)}</td>
+                              <td style={{ padding: '0.5rem' }}>{d.uploadedBy}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
               )}
@@ -2175,7 +2306,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.85rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.85rem' }}>
                       <div>
                         <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>Previous Medical Illnesses</label>
                         <textarea 
@@ -2382,7 +2513,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
 
                 {accordionOpen.sectionD && (
                   <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', background: '#FFF' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.85rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.85rem' }}>
                       <div>
                         <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>Family Medical History</label>
                         <textarea 
@@ -2649,7 +2780,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.85rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.85rem' }}>
                       <div>
                         <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>Pregnancy & Maternal Complications</label>
                         <textarea 
@@ -2818,7 +2949,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.85rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.85rem' }}>
                       <div>
                         <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>Social Support System & Network</label>
                         <textarea 
@@ -2968,7 +3099,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '0.85rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.85rem' }}>
                         <div>
                           <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>Presenting Concerns</label>
                           <textarea 

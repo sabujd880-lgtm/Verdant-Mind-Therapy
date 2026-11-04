@@ -149,65 +149,152 @@ export default function ClientPortal({
               <p style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>Use the Public Booking system on the homepage to schedule a session.</p>
             </div>
           ) : (
-            <div className="table-responsive">
-              <table className="appointments-table">
-                <thead>
-                  <tr>
-                    <th>Date & Time</th>
-                    <th>Session Format</th>
-                    <th>Inquiry Details</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div>
+              {/* Segmented View Switcher on Mobile (<768px) */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div className="table-scroll-hint" style={{ margin: 0 }}>
+                  {mobileClientAptView === 'table' ? 'Scroll horizontally to view all columns ⇄' : 'Viewing responsive cards'}
+                </div>
+                <div className="table-view-toggle">
+                  <button
+                    type="button"
+                    className={`table-view-toggle-btn ${mobileClientAptView === 'cards' ? 'active' : ''}`}
+                    onClick={() => setMobileClientAptView('cards')}
+                  >
+                    Cards View
+                  </button>
+                  <button
+                    type="button"
+                    className={`table-view-toggle-btn ${mobileClientAptView === 'table' ? 'active' : ''}`}
+                    onClick={() => setMobileClientAptView('table')}
+                  >
+                    Table View
+                  </button>
+                </div>
+              </div>
+
+              {/* MOBILE CARDS VIEW */}
+              {mobileClientAptView === 'cards' && (
+                <div className="mobile-only-card-view mobile-card-list">
                   {[...clientAppointments].reverse().map(apt => (
-                    <tr key={apt._id || apt.id}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-                          <Calendar size={14} style={{ color: 'var(--color-slate-light)' }} />
-                          <span>{formatISTDate(apt.date)}</span>
+                    <div key={apt._id || apt.id} className="mobile-record-card">
+                      <div className="mobile-card-header">
+                        <div>
+                          <div className="mobile-card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Calendar size={14} style={{ color: 'var(--color-slate-light)' }} />
+                            {formatISTDate(apt.date)}
+                          </div>
+                          <div className="mobile-card-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Clock size={12} />
+                            {formatISTTime(apt.time)}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
-                          <Clock size={12} />
-                          <span>{formatISTTime(apt.time)}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="mode-badge">
-                          {getModeIcon(apt.sessionMode)}
-                          {apt.sessionMode}
-                        </span>
-                      </td>
-                      <td style={{ maxWidth: '300px' }}>
-                        <p style={{ fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-slate-light)' }}>
-                          {apt.problemDescription}
-                        </p>
-                      </td>
-                      <td>
-                        <span className={`status-badge ${apt.status.toLowerCase()}`}>
+                        <span className={`status-badge ${(apt.status || 'pending').toLowerCase()}`}>
                           <span className="badge-dot"></span>
                           {apt.status}
                         </span>
-                      </td>
-                      <td>
+                      </div>
+
+                      <div className="mobile-card-grid">
+                        <div className="mobile-card-field">
+                          <span className="mobile-field-label">Format</span>
+                          <span className="mobile-field-value">
+                            <span className="mode-badge" style={{ fontSize: '0.8rem' }}>
+                              {getModeIcon(apt.sessionMode)} {apt.sessionMode}
+                            </span>
+                          </span>
+                        </div>
+
+                        <div className="mobile-card-field">
+                          <span className="mobile-field-label">Inquiry Notes</span>
+                          <span className="mobile-field-value" style={{ fontSize: '0.82rem', color: 'var(--color-slate)' }}>
+                            {apt.problemDescription || 'General psychological consultation inquiry'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mobile-card-actions">
                         {apt.status === 'Pending' ? (
                           <button
                             type="button"
                             className="premium-btn-outline"
-                            style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+                            style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem', color: '#C62828', borderColor: '#FFCDD2' }}
                             onClick={() => onCancelAppointment(apt._id || apt.id)}
                           >
                             Cancel Inquiry
                           </button>
                         ) : (
-                          <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)', fontStyle: 'italic' }}>Locked</span>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)', fontStyle: 'italic' }}>
+                            Session Confirmed / Locked
+                          </span>
                         )}
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
+
+              {/* DESKTOP & SCROLLABLE TABLE VIEW */}
+              <div className={`desktop-table-container responsive-table-wrapper ${mobileClientAptView === 'cards' ? 'mobile-hidden' : ''}`} style={{ margin: 0 }}>
+                <table className="appointments-table">
+                  <thead>
+                    <tr>
+                      <th>Date & Time</th>
+                      <th>Session Format</th>
+                      <th>Inquiry Details</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...clientAppointments].reverse().map(apt => (
+                      <tr key={apt._id || apt.id}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+                            <Calendar size={14} style={{ color: 'var(--color-slate-light)' }} />
+                            <span>{formatISTDate(apt.date)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
+                            <Clock size={12} />
+                            <span>{formatISTTime(apt.time)}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="mode-badge">
+                            {getModeIcon(apt.sessionMode)}
+                            {apt.sessionMode}
+                          </span>
+                        </td>
+                        <td style={{ maxWidth: '300px' }}>
+                          <p style={{ fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--color-slate-light)' }}>
+                            {apt.problemDescription}
+                          </p>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${apt.status.toLowerCase()}`}>
+                            <span className="badge-dot"></span>
+                            {apt.status}
+                          </span>
+                        </td>
+                        <td>
+                          {apt.status === 'Pending' ? (
+                            <button
+                              type="button"
+                              className="premium-btn-outline"
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+                              onClick={() => onCancelAppointment(apt._id || apt.id)}
+                            >
+                              Cancel Inquiry
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)', fontStyle: 'italic' }}>Locked</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -493,7 +580,8 @@ export default function ClientPortal({
                   {/* RECEIPT PREVIEW CONTENT */}
                   {selectedDoc.type === 'receipt' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.5rem' }}>
+                      <div className="responsive-table-wrapper" style={{ margin: 0 }}>
+                        <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse', marginTop: '0.5rem' }}>
                         <thead>
                           <tr style={{ borderBottom: '2px solid var(--color-slate)', color: 'var(--color-slate-dark)', fontWeight: 700, fontSize: '0.8rem', textAlign: 'left' }}>
                             <th style={{ padding: '0.5rem 0.25rem' }}>Description of Services</th>
@@ -514,6 +602,7 @@ export default function ClientPortal({
                           </tr>
                         </tbody>
                       </table>
+                      </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '1rem', fontSize: '0.78rem', background: '#FAF9F6', padding: '0.75rem', borderRadius: '4px' }}>
                         <strong>Payment Transactions Info:</strong>
@@ -533,7 +622,8 @@ export default function ClientPortal({
                       <div>
                         <strong style={{ display: 'block', color: 'var(--color-slate-dark)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '0.4rem' }}>Therapeutic Plan & Practice Guidelines (Rx):</strong>
                         
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <div className="responsive-table-wrapper" style={{ margin: 0 }}>
+                          <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse' }}>
                           <thead>
                             <tr style={{ borderBottom: '1px solid var(--color-slate)', color: 'var(--color-slate-dark)', fontWeight: 700, fontSize: '0.75rem', textAlign: 'left' }}>
                               <th style={{ padding: '0.4rem 0.25rem' }}>Exercise / Recommendation</th>
@@ -553,6 +643,7 @@ export default function ClientPortal({
                             ))}
                           </tbody>
                         </table>
+                        </div>
                       </div>
 
                       <div style={{ marginTop: '0.5rem', background: '#FAF9F6', padding: '0.85rem', borderRadius: '4px', fontSize: '0.78rem', borderLeft: '3px solid var(--color-terracotta)' }}>

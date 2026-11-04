@@ -340,7 +340,7 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          <div className="responsive-2col">
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
                 1. Chief Presenting Complaints & Triggers
@@ -370,7 +370,7 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          <div className="responsive-2col">
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
                 3. Past Psychiatric & Therapy History
@@ -400,7 +400,7 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+          <div className="responsive-2col" style={{ marginBottom: '2rem' }}>
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
                 5. Family Psychiatric History
@@ -436,7 +436,7 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
               <AlertTriangle size={16} /> Clinical Risk Assessment Matrix
             </h4>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="responsive-3col">
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>Suicide Risk</label>
                 <select
@@ -500,7 +500,7 @@ export default function ClinicalRecords({ appointments = [], currentUser }) {
 
       {/* SUBTAB 2: MENTAL STATUS EXAMINATION (MSE) */}
       {activeSubTab === 'mse' && (
-        <div style={{ display: 'grid', gridTemplateColumns: isReadOnly ? '1fr' : '1.1fr 0.9fr', gap: '1.5rem' }}>
+        <div className="clinical-records-grid" style={{ gridTemplateColumns: isReadOnly ? '1fr' : undefined }}>
           {/* New MSE Form (Hidden for Viewers) */}
           {!isReadOnly && (
             <form onSubmit={handleCreateMse} className="glass-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-sm)' }}>

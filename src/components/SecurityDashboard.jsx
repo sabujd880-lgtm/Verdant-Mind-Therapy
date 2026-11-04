@@ -36,6 +36,8 @@ export default function SecurityDashboard({ currentUser }) {
   const [revokingSessionId, setRevokingSessionId] = useState(null);
   const [bulkRevokeTarget, setBulkRevokeTarget] = useState('');
   const [showBulkRevokeModal, setShowBulkRevokeModal] = useState(false);
+  const [mobileAlertsView, setMobileAlertsView] = useState('cards'); // 'cards' | 'table'
+  const [mobileSessionsView, setMobileSessionsView] = useState('cards'); // 'cards' | 'table'
 
   // Security settings state
   const [settings, setSettings] = useState({
@@ -461,7 +463,7 @@ export default function SecurityDashboard({ currentUser }) {
           </div>
 
           {/* Visual Analytics Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '1.5rem', marginBottom: '2rem' }}>
+          <div className="security-analytics-grid">
             
             {/* Chart 1: 7-Day Authentication Trends */}
             <div className="card" style={{ padding: '1.5rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)' }}>
@@ -563,17 +565,17 @@ export default function SecurityDashboard({ currentUser }) {
                 <p style={{ margin: 0 }}>No active security alerts. System security parameters normal.</p>
               </div>
             ) : (
-              <div className="table-responsive">
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <div className="responsive-table-wrapper" style={{ margin: 0 }}>
+                <table className="responsive-table" style={{ width: '100%', minWidth: '680px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--color-slate-10)', textAlign: 'left', color: 'var(--color-slate-light)' }}>
-                      <th style={{ padding: '0.5rem' }}>Severity</th>
-                      <th style={{ padding: '0.5rem' }}>Event ID</th>
-                      <th style={{ padding: '0.5rem' }}>Description</th>
-                      <th style={{ padding: '0.5rem' }}>Source IP</th>
-                      <th style={{ padding: '0.5rem' }}>Occurrences</th>
-                      <th style={{ padding: '0.5rem' }}>Last Occurred</th>
-                      <th style={{ padding: '0.5rem' }}>Action</th>
+                      <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Severity</th>
+                      <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Event ID</th>
+                      <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Description</th>
+                      <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Source IP</th>
+                      <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Occurrences</th>
+                      <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Last Occurred</th>
+                      <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -662,19 +664,100 @@ export default function SecurityDashboard({ currentUser }) {
               <p>No security alerts match the active criteria.</p>
             </div>
           ) : (
-            <div className="table-responsive">
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <div>
+            {/* Segmented View Switcher on Mobile (<768px) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div className="table-scroll-hint" style={{ margin: 0 }}>
+                {mobileAlertsView === 'table' ? 'Scroll horizontally to view all columns ⇄' : 'Viewing responsive threat cards'}
+              </div>
+              <div className="table-view-toggle">
+                <button
+                  type="button"
+                  className={`table-view-toggle-btn ${mobileAlertsView === 'cards' ? 'active' : ''}`}
+                  onClick={() => setMobileAlertsView('cards')}
+                >
+                  Cards View
+                </button>
+                <button
+                  type="button"
+                  className={`table-view-toggle-btn ${mobileAlertsView === 'table' ? 'active' : ''}`}
+                  onClick={() => setMobileAlertsView('table')}
+                >
+                  Table View
+                </button>
+              </div>
+            </div>
+
+            {/* MOBILE CARDS VIEW */}
+            {mobileAlertsView === 'cards' && (
+              <div className="mobile-only-card-view mobile-card-list">
+                {events.map(ev => (
+                  <div key={ev._id || ev.id || ev.eventId} className="mobile-record-card">
+                    <div className="mobile-card-header">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {getSeverityBadge(ev.severity)}
+                        <span style={{ fontWeight: 600, fontSize: '0.84rem' }}>{ev.eventId}</span>
+                      </div>
+                      {getStatusBadge(ev.status)}
+                    </div>
+
+                    <div className="mobile-card-grid">
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Threat Description</span>
+                        <span className="mobile-field-value">
+                          <strong style={{ display: 'block', color: 'var(--color-slate-dark)' }}>{ev.title}</strong>
+                          <span style={{ fontSize: '0.76rem', color: 'var(--color-slate-light)' }}>{ev.description}</span>
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Source IP & Account</span>
+                        <span className="mobile-field-value">
+                          <span style={{ fontFamily: 'monospace' }}>{ev.sourceIp || '—'}</span>
+                          {ev.affectedUser && <div style={{ fontSize: '0.75rem', color: 'var(--color-slate-light)' }}>User: {ev.affectedUser}</div>}
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Occurrences & Last Active</span>
+                        <span className="mobile-field-value" style={{ fontSize: '0.78rem' }}>
+                          {ev.occurrences || 1} occurrences • {formatISTDateTimeWithZone(ev.lastOccurred || ev.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mobile-card-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedEvent(ev);
+                          setEventResolutionStatus(ev.status === 'open' ? 'investigating' : ev.status);
+                          setEventResolutionNotes(ev.resolutionNotes || '');
+                        }}
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        Manage Alert
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* DESKTOP & SCROLLABLE TABLE VIEW */}
+            <div className={`desktop-table-container responsive-table-wrapper ${mobileAlertsView === 'cards' ? 'mobile-hidden' : ''}`} style={{ margin: 0 }}>
+              <table className="responsive-table responsive-table-wide" style={{ borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--color-slate-10)', textAlign: 'left', color: 'var(--color-slate-light)' }}>
-                    <th style={{ padding: '0.55rem' }}>Severity</th>
-                    <th style={{ padding: '0.55rem' }}>Event ID</th>
-                    <th style={{ padding: '0.55rem' }}>Title & Description</th>
-                    <th style={{ padding: '0.55rem' }}>Source IP</th>
-                    <th style={{ padding: '0.55rem' }}>Affected Account</th>
-                    <th style={{ padding: '0.55rem' }}>Occurrences</th>
-                    <th style={{ padding: '0.55rem' }}>Status</th>
-                    <th style={{ padding: '0.55rem' }}>Last Occurred</th>
-                    <th style={{ padding: '0.55rem' }}>Action</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Severity</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Event ID</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Title & Description</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Source IP</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Affected Account</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Occurrences</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Status</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Last Occurred</th>
+                    <th style={{ padding: '0.55rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -691,7 +774,7 @@ export default function SecurityDashboard({ currentUser }) {
                       <td style={{ padding: '0.65rem 0.55rem' }}>{ev.occurrences || 1}</td>
                       <td style={{ padding: '0.65rem 0.55rem' }}>{getStatusBadge(ev.status)}</td>
                       <td style={{ padding: '0.65rem 0.55rem', color: 'var(--color-slate-light)' }}>{formatISTDateTimeWithZone(ev.lastOccurred || ev.createdAt)}</td>
-                      <td style={{ padding: '0.65rem 0.55rem' }}>
+                      <td style={{ padding: '0.65rem 0.55rem', textAlign: 'right' }}>
                         <button
                           type="button"
                           onClick={() => {
@@ -708,6 +791,7 @@ export default function SecurityDashboard({ currentUser }) {
                   ))}
                 </tbody>
               </table>
+            </div>
 
               {/* Pagination */}
               {eventPagination.totalPages > 1 && (
@@ -772,18 +856,104 @@ export default function SecurityDashboard({ currentUser }) {
               <p>No active sessions located matching criteria.</p>
             </div>
           ) : (
-            <div className="table-responsive">
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <div>
+            {/* Segmented View Switcher on Mobile (<768px) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div className="table-scroll-hint" style={{ margin: 0 }}>
+                {mobileSessionsView === 'table' ? 'Scroll horizontally to view all columns ⇄' : 'Viewing responsive active sessions'}
+              </div>
+              <div className="table-view-toggle">
+                <button
+                  type="button"
+                  className={`table-view-toggle-btn ${mobileSessionsView === 'cards' ? 'active' : ''}`}
+                  onClick={() => setMobileSessionsView('cards')}
+                >
+                  Cards View
+                </button>
+                <button
+                  type="button"
+                  className={`table-view-toggle-btn ${mobileSessionsView === 'table' ? 'active' : ''}`}
+                  onClick={() => setMobileSessionsView('table')}
+                >
+                  Table View
+                </button>
+              </div>
+            </div>
+
+            {/* MOBILE CARDS VIEW */}
+            {mobileSessionsView === 'cards' && (
+              <div className="mobile-only-card-view mobile-card-list">
+                {filteredSessions.map(s => (
+                  <div key={s._id || s.id || s.sessionId} className="mobile-record-card">
+                    <div className="mobile-card-header">
+                      <div>
+                        <div className="mobile-card-title">{s.userName || 'User'}</div>
+                        <div className="mobile-card-subtitle">{s.userEmail}</div>
+                      </div>
+                      <span style={{ padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.74rem', background: s.role === 'Super Admin' ? '#FEF3C7' : 'var(--color-slate-10)', color: 'var(--color-slate-dark)', fontWeight: 600 }}>
+                        {s.role}
+                      </span>
+                    </div>
+
+                    <div className="mobile-card-grid">
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Session ID</span>
+                        <span className="mobile-field-value" style={{ fontFamily: 'monospace', fontSize: '0.76rem' }}>
+                          {s.sessionId?.substring(0, 16)}...
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Source IP</span>
+                        <span className="mobile-field-value" style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                          {s.ipAddress || '—'}
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Device / Browser</span>
+                        <span className="mobile-field-value" style={{ fontSize: '0.76rem', color: 'var(--color-slate-light)' }} title={s.userAgent}>
+                          {s.userAgent || 'Web Browser'}
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Activity Timeline</span>
+                        <span className="mobile-field-value" style={{ fontSize: '0.76rem' }}>
+                          Active: {formatISTDateTimeWithZone(s.lastActivity)}
+                          <div style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)' }}>Login: {formatISTDateTimeWithZone(s.loginTime)}</div>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mobile-card-actions">
+                      <button
+                        type="button"
+                        disabled={revokingSessionId === s.sessionId}
+                        onClick={() => handleRevokeSession(s.sessionId, s.userEmail)}
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem', background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        {revokingSessionId === s.sessionId ? 'Revoking...' : 'Terminate Session'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* DESKTOP & SCROLLABLE TABLE VIEW */}
+            <div className={`desktop-table-container responsive-table-wrapper ${mobileSessionsView === 'cards' ? 'mobile-hidden' : ''}`} style={{ margin: 0 }}>
+              <table className="responsive-table responsive-table-wide" style={{ borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--color-slate-10)', textAlign: 'left', color: 'var(--color-slate-light)' }}>
-                    <th style={{ padding: '0.55rem' }}>User & Email</th>
-                    <th style={{ padding: '0.55rem' }}>Role</th>
-                    <th style={{ padding: '0.55rem' }}>Session ID</th>
-                    <th style={{ padding: '0.55rem' }}>IP Address</th>
-                    <th style={{ padding: '0.55rem' }}>Device / Agent</th>
-                    <th style={{ padding: '0.55rem' }}>Login Time</th>
-                    <th style={{ padding: '0.55rem' }}>Last Activity</th>
-                    <th style={{ padding: '0.55rem' }}>Action</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>User & Email</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Role</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Session ID</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>IP Address</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Device / Agent</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Login Time</th>
+                    <th style={{ padding: '0.55rem', whiteSpace: 'nowrap' }}>Last Activity</th>
+                    <th style={{ padding: '0.55rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -807,7 +977,7 @@ export default function SecurityDashboard({ currentUser }) {
                       </td>
                       <td style={{ padding: '0.65rem 0.55rem', color: 'var(--color-slate-light)' }}>{formatISTDateTimeWithZone(s.loginTime)}</td>
                       <td style={{ padding: '0.65rem 0.55rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>{formatISTDateTimeWithZone(s.lastActivity)}</td>
-                      <td style={{ padding: '0.65rem 0.55rem' }}>
+                      <td style={{ padding: '0.65rem 0.55rem', textAlign: 'right' }}>
                         <button
                           type="button"
                           disabled={revokingSessionId === s.sessionId}
@@ -822,6 +992,7 @@ export default function SecurityDashboard({ currentUser }) {
                 </tbody>
               </table>
             </div>
+          </div>
           )}
         </div>
       )}

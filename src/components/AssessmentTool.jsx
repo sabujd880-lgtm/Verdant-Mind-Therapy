@@ -137,7 +137,7 @@ Breakdown:
             This short questionnaire is the standard 4-item Patient Health Questionnaire (PHQ-4), a validated clinical screening tool used by psychologists globally to flag general indicators of anxiety and depression.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
+          <div className="assessment-inputs-grid">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <label htmlFor="assess-name" style={{ fontSize: '0.82rem', fontWeight: 600 }}>Your Name *</label>
               <input
@@ -188,7 +188,7 @@ Breakdown:
             {questions.map((q) => (
               <div key={q.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <h4 style={{ fontSize: '0.98rem', fontWeight: 600, color: 'var(--color-slate-dark)' }}>{q.text}</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                <div className="assessment-options-grid">
                   {options.map((opt) => {
                     const isSelected = formData[q.id] === opt.value;
                     return (
@@ -241,7 +241,7 @@ Breakdown:
           </div>
 
           {/* Breakdown grids */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="assessment-results-grid">
             <div style={{ padding: '1rem', background: '#FAF9F6', borderRadius: '8px', borderLeft: '3px solid var(--color-terracotta)' }}>
               <div style={{ fontSize: '0.78rem', color: 'var(--color-slate-light)', fontWeight: 600 }}>Anxiety Screener (GAD-2)</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{anxietyScore} / 6</div>

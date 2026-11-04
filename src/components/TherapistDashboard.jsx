@@ -33,6 +33,7 @@ export default function TherapistDashboard({
 }) {
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' | 'messages' | 'documents' | 'availability' | 'clinical-records' | 'recordings' | 'admin'
   const [scheduleView, setScheduleView] = useState('table'); // 'table' | 'week' | 'day'
+  const [mobileAptView, setMobileAptView] = useState('cards'); // 'cards' | 'table' on mobile screens
   const [currentScheduleDate, setCurrentScheduleDate] = useState(() => getNowIST().dateObj);
   const [selectedApt, setSelectedApt] = useState(null); // For detailed inquiry viewer modal
   const [tempNotes, setTempNotes] = useState('');
@@ -524,86 +525,104 @@ export default function TherapistDashboard({
             </div>
           </div>
 
-          {/* VIEW 1: TABLE VIEW */}
+          {/* VIEW 1: TABLE VIEW & RESPONSIVE MOBILE CARDS */}
           {scheduleView === 'table' && (
-            <div className="table-responsive">
+            <div>
               {appointments.length === 0 ? (
                 <div className="no-data-state">
                   <AlertCircle size={40} />
                   <p>No bookings or inquiries submitted yet.</p>
                 </div>
               ) : (
-                <table className="appointments-table">
-                  <thead>
-                    <tr>
-                      <th>Client Name</th>
-                      <th>Date & Time (IST)</th>
-                      <th>Duration</th>
-                      <th>Session Mode</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...appointments].reverse().map((apt) => (
-                      <tr key={apt._id || apt.id}>
-                        <td>
-                          <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{apt.clientName}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--color-slate-light)' }}>{apt.clientAgeGroup || 'Client'}</div>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <Calendar size={14} style={{ color: 'var(--color-slate-light)' }} />
-                            <span>{formatISTDate(apt.date)}</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
-                            <Clock size={12} />
-                            <span>{formatISTTime(apt.time)}</span>
-                          </div>
-                          {apt.rescheduledFrom && (
-                            <div style={{ fontSize: '0.68rem', color: '#DF9B34', marginTop: '2px' }}>
-                              Rescheduled from {apt.rescheduledFrom.date} {apt.rescheduledFrom.time}
+                <>
+                  {/* Segmented View Switcher on Mobile (<768px) */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div className="table-scroll-hint" style={{ margin: 0 }}>
+                      {mobileAptView === 'table' ? 'Scroll horizontally to view all columns ⇄' : 'Viewing responsive cards'}
+                    </div>
+                    <div className="table-view-toggle">
+                      <button
+                        type="button"
+                        className={`table-view-toggle-btn ${mobileAptView === 'cards' ? 'active' : ''}`}
+                        onClick={() => setMobileAptView('cards')}
+                      >
+                        Cards View
+                      </button>
+                      <button
+                        type="button"
+                        className={`table-view-toggle-btn ${mobileAptView === 'table' ? 'active' : ''}`}
+                        onClick={() => setMobileAptView('table')}
+                      >
+                        Table View
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* MOBILE CARDS VIEW */}
+                  {mobileAptView === 'cards' && (
+                    <div className="mobile-only-card-view mobile-card-list">
+                      {[...appointments].reverse().map((apt) => (
+                        <div key={apt._id || apt.id} className="mobile-record-card">
+                          <div className="mobile-card-header">
+                            <div>
+                              <div className="mobile-card-title">{apt.clientName}</div>
+                              <div className="mobile-card-subtitle">{apt.clientAgeGroup || 'Client'}</div>
                             </div>
-                          )}
-                        </td>
-                        <td>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{apt.durationMinutes || 60}m</span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--color-slate-light)', display: 'block' }}>+{apt.bufferMinutes !== undefined ? apt.bufferMinutes : 15}m buf</span>
-                        </td>
-                        <td>
-                          <span className="mode-badge">
-                            {getModeIcon(apt.sessionMode)}
-                            {apt.sessionMode}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`status-badge ${(apt.status || 'Pending').toLowerCase()}`}>
-                            <span className="badge-dot"></span>
-                            {apt.status || 'Pending'}
-                          </span>
-                          {apt.status === 'Cancelled' && apt.cancellationReason && (
-                            <div style={{ fontSize: '0.68rem', color: 'var(--color-cancelled)', marginTop: '2px', maxWidth: '140px' }} title={apt.cancellationReason}>
-                              {apt.cancellationReason}
+                            <span className={`status-badge ${(apt.status || 'Pending').toLowerCase()}`}>
+                              <span className="badge-dot"></span>
+                              {apt.status || 'Pending'}
+                            </span>
+                          </div>
+
+                          <div className="mobile-card-grid">
+                            <div className="mobile-card-field">
+                              <span className="mobile-field-label">Date & Time</span>
+                              <span className="mobile-field-value" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Calendar size={13} style={{ color: 'var(--color-slate-light)' }} />
+                                {formatISTDate(apt.date)} • {formatISTTime(apt.time)}
+                              </span>
+                              {apt.rescheduledFrom && (
+                                <span style={{ fontSize: '0.7rem', color: '#DF9B34', marginTop: '2px' }}>
+                                  Rescheduled from {apt.rescheduledFrom.date} {apt.rescheduledFrom.time}
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </td>
-                        <td>
-                          <div className="action-row">
+
+                            <div className="mobile-card-field">
+                              <span className="mobile-field-label">Duration & Format</span>
+                              <span className="mobile-field-value" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontWeight: 600 }}>{apt.durationMinutes || 60}m</span>
+                                <span className="mode-badge" style={{ fontSize: '0.78rem' }}>
+                                  {getModeIcon(apt.sessionMode)} {apt.sessionMode}
+                                </span>
+                              </span>
+                            </div>
+
+                            {apt.status === 'Cancelled' && apt.cancellationReason && (
+                              <div className="mobile-card-field" style={{ gridColumn: '1 / -1' }}>
+                                <span className="mobile-field-label">Cancellation Reason</span>
+                                <span className="mobile-field-value" style={{ color: 'var(--color-cancelled)', fontSize: '0.8rem' }}>
+                                  {apt.cancellationReason}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mobile-card-actions">
                             <button
                               type="button"
-                              className="action-icon-btn"
-                              title="Review details, write notes, and generate clinical documents"
+                              className="premium-btn-outline"
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.76rem' }}
                               onClick={() => handleOpenDetails(apt)}
                             >
-                              <Eye size={14} />
+                              <Eye size={13} /> Review Details
                             </button>
 
-                            {/* Reschedule Button */}
                             {apt.status !== 'Cancelled' && (
                               <button
                                 type="button"
-                                className="action-icon-btn"
-                                title="Reschedule Session"
+                                className="premium-btn-outline"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.76rem' }}
                                 onClick={() => {
                                   setRescheduleApt(apt);
                                   setRescheduleForm({
@@ -616,40 +635,161 @@ export default function TherapistDashboard({
                                   setRescheduleSuccess('');
                                 }}
                               >
-                                <RefreshCw size={14} />
+                                <RefreshCw size={13} /> Reschedule
                               </button>
                             )}
-                            
+
                             {(apt.status || 'Pending') !== 'Confirmed' && apt.status !== 'Cancelled' && (
                               <button
                                 type="button"
-                                className="action-icon-btn approve"
-                                title="Confirm Session"
+                                className="premium-btn"
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem', background: '#2E7D32', color: '#fff' }}
                                 onClick={() => onUpdateStatus(apt._id || apt.id, 'Confirmed')}
                               >
-                                <Check size={14} />
+                                <Check size={13} /> Confirm
                               </button>
                             )}
-                            
+
                             {(apt.status || 'Pending') !== 'Cancelled' && (
                               <button
                                 type="button"
-                                className="action-icon-btn cancel"
-                                title="Cancel Session"
+                                className="premium-btn-outline"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.76rem', color: '#C62828', borderColor: '#FFCDD2' }}
                                 onClick={() => {
                                   setCancelModalApt(apt);
                                   setCancelReasonText('');
                                 }}
                               >
-                                <X size={14} />
+                                <X size={13} /> Cancel
                               </button>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* DESKTOP & SCROLLABLE TABLE VIEW */}
+                  <div className={`desktop-table-container responsive-table-wrapper ${mobileAptView === 'cards' ? 'mobile-hidden' : ''}`}>
+                    <table className="appointments-table">
+                      <thead>
+                        <tr>
+                          <th>Client Name</th>
+                          <th>Date & Time (IST)</th>
+                          <th>Duration</th>
+                          <th>Session Mode</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...appointments].reverse().map((apt) => (
+                          <tr key={apt._id || apt.id}>
+                            <td>
+                              <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{apt.clientName}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--color-slate-light)' }}>{apt.clientAgeGroup || 'Client'}</div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Calendar size={14} style={{ color: 'var(--color-slate-light)' }} />
+                                <span>{formatISTDate(apt.date)}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', color: 'var(--color-slate-light)' }}>
+                                <Clock size={12} />
+                                <span>{formatISTTime(apt.time)}</span>
+                              </div>
+                              {apt.rescheduledFrom && (
+                                <div style={{ fontSize: '0.68rem', color: '#DF9B34', marginTop: '2px' }}>
+                                  Rescheduled from {apt.rescheduledFrom.date} {apt.rescheduledFrom.time}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{apt.durationMinutes || 60}m</span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--color-slate-light)', display: 'block' }}>+{apt.bufferMinutes !== undefined ? apt.bufferMinutes : 15}m buf</span>
+                            </td>
+                            <td>
+                              <span className="mode-badge">
+                                {getModeIcon(apt.sessionMode)}
+                                {apt.sessionMode}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`status-badge ${(apt.status || 'Pending').toLowerCase()}`}>
+                                <span className="badge-dot"></span>
+                                {apt.status || 'Pending'}
+                              </span>
+                              {apt.status === 'Cancelled' && apt.cancellationReason && (
+                                <div style={{ fontSize: '0.68rem', color: 'var(--color-cancelled)', marginTop: '2px', maxWidth: '140px' }} title={apt.cancellationReason}>
+                                  {apt.cancellationReason}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <div className="action-row">
+                                <button
+                                  type="button"
+                                  className="action-icon-btn"
+                                  title="Review details, write notes, and generate clinical documents"
+                                  onClick={() => handleOpenDetails(apt)}
+                                >
+                                  <Eye size={14} />
+                                </button>
+
+                                {/* Reschedule Button */}
+                                {apt.status !== 'Cancelled' && (
+                                  <button
+                                    type="button"
+                                    className="action-icon-btn"
+                                    title="Reschedule Session"
+                                    onClick={() => {
+                                      setRescheduleApt(apt);
+                                      setRescheduleForm({
+                                        date: apt.date,
+                                        time: apt.time,
+                                        durationMinutes: apt.durationMinutes || 60,
+                                        reason: ''
+                                      });
+                                      setRescheduleError('');
+                                      setRescheduleSuccess('');
+                                    }}
+                                  >
+                                    <RefreshCw size={14} />
+                                  </button>
+                                )}
+                                
+                                {(apt.status || 'Pending') !== 'Confirmed' && apt.status !== 'Cancelled' && (
+                                  <button
+                                    type="button"
+                                    className="action-icon-btn approve"
+                                    title="Confirm Session"
+                                    onClick={() => onUpdateStatus(apt._id || apt.id, 'Confirmed')}
+                                  >
+                                    <Check size={14} />
+                                  </button>
+                                )}
+                                
+                                {(apt.status || 'Pending') !== 'Cancelled' && (
+                                  <button
+                                    type="button"
+                                    className="action-icon-btn cancel"
+                                    title="Cancel Session"
+                                    onClick={() => {
+                                      setCancelModalApt(apt);
+                                      setCancelReasonText('');
+                                    }}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -1514,31 +1654,33 @@ export default function TherapistDashboard({
                   {/* RECEIPT PREVIEW CONTENT */}
                   {docType === 'receipt' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.5rem' }}>
-                        <thead>
-                          <tr style={{ borderBottom: '2px solid #2C3E50', color: '#1A252C', fontWeight: 700, fontSize: '0.85rem', textAlign: 'left' }}>
-                            <th style={{ padding: '0.5rem' }}>Consultation Date</th>
-                            <th style={{ padding: '0.5rem' }}>Description of Services</th>
-                            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount Charged</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr style={{ borderBottom: '1px solid rgba(44, 62, 80, 0.1)' }}>
-                            <td style={{ padding: '0.75rem 0.5rem' }}>{selectedAptForDoc.date}</td>
-                            <td style={{ padding: '0.75rem 0.5rem' }}>
-                              <div><strong>{receiptServices}</strong></div>
-                              <div style={{ fontSize: '0.78rem', color: '#5A738E' }}>Professional counseling service with Sabuj Das</div>
-                            </td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>₹{receiptAmount}.00</td>
-                          </tr>
-                          <tr>
-                            <td colSpan="2" style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 600, color: '#5A738E' }}>Total Paid / Settled:</td>
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, fontSize: '1.05rem' }}>₹{receiptAmount}.00</td>
-                          </tr>
-                        </tbody>
-                      </table>
+                      <div className="responsive-table-wrapper" style={{ margin: 0 }}>
+                        <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse', marginTop: '0.5rem' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '2px solid #2C3E50', color: '#1A252C', fontWeight: 700, fontSize: '0.85rem', textAlign: 'left' }}>
+                              <th style={{ padding: '0.5rem' }}>Consultation Date</th>
+                              <th style={{ padding: '0.5rem' }}>Description of Services</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount Charged</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr style={{ borderBottom: '1px solid rgba(44, 62, 80, 0.1)' }}>
+                              <td style={{ padding: '0.75rem 0.5rem' }}>{selectedAptForDoc.date}</td>
+                              <td style={{ padding: '0.75rem 0.5rem' }}>
+                                <div><strong>{receiptServices}</strong></div>
+                                <div style={{ fontSize: '0.78rem', color: '#5A738E' }}>Professional counseling service with Sabuj Das</div>
+                              </td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>₹{receiptAmount}.00</td>
+                            </tr>
+                            <tr>
+                              <td colSpan="2" style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 600, color: '#5A738E' }}>Total Paid / Settled:</td>
+                              <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, fontSize: '1.05rem' }}>₹{receiptAmount}.00</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', marginTop: '1.5rem', fontSize: '0.8rem', background: '#FAF9F6', padding: '1rem', borderRadius: '4px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1.5rem', fontSize: '0.8rem', background: '#FAF9F6', padding: '1rem', borderRadius: '4px' }}>
                         <div>
                           <strong style={{ display: 'block', marginBottom: '0.2rem', color: '#1A252C' }}>Payment Transactions Info:</strong>
                           <span>Settled via {paymentMethod}. Transactions are securely processed under professional licensing.</span>
@@ -1563,32 +1705,34 @@ export default function TherapistDashboard({
                       <div>
                         <strong style={{ display: 'block', color: '#1A252C', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '0.6rem' }}>Therapeutic Plan & Practice Guidelines (Rx):</strong>
                         
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                          <thead>
-                            <tr style={{ borderBottom: '1px solid #2C3E50', color: '#1A252C', fontWeight: 700, fontSize: '0.8rem', textAlign: 'left' }}>
-                              <th style={{ padding: '0.4rem 0.25rem' }}>Exercise / Recommendation</th>
-                              <th style={{ padding: '0.4rem 0.25rem' }}>Technique Focus / Instructions</th>
-                              <th style={{ padding: '0.4rem 0.25rem' }}>Practice Frequency</th>
-                              <th style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>Target Duration</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {prescItems.length === 0 ? (
-                              <tr>
-                                <td colSpan="4" style={{ padding: '1rem 0', textAlign: 'center', fontStyle: 'italic', color: '#5A738E' }}>No recommendations listed. Add exercises in the left panel.</td>
+                        <div className="responsive-table-wrapper" style={{ margin: 0 }}>
+                          <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #2C3E50', color: '#1A252C', fontWeight: 700, fontSize: '0.8rem', textAlign: 'left' }}>
+                                <th style={{ padding: '0.4rem 0.25rem' }}>Exercise / Recommendation</th>
+                                <th style={{ padding: '0.4rem 0.25rem' }}>Technique Focus / Instructions</th>
+                                <th style={{ padding: '0.4rem 0.25rem' }}>Practice Frequency</th>
+                                <th style={{ padding: '0.4rem 0.25rem', textAlign: 'right' }}>Target Duration</th>
                               </tr>
-                            ) : (
-                              prescItems.map((item, idx) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid rgba(44, 62, 80, 0.08)' }}>
-                                  <td style={{ padding: '0.6rem 0.25rem', fontWeight: 600 }}>{item.name}</td>
-                                  <td style={{ padding: '0.6rem 0.25rem' }}>{item.dose}</td>
-                                  <td style={{ padding: '0.6rem 0.25rem' }}>{item.freq}</td>
-                                  <td style={{ padding: '0.6rem 0.25rem', textAlign: 'right' }}>{item.duration}</td>
+                            </thead>
+                            <tbody>
+                              {prescItems.length === 0 ? (
+                                <tr>
+                                  <td colSpan="4" style={{ padding: '1rem 0', textAlign: 'center', fontStyle: 'italic', color: '#5A738E' }}>No recommendations listed. Add exercises in the left panel.</td>
                                 </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                              ) : (
+                                prescItems.map((item, idx) => (
+                                  <tr key={idx} style={{ borderBottom: '1px solid rgba(44, 62, 80, 0.08)' }}>
+                                    <td style={{ padding: '0.6rem 0.25rem', fontWeight: 600 }}>{item.name}</td>
+                                    <td style={{ padding: '0.6rem 0.25rem' }}>{item.dose}</td>
+                                    <td style={{ padding: '0.6rem 0.25rem' }}>{item.freq}</td>
+                                    <td style={{ padding: '0.6rem 0.25rem', textAlign: 'right' }}>{item.duration}</td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
 
                       <div style={{ marginTop: '0.5rem', background: '#FAF9F6', padding: '1rem', borderRadius: '4px', fontSize: '0.8rem', borderLeft: '3px solid var(--color-terracotta)' }}>

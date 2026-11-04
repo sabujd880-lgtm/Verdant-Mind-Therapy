@@ -21,6 +21,7 @@ export default function AuditLogManager({ currentUser }) {
   const [dateRange, setDateRange] = useState('all'); // 'all' | 'today' | '7d' | '30d'
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
+  const [mobileAuditView, setMobileAuditView] = useState('cards'); // 'cards' | 'table' on mobile screens
 
   // Inspection modal
   const [selectedLog, setSelectedLog] = useState(null);
@@ -293,56 +294,148 @@ export default function AuditLogManager({ currentUser }) {
             <p>No audit log events located matching the query criteria.</p>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--color-slate-10)', textAlign: 'left', color: 'var(--color-slate-light)' }}>
-                  <th style={{ padding: '0.5rem' }}>Severity</th>
-                  <th style={{ padding: '0.5rem' }}>Timestamp (IST)</th>
-                  <th style={{ padding: '0.5rem' }}>Event ID</th>
-                  <th style={{ padding: '0.5rem' }}>Actor & Role</th>
-                  <th style={{ padding: '0.5rem' }}>Action Code</th>
-                  <th style={{ padding: '0.5rem' }}>Category</th>
-                  <th style={{ padding: '0.5rem' }}>Resource</th>
-                  <th style={{ padding: '0.5rem' }}>Outcome</th>
-                  <th style={{ padding: '0.5rem' }}>IP Address</th>
-                  <th style={{ padding: '0.5rem' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div>
+            {/* Segmented View Switcher on Mobile (<768px) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div className="table-scroll-hint" style={{ margin: 0 }}>
+                {mobileAuditView === 'table' ? 'Scroll horizontally to view all 10 columns ⇄' : 'Viewing responsive audit cards'}
+              </div>
+              <div className="table-view-toggle">
+                <button
+                  type="button"
+                  className={`table-view-toggle-btn ${mobileAuditView === 'cards' ? 'active' : ''}`}
+                  onClick={() => setMobileAuditView('cards')}
+                >
+                  Cards View
+                </button>
+                <button
+                  type="button"
+                  className={`table-view-toggle-btn ${mobileAuditView === 'table' ? 'active' : ''}`}
+                  onClick={() => setMobileAuditView('table')}
+                >
+                  Table View
+                </button>
+              </div>
+            </div>
+
+            {/* MOBILE CARDS VIEW */}
+            {mobileAuditView === 'cards' && (
+              <div className="mobile-only-card-view mobile-card-list">
                 {logs.map((l, idx) => (
-                  <tr key={l._id || l.id || idx} style={{ borderBottom: '1px solid var(--color-slate-05)' }}>
-                    <td style={{ padding: '0.55rem 0.5rem' }}>{getSeverityBadge(l.severity)}</td>
-                    <td style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', color: 'var(--color-slate-dark)' }}>
-                      {formatISTDateTimeWithZone(l.timestamp || l.createdAt)}
-                    </td>
-                    <td style={{ padding: '0.55rem 0.5rem', fontFamily: 'monospace', fontWeight: 600 }}>{l.eventId || '—'}</td>
-                    <td style={{ padding: '0.55rem 0.5rem' }}>
-                      <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{l.actorEmail || 'system'}</div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)' }}>{l.actorRole || 'system'}</div>
-                    </td>
-                    <td style={{ padding: '0.55rem 0.5rem', fontFamily: 'monospace', color: 'var(--color-slate-dark)', fontWeight: 600 }}>
-                      {l.action}
-                    </td>
-                    <td style={{ padding: '0.55rem 0.5rem', color: 'var(--color-slate-light)' }}>{l.eventCategory || 'Security'}</td>
-                    <td style={{ padding: '0.55rem 0.5rem', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.targetResource}>
-                      {l.targetResource || '—'}
-                    </td>
-                    <td style={{ padding: '0.55rem 0.5rem' }}>{getOutcomeBadge(l.outcome)}</td>
-                    <td style={{ padding: '0.55rem 0.5rem', fontFamily: 'monospace', fontSize: '0.74rem' }}>{l.ipAddress || '—'}</td>
-                    <td style={{ padding: '0.55rem 0.5rem' }}>
+                  <div key={l._id || l.id || idx} className="mobile-record-card">
+                    <div className="mobile-card-header">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {getSeverityBadge(l.severity)}
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.82rem' }}>{l.eventId || '—'}</span>
+                      </div>
+                      {getOutcomeBadge(l.outcome)}
+                    </div>
+
+                    <div className="mobile-card-grid">
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Action Code</span>
+                        <span className="mobile-field-value" style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--color-slate-dark)' }}>
+                          {l.action}
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Timestamp</span>
+                        <span className="mobile-field-value" style={{ fontSize: '0.78rem' }}>
+                          {formatISTDateTimeWithZone(l.timestamp || l.createdAt)}
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Actor & Role</span>
+                        <span className="mobile-field-value">
+                          <div style={{ fontWeight: 600 }}>{l.actorEmail || 'system'}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)' }}>{l.actorRole || 'system'}</div>
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Target Resource</span>
+                        <span className="mobile-field-value" style={{ wordBreak: 'break-all' }}>
+                          {l.targetResource || '—'}
+                          <div style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)' }}>Category: {l.eventCategory || 'Security'}</div>
+                        </span>
+                      </div>
+
+                      <div className="mobile-card-field">
+                        <span className="mobile-field-label">Client IP</span>
+                        <span className="mobile-field-value" style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                          {l.ipAddress || '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mobile-card-actions">
                       <button
                         type="button"
                         onClick={() => setSelectedLog(l)}
-                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.74rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '3px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                       >
-                        <Eye size={12} /> Inspect
+                        <Eye size={13} /> Inspect Payload
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
+
+            {/* DESKTOP & SCROLLABLE TABLE VIEW */}
+            <div className={`desktop-table-container responsive-table-wrapper ${mobileAuditView === 'cards' ? 'mobile-hidden' : ''}`} style={{ margin: 0 }}>
+              <table className="responsive-table responsive-table-ultra-wide" style={{ borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-slate-10)', textAlign: 'left', color: 'var(--color-slate-light)' }}>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Severity</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Timestamp (IST)</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Event ID</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Actor & Role</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Action Code</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Category</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Resource</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Outcome</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>IP Address</th>
+                    <th style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((l, idx) => (
+                    <tr key={l._id || l.id || idx} style={{ borderBottom: '1px solid var(--color-slate-05)' }}>
+                      <td style={{ padding: '0.55rem 0.5rem' }}>{getSeverityBadge(l.severity)}</td>
+                      <td style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap', color: 'var(--color-slate-dark)' }}>
+                        {formatISTDateTimeWithZone(l.timestamp || l.createdAt)}
+                      </td>
+                      <td style={{ padding: '0.55rem 0.5rem', fontFamily: 'monospace', fontWeight: 600 }}>{l.eventId || '—'}</td>
+                      <td style={{ padding: '0.55rem 0.5rem' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--color-slate-dark)' }}>{l.actorEmail || 'system'}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-slate-light)' }}>{l.actorRole || 'system'}</div>
+                      </td>
+                      <td style={{ padding: '0.55rem 0.5rem', fontFamily: 'monospace', color: 'var(--color-slate-dark)', fontWeight: 600 }}>
+                        {l.action}
+                      </td>
+                      <td style={{ padding: '0.55rem 0.5rem', color: 'var(--color-slate-light)' }}>{l.eventCategory || 'Security'}</td>
+                      <td style={{ padding: '0.55rem 0.5rem', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.targetResource}>
+                        {l.targetResource || '—'}
+                      </td>
+                      <td style={{ padding: '0.55rem 0.5rem' }}>{getOutcomeBadge(l.outcome)}</td>
+                      <td style={{ padding: '0.55rem 0.5rem', fontFamily: 'monospace', fontSize: '0.74rem' }}>{l.ipAddress || '—'}</td>
+                      <td style={{ padding: '0.55rem 0.5rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLog(l)}
+                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.74rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '3px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        >
+                          <Eye size={12} /> Inspect
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* Pagination Controls */}
             {pagination.totalPages > 1 && (

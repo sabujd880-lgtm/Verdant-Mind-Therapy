@@ -80,6 +80,7 @@ export default function PrivacyManagement({ currentUser, mode = 'client' }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [mobileAdminReqView, setMobileAdminReqView] = useState('cards'); // 'cards' | 'table'
   const [adminResolution, setAdminResolution] = useState({
     status: 'completed',
     adminNotes: ''
@@ -392,8 +393,8 @@ export default function PrivacyManagement({ currentUser, mode = 'client' }) {
             </h4>
           </div>
 
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: 'var(--radius-sm)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
+          <div className="glass-card responsive-table-wrapper" style={{ margin: 0, borderRadius: 'var(--radius-sm)' }}>
+            <table className="responsive-table" style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(42,71,62,0.06)', borderBottom: '1px solid var(--color-slate-10)', color: 'var(--color-slate-dark)' }}>
                   <th style={{ padding: '0.75rem 1rem' }}>Request ID</th>
@@ -463,8 +464,8 @@ export default function PrivacyManagement({ currentUser, mode = 'client' }) {
           <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '1.05rem', color: 'var(--color-slate-dark)', fontWeight: 600 }}>
             Consent Verification & Audit History
           </h4>
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: 'var(--radius-sm)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
+          <div className="glass-card responsive-table-wrapper" style={{ margin: 0, borderRadius: 'var(--radius-sm)' }}>
+            <table className="responsive-table" style={{ width: '100%', minWidth: '650px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(42,71,62,0.06)', borderBottom: '1px solid var(--color-slate-10)', color: 'var(--color-slate-dark)' }}>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Timestamp (IST)</th>
@@ -665,9 +666,116 @@ export default function PrivacyManagement({ currentUser, mode = 'client' }) {
         </button>
       </div>
 
-      {/* Admin Requests Table */}
-      <div className="glass-card" style={{ overflowX: 'auto', borderRadius: 'var(--radius-sm)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
+      {/* Admin Requests Table & Mobile Cards */}
+      {/* Segmented View Switcher on Mobile (<768px) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="table-scroll-hint" style={{ margin: 0 }}>
+          {mobileAdminReqView === 'table' ? 'Scroll horizontally to view all columns ⇄' : 'Viewing responsive DSAR cards'}
+        </div>
+        <div className="table-view-toggle">
+          <button
+            type="button"
+            className={`table-view-toggle-btn ${mobileAdminReqView === 'cards' ? 'active' : ''}`}
+            onClick={() => setMobileAdminReqView('cards')}
+          >
+            Cards View
+          </button>
+          <button
+            type="button"
+            className={`table-view-toggle-btn ${mobileAdminReqView === 'table' ? 'active' : ''}`}
+            onClick={() => setMobileAdminReqView('table')}
+          >
+            Table View
+          </button>
+        </div>
+      </div>
+
+      {/* MOBILE CARDS VIEW */}
+      {mobileAdminReqView === 'cards' && (
+        <div className="mobile-only-card-view mobile-card-list">
+          {filteredAdminRequests.length === 0 ? (
+            <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-slate-light)' }}>
+              No privacy or data rights requests found matching your filter criteria.
+            </div>
+          ) : (
+            filteredAdminRequests.map(req => {
+              const typeLabel = REQUEST_TYPES.find(t => t.value === req.requestType)?.label || req.requestType;
+              const getStatusColor = (s) => {
+                switch (s) {
+                  case 'completed': return { bg: 'rgba(74,140,112,0.15)', color: '#2A5D48' };
+                  case 'in_review': return { bg: 'rgba(212,163,115,0.2)', color: '#B46A2C' };
+                  case 'rejected': return { bg: 'rgba(201,93,93,0.15)', color: '#A93B3B' };
+                  default: return { bg: 'rgba(42,71,62,0.08)', color: 'var(--color-slate-dark)' };
+                }
+              };
+              const color = getStatusColor(req.status);
+
+              return (
+                <div key={req._id || req.id} className="mobile-record-card">
+                  <div className="mobile-card-header">
+                    <div>
+                      <div className="mobile-card-title">{req.userName || 'Patient'}</div>
+                      <div className="mobile-card-subtitle" style={{ fontFamily: 'monospace', color: 'var(--color-primary-forest)', fontWeight: 600 }}>
+                        {req.requestId}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 600, padding: '3px 8px', borderRadius: '12px', background: color.bg, color: color.color, textTransform: 'capitalize' }}>
+                      {req.status?.replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  <div className="mobile-card-grid">
+                    <div className="mobile-card-field">
+                      <span className="mobile-field-label">Right Requested</span>
+                      <span className="mobile-field-value" style={{ fontWeight: 600 }}>{typeLabel}</span>
+                    </div>
+
+                    <div className="mobile-card-field">
+                      <span className="mobile-field-label">Subject & Details</span>
+                      <span className="mobile-field-value">
+                        <div>{req.reason}</div>
+                        {req.details && <div style={{ fontSize: '0.74rem', color: 'var(--color-slate-light)', marginTop: '2px' }}>{req.details}</div>}
+                      </span>
+                    </div>
+
+                    <div className="mobile-card-field">
+                      <span className="mobile-field-label">Applicant Email</span>
+                      <span className="mobile-field-value">{req.userEmail}</span>
+                    </div>
+
+                    <div className="mobile-card-field">
+                      <span className="mobile-field-label">Date Lodged</span>
+                      <span className="mobile-field-value" style={{ fontSize: '0.78rem' }}>
+                        {formatISTDateTimeWithZone(req.submittedAt || req.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mobile-card-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRequest(req);
+                        setAdminResolution({
+                          status: req.status === 'submitted' ? 'in_review' : req.status,
+                          adminNotes: req.adminNotes || ''
+                        });
+                      }}
+                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.76rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Review Request
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* DESKTOP & SCROLLABLE TABLE VIEW */}
+      <div className={`desktop-table-container glass-card responsive-table-wrapper ${mobileAdminReqView === 'cards' ? 'mobile-hidden' : ''}`} style={{ margin: 0, borderRadius: 'var(--radius-sm)' }}>
+        <table className="responsive-table responsive-table-wide" style={{ borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.84rem' }}>
           <thead>
             <tr style={{ background: 'rgba(42,71,62,0.06)', borderBottom: '1px solid var(--color-slate-10)', color: 'var(--color-slate-dark)' }}>
               <th style={{ padding: '0.75rem 1rem' }}>Request ID</th>
