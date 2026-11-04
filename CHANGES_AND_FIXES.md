@@ -154,3 +154,27 @@ This document details every specific technical issue diagnosed, the underlying r
 - **Test Performed:** Tested with `npm run build` and full test suite `node tests/run_tests.js`.
 - **Verification Result:** Zero overflow; input boxes and dropdowns remain strictly bounded within card borders.
 
+---
+
+### 14. Production Asset 403 Forbidden & Blank Screen Fix
+
+- **Issue Diagnosed:** In production on Render (`https://verdant-mind-therapy-ys6i.onrender.com/`), browsers received HTTP 403 with `Content-Type: application/json` when requesting `/assets/index-CVUPra5W.js` and `/assets/index-C6jIEYE5.css`. The browser refused to execute the JavaScript module script or parse the stylesheet due to the JSON MIME type, resulting in a blank white page.
+- **Root Cause:**
+  1. `index.html` loads module script and stylesheet with `<script crossorigin>` and `<link crossorigin>`, causing modern browsers to send an `Origin: https://verdant-mind-therapy-ys6i.onrender.com` request header with static asset requests.
+  2. `server.js` applied strict API CORS middleware globally before static asset serving. The `allowedOrigins` whitelist was hardcoded to `https://verdant-mind.onrender.com` (missing `-therapy-ys6i`).
+  3. When the browser requested static assets, CORS rejected the origin, calling `callback(new Error('CORS policy blocked...'))`, and the global error handler returned HTTP 403 with JSON error message.
+  4. Missing static assets fell through into the SPA catch-all returning `index.html` (`text/html`) instead of 404.
+- **Files Modified:** `server.js`, `render.yaml`, `tests/run_tests.js`.
+- **Fix Implemented:**
+  1. Mounted static asset serving (`/assets`) at the top of `server.js` before strict API CORS, setting `Access-Control-Allow-Origin: *`, `Cross-Origin-Resource-Policy: cross-origin`, immutable 1-year caching, and strict UTF-8 MIME types (`application/javascript` and `text/css`).
+  2. Added missing static asset guard: unhandled `/assets/*` or paths with file extensions return `404 text/plain` ("Asset not found") and never serve `index.html` or JSON.
+  3. Re-architected API CORS origin validator `isOriginAllowed(origin, req)` to automatically allow:
+     - Render cloud subdomains (`*.onrender.com`)
+     - Same-origin matches with current `Host` / `X-Forwarded-Host` headers
+     - `process.env.RENDER_EXTERNAL_URL` and `process.env.FRONTEND_URL`
+     - Explicit deployed domain `https://verdant-mind-therapy-ys6i.onrender.com`
+  4. Updated `render.yaml` environment variables (`FRONTEND_URL`, `BACKEND_URL`, `API_URL`, `GOOGLE_CALLBACK_URL`) to match `verdant-mind-therapy-ys6i.onrender.com`.
+  5. Added automated tests (tests 63–66) validating cross-origin asset serving, strict MIME types, missing asset 404 guards, and API CORS echo.
+- **Test Performed:** Full automated test suite `node tests/run_tests.js`.
+- **Verification Result:** 85 / 85 tests passed with 0 failures. Asset requests with `Origin` headers return HTTP 200 with proper `application/javascript` and `text/css` MIME types.
+

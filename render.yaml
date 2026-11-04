@@ -18,13 +18,13 @@ services:
       - key: PORT
         value: 10000
       - key: FRONTEND_URL
-        value: https://verdant-mind.onrender.com
+        value: https://verdant-mind-therapy-ys6i.onrender.com
       - key: BACKEND_URL
-        value: https://verdant-mind.onrender.com
+        value: https://verdant-mind-therapy-ys6i.onrender.com
       - key: API_URL
-        value: https://verdant-mind.onrender.com
+        value: https://verdant-mind-therapy-ys6i.onrender.com
       - key: GOOGLE_CALLBACK_URL
-        value: https://verdant-mind.onrender.com/api/auth/google/callback
+        value: https://verdant-mind-therapy-ys6i.onrender.com/api/auth/google/callback
       - key: BOOTSTRAP_ADMIN_EMAIL
         value: sabujd880@gmail.com
       - key: MONGODB_URI

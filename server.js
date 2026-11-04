@@ -101,39 +101,128 @@ export function getClientIp(req) {
 }
 
 // =========================================================================
-// SECURITY HEADERS & CORS
+// STATIC ASSET SERVING & SECURITY HEADERS
 // =========================================================================
+const __dirname = path.resolve();
+const distPath = path.join(__dirname, 'dist');
+const assetsPath = path.join(distPath, 'assets');
+
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
+// Serve static frontend assets with public cross-origin access and strict MIME types
+if (fs.existsSync(distPath)) {
+  // 1. Dedicated /assets router with 1-year immutable caching, cross-origin headers, and strict MIME types
+  app.use('/assets', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  }, express.static(assetsPath, {
+    immutable: true,
+    maxAge: '1y',
+    setHeaders: (res, filePath) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      }
+    }
+  }));
+
+  // Missing /assets/* files must return 404 text/plain, never JSON or index.html
+  app.use('/assets', (req, res) => {
+    res.status(404).type('text/plain').send('Asset not found');
+  });
+
+  // 2. Root static files (favicon.ico, manifest.webmanifest, images, etc.)
+  app.use(express.static(distPath, {
+    maxAge: '1h',
+    setHeaders: (res, filePath) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      }
+    }
+  }));
+}
+
+// =========================================================================
+// CORS & ORIGIN GOVERNANCE FOR API ENDPOINTS
+// =========================================================================
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  process.env.RENDER_EXTERNAL_URL,
+  'https://verdant-mind-therapy-ys6i.onrender.com',
   'https://verdant-mind.onrender.com',
   'https://counselling.yourdomain.com',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:5000',
-  'http://127.0.0.1:5173'
-].filter(Boolean);
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5000'
+].filter(Boolean).map(o => o.trim().replace(/\/+$/, ''));
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      if (isProd) {
-        callback(new Error(`CORS policy blocked request from unauthorized origin: ${origin}`));
-      } else {
-        callback(null, true);
-      }
+const isOriginAllowed = (origin, req) => {
+  if (!origin) return true; // Direct non-CORS navigation, curl, server-to-server
+  const cleanOrigin = origin.trim().replace(/\/+$/, '');
+
+  // 1. Explicit allowed list
+  if (allowedOrigins.includes(cleanOrigin)) return true;
+
+  // 2. Render cloud deployments (*.onrender.com)
+  try {
+    const originUrl = new URL(cleanOrigin);
+    if (originUrl.hostname.endsWith('.onrender.com')) return true;
+
+    // 3. Same-origin match with current Host or X-Forwarded-Host header
+    const hostHeader = (req?.headers?.['x-forwarded-host'] || req?.headers?.host || '').split(':')[0].toLowerCase();
+    if (hostHeader && originUrl.hostname.toLowerCase() === hostHeader) return true;
+
+    // 4. Local development
+    if (originUrl.hostname === 'localhost' || originUrl.hostname === '127.0.0.1') return true;
+  } catch (e) {
+    return false;
+  }
+
+  return false;
+};
+
+app.use((req, res, next) => {
+  // Static assets and non-API paths are public and allowed
+  if (!req.path.startsWith('/api')) {
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    return next();
+  }
+
+  // API endpoints: enforce origin authorization
+  const origin = req.headers.origin;
+  if (isOriginAllowed(origin, req)) {
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'CSRF-Token']
-}));
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, CSRF-Token');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  } else {
+    if (isProd) {
+      return res.status(403).json({ error: `CORS policy blocked request from unauthorized origin: ${origin}` });
+    }
+    next();
+  }
+});
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -6747,22 +6836,25 @@ mongoose.connection.on('error', (err) => {
   console.error('[DATABASE ERROR]', err.message);
 });
 
-// Serve built frontend assets in production
-const __dirname = path.resolve();
-const distPath = path.join(__dirname, 'dist');
-
-if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-}
-
 // Catch-all for undefined /api routes - guarantees JSON 404 instead of Express default HTML error
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'API endpoint not found: ' + req.method + ' ' + req.originalUrl });
 });
+
+// Guard: Missing static assets under /assets/ or with file extensions must return 404 text, NEVER index.html
+app.use((req, res, next) => {
+  if (req.path.startsWith('/assets/') || path.extname(req.path)) {
+    return res.status(404).type('text/plain').send('Asset not found: ' + req.path);
+  }
+  next();
+});
+
+// SPA fallback for HTML client-side navigation routes
+if (fs.existsSync(distPath)) {
+  app.use((req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Start listening on all network interfaces (0.0.0.0) for cloud/LAN access
 let serverInstance = null;

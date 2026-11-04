@@ -2348,6 +2348,79 @@ async function run() {
     assert.strictEqual(errBody.error, 'Date of birth cannot be in the future.');
   });
 
+  // Test 63: Production Asset Serving & Cross-Origin Accessibility
+  await test('Static Assets: Serves JS/CSS with 200 OK and strict MIME types under cross-origin request', async () => {
+    // 1. Fetch index.html to extract current JS and CSS bundle names
+    const indexRes = await fetch(`${BASE_URL}/`);
+    assert.strictEqual(indexRes.status, 200);
+    const htmlText = await indexRes.text();
+    
+    // Extract JS bundle filename
+    const jsMatch = htmlText.match(/src="(\/assets\/[^"]+\.js)"/);
+    assert.ok(jsMatch, 'index.html references a JS asset bundle');
+    const jsPath = jsMatch[1];
+
+    // Extract CSS bundle filename
+    const cssMatch = htmlText.match(/href="(\/assets\/[^"]+\.css)"/);
+    assert.ok(cssMatch, 'index.html references a CSS asset bundle');
+    const cssPath = cssMatch[1];
+
+    // Test JS bundle request with Origin header (browser module script simulation)
+    const jsRes = await fetch(`${BASE_URL}${jsPath}`, {
+      headers: {
+        'Origin': 'https://verdant-mind-therapy-ys6i.onrender.com'
+      }
+    });
+    assert.strictEqual(jsRes.status, 200, 'JS asset must return 200 OK, not 403');
+    const jsContentType = jsRes.headers.get('content-type') || '';
+    assert.ok(jsContentType.includes('javascript'), `JS Content-Type must be javascript, got: ${jsContentType}`);
+    assert.ok(jsRes.headers.get('access-control-allow-origin'), 'Must include Access-Control-Allow-Origin header');
+
+    // Test CSS bundle request with Origin header (browser stylesheet link simulation)
+    const cssRes = await fetch(`${BASE_URL}${cssPath}`, {
+      headers: {
+        'Origin': 'https://verdant-mind-therapy-ys6i.onrender.com'
+      }
+    });
+    assert.strictEqual(cssRes.status, 200, 'CSS asset must return 200 OK, not 403');
+    const cssContentType = cssRes.headers.get('content-type') || '';
+    assert.ok(cssContentType.includes('text/css'), `CSS Content-Type must be text/css, got: ${cssContentType}`);
+    assert.ok(cssRes.headers.get('access-control-allow-origin'), 'Must include Access-Control-Allow-Origin header');
+  });
+
+  // Test 64: Missing Static Assets Guard
+  await test('Static Assets: Missing asset returns 404 text/plain and does NOT fall back to index.html or JSON', async () => {
+    const missingRes = await fetch(`${BASE_URL}/assets/non-existent-chunk-999.css`);
+    assert.strictEqual(missingRes.status, 404, 'Missing asset must return 404');
+    const contentType = missingRes.headers.get('content-type') || '';
+    assert.ok(contentType.includes('text/plain'), `Missing asset content-type must be text/plain, got: ${contentType}`);
+    const body = await missingRes.text();
+    assert.ok(!body.includes('<!doctype html>'), 'Missing asset must NOT return index.html');
+  });
+
+  // Test 65: CORS Governance on API routes for Render domains
+  await test('CORS Governance: Allows Render domain on API endpoints with Access-Control-Allow-Origin', async () => {
+    const apiRes = await fetch(`${BASE_URL}/api/theme`, {
+      headers: {
+        'Origin': 'https://verdant-mind-therapy-ys6i.onrender.com'
+      }
+    });
+    assert.strictEqual(apiRes.status, 200);
+    assert.strictEqual(
+      apiRes.headers.get('access-control-allow-origin'),
+      'https://verdant-mind-therapy-ys6i.onrender.com',
+      'Should echo authorized Render domain'
+    );
+  });
+
+  // Test 66: SPA Route Navigation Fallback
+  await test('SPA Navigation: Client routes serve index.html with 200 OK', async () => {
+    const navRes = await fetch(`${BASE_URL}/client-portal`);
+    assert.strictEqual(navRes.status, 200);
+    const html = await navRes.text();
+    assert.ok(html.includes('<div id="root"></div>'), 'Navigation route must serve React root');
+  });
+
   console.log('\n===========================================================');
   console.log(`TEST SUMMARY: ${passedCount} PASSED, ${failedCount} FAILED`);
   console.log('===========================================================');
