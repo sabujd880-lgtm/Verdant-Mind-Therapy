@@ -168,7 +168,7 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
           <select
             value={selectedAptId}
             onChange={(e) => setSelectedAptId(e.target.value)}
-            style={{ padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid var(--color-slate-10)', fontSize: '0.9rem', minWidth: '320px', background: '#fff' }}
+            style={{ padding: '0.5rem 1rem', borderRadius: '4px', border: '1px solid var(--color-slate-10)', fontSize: '0.9rem', width: '100%', maxWidth: '360px', background: '#fff' }}
           >
             {appointments.map(apt => (
               <option key={apt._id || apt.id} value={apt._id || apt.id}>
@@ -201,7 +201,7 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1.5rem' }}>
+      <div className="responsive-2col" style={{ gap: '1.5rem' }}>
         
         {/* LEFT: RECORDINGS LIST & PLAYER */}
         <div className="glass-card" style={{ padding: '1.5rem', borderRadius: 'var(--radius-sm)' }}>
@@ -245,7 +245,9 @@ export default function AudioRecordings({ appointments = [], currentUser }) {
                       background: '#fff',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem'
                     }}
                   >
                     <div>
