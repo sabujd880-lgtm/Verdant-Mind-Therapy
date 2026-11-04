@@ -19,7 +19,7 @@ import {
 } from '../src/utils/dateTime.js';
 
 // Dynamically import server after NODE_ENV=test is set
-const { app, getClientIp, User, Client, hashPassword, verifyPassword } = await import('../server.js');
+const { app, getClientIp, User, Client, PatientProfile, hashPassword, verifyPassword } = await import('../server.js');
 
 let server = null;
 const TEST_PORT = 5099;
@@ -1471,6 +1471,235 @@ async function run() {
     const logs = await auditRes.json();
     const themeAudit = logs.find(l => l.action === 'BRAND_THEME_UPDATED');
     assert.ok(themeAudit, 'Audit trail must record BRAND_THEME_UPDATED event');
+  });
+
+  // =========================================================================
+  // Patient / Student Profile Management System Test Suite
+  // =========================================================================
+
+  // Test 43: PatientProfile Schema & Index Verification
+  await test('PatientProfile: Model carries compound indexes on email, status, and department', async () => {
+    const profileIndexes = mongoose.model('PatientProfile').schema.indexes();
+    const hasEmailIndex = profileIndexes.some(idx => idx[0]['personalInfo.email'] === 1);
+    const hasStatusCatIndex = profileIndexes.some(idx => idx[0].profileStatus === 1 && idx[0].category === 1);
+    const hasDeptLevelIndex = profileIndexes.some(idx => idx[0]['academicInfo.department'] === 1 && idx[0]['academicInfo.programmeLevel'] === 1);
+
+    assert.ok(hasEmailIndex, 'Must index personalInfo.email');
+    assert.ok(hasStatusCatIndex, 'Must compound index profileStatus and category');
+    assert.ok(hasDeptLevelIndex, 'Must compound index department and programmeLevel');
+  });
+
+  // Test 44: Profile Creation & Automatic Calculations
+  let createdTestProfile = null;
+  const uniqueStudentEmail = `aarav_${Date.now()}@testuniv.edu`;
+  await test('PatientProfile: POST /api/profiles creates record with unique ID and calculated age', async () => {
+    // Sign in as Super Admin
+    const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'sabujd880@gmail.com', password: 'SabujCare#2026!' })
+    });
+    assert.strictEqual(loginRes.status, 200);
+    adminSessionCookie = loginRes.headers.get('set-cookie').split(';')[0];
+
+    const createRes = await fetch(`${BASE_URL}/api/profiles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({
+        category: 'student',
+        profileStatus: 'active',
+        personalInfo: {
+          fullName: 'Aarav Sharma',
+          email: uniqueStudentEmail,
+          phone: '+91 98765 43210',
+          dateOfBirth: '2003-05-15',
+          gender: 'Male',
+          preferredLanguage: 'English'
+        },
+        academicInfo: {
+          isStudent: true,
+          registrationNumber: 'REG-2023-CSE-042',
+          department: 'Computer Science & Engineering',
+          programmeLevel: 'UG',
+          currentSemester: '6th Semester',
+          academicAdvisorName: 'Dr. Mukherjee'
+        },
+        emergencyContact: {
+          contactName: 'Ramesh Sharma',
+          relationship: 'Father',
+          primaryPhone: '+91 98765 00000'
+        },
+        clinicalInfo: {
+          presentingConcerns: 'Academic anxiety and exam stress',
+          currentCareStatus: 'Intake'
+        }
+      })
+    });
+
+    assert.strictEqual(createRes.status, 201);
+    createdTestProfile = await createRes.json();
+    assert.ok(createdTestProfile.profileId.startsWith('VM-'), 'Profile ID must start with VM-');
+    assert.strictEqual(createdTestProfile.personalInfo.fullName, 'Aarav Sharma');
+    assert.ok(createdTestProfile.personalInfo.age >= 20, 'Age must be calculated accurately from dateOfBirth');
+    assert.strictEqual(createdTestProfile.profileStatus, 'active');
+  });
+
+  // Test 45: Student Self-Service Scoping & Privacy Protections
+  await test('PatientProfile: GET /api/profiles/me returns student profile and strips clinical notes', async () => {
+    // Register or sign in a student client
+    await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Aarav Sharma',
+        email: uniqueStudentEmail,
+        password: 'Student#Pass2026!'
+      })
+    });
+
+    // Mark client as verified for testing login
+    await Client.findOneAndUpdate({ email: uniqueStudentEmail }, { verified: true });
+
+    const studentLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: uniqueStudentEmail, password: 'Student#Pass2026!' })
+    });
+    assert.strictEqual(studentLoginRes.status, 200);
+    const studentCookie = studentLoginRes.headers.get('set-cookie').split(';')[0];
+
+    // Student calls GET /api/profiles/me
+    const meRes = await fetch(`${BASE_URL}/api/profiles/me`, {
+      headers: { Cookie: studentCookie }
+    });
+    assert.strictEqual(meRes.status, 200);
+    const meData = await meRes.json();
+    assert.strictEqual(meData.personalInfo.email, uniqueStudentEmail);
+    assert.strictEqual(meData.clinicalInfo, undefined, 'Confidential clinical info must be stripped from student view');
+
+    // Student attempts to access directory GET /api/profiles -> 403 Forbidden
+    const dirRes = await fetch(`${BASE_URL}/api/profiles`, {
+      headers: { Cookie: studentCookie }
+    });
+    assert.strictEqual(dirRes.status, 403, 'Students must be forbidden from accessing the provider profile directory');
+  });
+
+  // Test 46: Directory Search, Filtering & Aggregated Statistics
+  await test('PatientProfile: GET /api/profiles and /stats return scoped records and metrics', async () => {
+    // Search by department and search text
+    const searchRes = await fetch(`${BASE_URL}/api/profiles?search=Aarav&department=Computer+Science+%26+Engineering`, {
+      headers: { Cookie: adminSessionCookie }
+    });
+    assert.strictEqual(searchRes.status, 200);
+    const searchData = await searchRes.json();
+    assert.ok(Array.isArray(searchData.profiles));
+    assert.ok(searchData.profiles.some(p => p.personalInfo.fullName.includes('Aarav')));
+
+    // Get live stats
+    const statsRes = await fetch(`${BASE_URL}/api/profiles/stats`, {
+      headers: { Cookie: adminSessionCookie }
+    });
+    assert.strictEqual(statsRes.status, 200);
+    const statsData = await statsRes.json();
+    assert.ok(statsData.totalProfiles >= 1);
+    assert.ok(statsData.activeProfiles >= 1);
+    assert.ok(typeof statsData.studentCount === 'number');
+  });
+
+  // Test 47: RBAC Profile Update
+  await test('PatientProfile: PUT /api/profiles/:id updates allowed fields and logs audit event', async () => {
+    const updateRes = await fetch(`${BASE_URL}/api/profiles/${createdTestProfile.profileId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({
+        personalInfo: {
+          ...createdTestProfile.personalInfo,
+          phone: '+91 99999 77777'
+        }
+      })
+    });
+    assert.strictEqual(updateRes.status, 200);
+    const updated = await updateRes.json();
+    assert.strictEqual(updated.personalInfo.phone, '+91 99999 77777');
+  });
+
+  // Test 48: Provider Assignment & Assignment History
+  await test('PatientProfile: PATCH /api/profiles/:id/assign-provider assigns provider and records history', async () => {
+    const assignRes = await fetch(`${BASE_URL}/api/profiles/${createdTestProfile.profileId}/assign-provider`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({
+        providerEmail: 'sabujd880@gmail.com',
+        providerName: 'Sabuj Das',
+        reason: 'Assigned for cognitive behavioral therapy sessions'
+      })
+    });
+    assert.strictEqual(assignRes.status, 200);
+    const assigned = await assignRes.json();
+    assert.strictEqual(assigned.assignedProvider.providerEmail, 'sabujd880@gmail.com');
+    assert.ok(assigned.providerHistory.length >= 1);
+    assert.strictEqual(assigned.providerHistory[0].reason, 'Assigned for cognitive behavioral therapy sessions');
+  });
+
+  // Test 49: Status Lifecycle Management
+  await test('PatientProfile: PATCH /api/profiles/:id/status updates status and logs transition', async () => {
+    const statusRes = await fetch(`${BASE_URL}/api/profiles/${createdTestProfile.profileId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({
+        status: 'inactive',
+        reason: 'Student completed semester program'
+      })
+    });
+    assert.strictEqual(statusRes.status, 200);
+    const statusData = await statusRes.json();
+    assert.strictEqual(statusData.profileStatus || statusData.status, 'inactive');
+    assert.ok(statusData.statusHistory.length >= 1);
+    const lastEntry = statusData.statusHistory[statusData.statusHistory.length - 1];
+    assert.strictEqual(lastEntry.status || lastEntry.toStatus, 'inactive');
+  });
+
+  // Test 50: Consent Management & Audit Trail
+  await test('PatientProfile: POST /api/profiles/:id/consent manages client consents', async () => {
+    const consentRes = await fetch(`${BASE_URL}/api/profiles/${createdTestProfile.profileId}/consent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': adminSessionCookie
+      },
+      body: JSON.stringify({
+        counsellingConsent: true,
+        assessmentConsent: true,
+        audioRecordingConsent: false,
+        withdrawConsent: false
+      })
+    });
+    assert.strictEqual(consentRes.status, 200);
+    const consentData = await consentRes.json();
+    assert.strictEqual(consentData.consentAndPrivacy.counsellingConsent, true);
+    assert.strictEqual(consentData.consentAndPrivacy.audioRecordingConsent, false);
+
+    // Verify audit log
+    const auditRes = await fetch(`${BASE_URL}/api/admin/audit-logs`, {
+      headers: { Cookie: adminSessionCookie }
+    });
+    assert.strictEqual(auditRes.status, 200);
+    const logs = await auditRes.json();
+    assert.ok(logs.some(l => l.action === 'PROFILE_CREATED'));
+    assert.ok(logs.some(l => l.action === 'PROVIDER_ASSIGNED'));
+    assert.ok(logs.some(l => l.action === 'PROFILE_STATUS_CHANGED'));
   });
 
   console.log('\n===========================================================');

@@ -3,11 +3,12 @@ import {
   Check, X, Eye, Calendar, Clock, Plus, Trash2, 
   Video, PhoneCall, MessageSquare, BookOpen, AlertCircle,
   Inbox, FileText, Receipt, Mail, Send, Printer, CheckCircle2, Clipboard,
-  RefreshCw, ChevronLeft, ChevronRight
+  RefreshCw, ChevronLeft, ChevronRight, Users
 } from 'lucide-react';
 import ClinicalRecords from './ClinicalRecords';
 import AudioRecordings from './AudioRecordings';
 import AdminManagement from './AdminManagement';
+import PatientProfileManager from './PatientProfileManager';
 import { 
   formatISTDate, 
   formatISTTime, 
@@ -387,6 +388,12 @@ export default function TherapistDashboard({
             onClick={() => setActiveTab('appointments')}
           >
             Appointments & Inquiries
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'profiles' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profiles')}
+          >
+            Patient Profiles
           </button>
           <button 
             className={`tab-btn ${activeTab === 'messages' ? 'active' : ''}`}
@@ -1743,6 +1750,11 @@ export default function TherapistDashboard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Student / Patient Profiles Directory */}
+      {activeTab === 'profiles' && (
+        <PatientProfileManager currentUser={currentUser} mode="directory" />
       )}
 
       {/* Clinical Records: Case History & Mental Status Examination */}

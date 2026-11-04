@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save, Trash2, Plus, Bell, Palette, Sun, Moon } from 'lucide-react';
+import { Users, Shield, CheckCircle2, RefreshCw, Clock, AlertTriangle, UserPlus, Search, Lock, CalendarDays, Save, Trash2, Plus, Bell, Palette, Sun, Moon, Contact } from 'lucide-react';
+import PatientProfileManager from './PatientProfileManager.jsx';
 import { getActiveTheme, getActiveMode, applyTheme, THEMES, THEME_MODES } from '../styles/theme-config.js';
 import { formatISTDateTimeWithZone, normalizeToISTDate } from '../utils/dateTime.js';
 
 export default function AdminManagement({ currentUser }) {
-  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' | 'audit' | 'assignments' | 'scheduling' | 'appearance'
+  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' | 'profiles' | 'audit' | 'assignments' | 'scheduling' | 'appearance'
   const [currentTheme, setCurrentTheme] = useState(() => getActiveTheme());
   const [currentMode, setCurrentMode] = useState(() => getActiveMode());
   const [themeServerConfig, setThemeServerConfig] = useState({
@@ -363,6 +364,14 @@ export default function AdminManagement({ currentUser }) {
           </button>
           <button
             type="button"
+            className={`tab-btn ${activeSubTab === 'profiles' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('profiles')}
+            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+          >
+            <Contact size={15} style={{ marginRight: '0.35rem' }} /> Student & Patient Profiles
+          </button>
+          <button
+            type="button"
             className={`tab-btn ${activeSubTab === 'assignments' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('assignments')}
             style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
@@ -595,6 +604,11 @@ export default function AdminManagement({ currentUser }) {
             </table>
           </div>
         </div>
+      )}
+
+      {/* TAB 1.5: STUDENT & PATIENT PROFILES MANAGEMENT */}
+      {activeSubTab === 'profiles' && (
+        <PatientProfileManager currentUser={currentUser} mode="directory" />
       )}
 
       {/* TAB 2: COUNSELLOR CLIENT ASSIGNMENTS */}

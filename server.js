@@ -616,6 +616,174 @@ const themeConfigSchema = new mongoose.Schema({
 });
 let ThemeConfig = mongoose.model('ThemeConfig', themeConfigSchema);
 
+// 12. PatientProfile Schema (for Comprehensive Student / Patient Profile Management)
+const patientProfileSchema = new mongoose.Schema({
+  profileId: { type: String, required: true, unique: true, uppercase: true, index: true },
+  userId: { type: String, sparse: true, index: true },
+  category: { 
+    type: String, 
+    enum: ['student', 'patient', 'staff_referral', 'other'], 
+    default: 'student',
+    index: true
+  },
+  personalInfo: {
+    fullName: { type: String, required: true, trim: true },
+    photoUrl: { type: String, default: '' },
+    dateOfBirth: { type: String, default: '' },
+    age: { type: Number },
+    gender: { 
+      type: String, 
+      enum: ['Male', 'Female', 'Non-Binary', 'Prefer not to say', 'Self-described', 'Other', ''], 
+      default: 'Self-described' 
+    },
+    selfDescribedGender: { type: String, default: '' },
+    email: { type: String, required: true, lowercase: true, trim: true, index: true },
+    phone: { type: String, trim: true, default: '' },
+    address: { type: String, default: '' },
+    city: { type: String, default: '' },
+    state: { type: String, default: '' },
+    postalCode: { type: String, default: '' },
+    preferredLanguage: { type: String, default: 'English' }
+  },
+  academicInfo: {
+    isStudent: { type: Boolean, default: true },
+    registrationNumber: { type: String, trim: true, default: '', index: true },
+    department: { type: String, trim: true, default: '', index: true },
+    schoolFaculty: { type: String, trim: true, default: '' },
+    programme: { type: String, trim: true, default: '' },
+    programmeLevel: { 
+      type: String, 
+      enum: ['UG', 'PG', 'PhD', 'Diploma', 'Other', ''], 
+      default: 'UG',
+      index: true
+    },
+    currentSemester: { type: String, default: '' },
+    academicSession: { type: String, default: '' },
+    enrollmentStatus: { 
+      type: String, 
+      enum: ['Active', 'On Leave', 'Graduated', 'Suspended', 'Withdrawn', ''], 
+      default: 'Active' 
+    }
+  },
+  emergencyContact: {
+    name: { type: String, trim: true, default: '' },
+    relationship: { type: String, trim: true, default: '' },
+    phone: { type: String, trim: true, default: '' },
+    altPhone: { type: String, trim: true, default: '' },
+    authorizedForClinicalDisclosure: { type: Boolean, default: false }
+  },
+  clinicalInfo: {
+    presentingConcerns: { type: String, default: '' },
+    relevantClinicalHistory: { type: String, default: '' },
+    previousCounsellingHistory: { type: String, default: '' },
+    referralInformation: { type: String, default: '' },
+    assessmentReferences: { type: [String], default: [] },
+    currentCareStatus: { 
+      type: String, 
+      enum: ['Intake', 'Active Therapy', 'On Hold', 'Maintenance', 'Completed', 'Referred Out', 'Discharged'], 
+      default: 'Intake' 
+    },
+    followUpRecommendations: { type: String, default: '' },
+    lastClinicalReviewDate: { type: Date },
+    lastReviewedBy: { type: String, default: '' }
+  },
+  assignedProvider: {
+    providerId: { type: String, default: '' },
+    providerName: { type: String, default: '' },
+    providerEmail: { type: String, default: '' },
+    assignedAt: { type: Date },
+    assignedBy: { type: String, default: '' }
+  },
+  assignmentHistory: [{
+    providerId: String,
+    providerName: String,
+    providerEmail: String,
+    assignedAt: { type: Date, default: Date.now },
+    assignedBy: String,
+    reason: String
+  }],
+  consentAndPrivacy: {
+    privacyNoticeAcknowledged: { type: Boolean, default: false },
+    counsellingConsent: { type: Boolean, default: false },
+    assessmentConsent: { type: Boolean, default: false },
+    audioRecordingConsent: { type: Boolean, default: false },
+    consentVersion: { type: String, default: '1.0' },
+    consentTimestamp: { type: Date },
+    consentWithdrawn: { type: Boolean, default: false },
+    withdrawnTimestamp: { type: Date },
+    withdrawnReason: { type: String, default: '' }
+  },
+  documents: [{
+    docId: String,
+    title: String,
+    category: { type: String, enum: ['Referral', 'Consent', 'Academic', 'Clinical', 'Other'], default: 'Other' },
+    fileUrl: String,
+    fileSize: Number,
+    mimeType: String,
+    uploadedAt: { type: Date, default: Date.now },
+    uploadedBy: String
+  }],
+  profileStatus: { 
+    type: String, 
+    enum: ['pending_verification', 'active', 'inactive', 'archived'], 
+    default: 'pending_verification', 
+    index: true 
+  },
+  statusHistory: [{
+    status: String,
+    changedAt: { type: Date, default: Date.now },
+    changedBy: String,
+    reason: String
+  }],
+  createdAt: { type: Date, default: Date.now, index: true },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+patientProfileSchema.index({ 'personalInfo.email': 1 });
+patientProfileSchema.index({ profileStatus: 1, category: 1 });
+patientProfileSchema.index({ 'academicInfo.department': 1, 'academicInfo.programmeLevel': 1 });
+patientProfileSchema.index({ 'assignedProvider.providerEmail': 1 });
+let PatientProfile = mongoose.model('PatientProfile', patientProfileSchema);
+
+// Age calculation helper
+function calculateAgeFromDob(dob) {
+  if (!dob) return null;
+  let d = null;
+  if (typeof dob === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(dob)) {
+    const parts = dob.split('-');
+    d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+  } else {
+    d = new Date(dob);
+  }
+  if (isNaN(d.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) {
+    age--;
+  }
+  return age >= 0 && age < 130 ? age : null;
+}
+
+// Generate unique sequential profile ID e.g. VM-2026-00001
+async function generateUniqueProfileId() {
+  const currentYear = new Date().getFullYear();
+  const prefix = `VM-${currentYear}-`;
+  
+  let attempts = 0;
+  while (attempts < 10) {
+    attempts++;
+    const count = await PatientProfile.countDocuments();
+    const candidateId = `${prefix}${String(count + attempts).padStart(5, '0')}`;
+    const existing = await PatientProfile.findOne({ profileId: candidateId });
+    if (!existing) {
+      return candidateId;
+    }
+  }
+  const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+  return `${prefix}${randomSuffix}`;
+}
+
 // =========================================================================
 // AUDIT LOGGER HELPER
 // =========================================================================
@@ -657,13 +825,14 @@ function ensureDbFile() {
       auditlogs: [],
       audiorecordings: [],
       casehistories: [],
-      mserecords: []
+      mserecords: [],
+      patientprofiles: []
     }, null, 2));
   } else {
     try {
       const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
       let modified = false;
-      ['clients', 'appointments', 'messages', 'caredocuments', 'availabilities', 'users', 'auditlogs', 'audiorecordings', 'casehistories', 'mserecords'].forEach(k => {
+      ['clients', 'appointments', 'messages', 'caredocuments', 'availabilities', 'users', 'auditlogs', 'audiorecordings', 'casehistories', 'mserecords', 'patientprofiles'].forEach(k => {
         if (!data[k]) {
           data[k] = [];
           modified = true;
@@ -685,7 +854,7 @@ function readData() {
   } catch (e) {
     return { 
       clients: [], appointments: [], messages: [], caredocuments: [], availabilities: [],
-      users: [], auditlogs: [], audiorecordings: [], casehistories: [], mserecords: [], themeconfigs: [] 
+      users: [], auditlogs: [], audiorecordings: [], casehistories: [], mserecords: [], themeconfigs: [], patientprofiles: [] 
     };
   }
 }
@@ -723,6 +892,18 @@ class MockModel {
   }
 }
 
+function getNestedProp(obj, path) {
+  if (!obj || !path) return undefined;
+  if (Object.prototype.hasOwnProperty.call(obj, path)) return obj[path];
+  const parts = path.split('.');
+  let curr = obj;
+  for (const part of parts) {
+    if (curr == null) return undefined;
+    curr = curr[part];
+  }
+  return curr;
+}
+
 function matchesQuery(item, query = {}) {
   if (!query || Object.keys(query).length === 0) return true;
 
@@ -734,7 +915,7 @@ function matchesQuery(item, query = {}) {
   for (const key of Object.keys(query)) {
     if (key === '$or') continue;
     const qVal = query[key];
-    const iVal = item[key];
+    const iVal = key.includes('.') ? getNestedProp(item, key) : item[key];
 
     if (qVal instanceof RegExp) {
       if (!qVal.test(String(iVal || ''))) return false;
@@ -824,6 +1005,17 @@ const makeMockModel = (collectionName) => {
     }
     return null;
   };
+  Model.findOneAndUpdate = async function(query = {}, update = {}) {
+    const db = readData();
+    const list = db[collectionName] || [];
+    const index = list.findIndex(item => matchesQuery(item, query));
+    if (index >= 0) {
+      list[index] = { ...list[index], ...update };
+      writeData(db);
+      return new MockModel(collectionName, list[index]);
+    }
+    return null;
+  };
   Model.create = async function(data) {
     const instance = new MockModel(collectionName, data);
     await instance.save();
@@ -874,6 +1066,7 @@ function setupLocalDBFallback() {
   ClinicalCaseHistory = makeMockModel('casehistories');
   MentalStatusExam = makeMockModel('mserecords');
   ThemeConfig = makeMockModel('themeconfigs');
+  PatientProfile = makeMockModel('patientprofiles');
   initializeAvailability();
   initializeSuperAdmin();
   initializeThemeConfig();
@@ -2322,6 +2515,726 @@ app.get('/api/clients/:email',
     }
   }
 );
+
+// =========================================================================
+// PATIENT / STUDENT PROFILE MANAGEMENT REST APIS
+// =========================================================================
+
+// Helper: Sanitize profile for student/client role (stripping confidential provider notes)
+function sanitizeProfileForRole(profile, role) {
+  const obj = profile.toObject ? profile.toObject() : { ...profile };
+  if (role === 'client') {
+    delete obj.clinicalInfo;
+  }
+  return obj;
+}
+
+// 1. GET /api/profiles - List profiles (Admin / Provider) with search, filter, pagination
+app.get('/api/profiles', requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor', 'Viewer', 'provider']), async (req, res) => {
+  try {
+    const user = req.session.user;
+    const role = user.role === 'provider' ? 'Super Admin' : user.role;
+    const {
+      search = '',
+      department = '',
+      programmeLevel = '',
+      status = '',
+      category = '',
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
+
+    let allProfiles = await PatientProfile.find();
+    if (!Array.isArray(allProfiles)) allProfiles = [];
+
+    // Filter by Provider authorization if Counsellor/Viewer has assigned caseload restrictions
+    if (role === 'Counsellor' || role === 'Viewer') {
+      if (user.assignedClients && user.assignedClients.length > 0) {
+        allProfiles = allProfiles.filter(p => {
+          const pEmail = (p.personalInfo?.email || '').toLowerCase().trim();
+          return user.assignedClients.some(assigned => assigned.toLowerCase().trim() === pEmail);
+        });
+      }
+    }
+
+    // Apply Filters
+    let filtered = allProfiles.filter(p => {
+      const pInfo = p.personalInfo || {};
+      const aInfo = p.academicInfo || {};
+
+      // Search matching name, ID, email, or registration number
+      if (search) {
+        const s = search.toLowerCase().trim();
+        const matchesName = (pInfo.fullName || '').toLowerCase().includes(s);
+        const matchesId = (p.profileId || '').toLowerCase().includes(s);
+        const matchesEmail = (pInfo.email || '').toLowerCase().includes(s);
+        const matchesReg = (aInfo.registrationNumber || '').toLowerCase().includes(s);
+        if (!matchesName && !matchesId && !matchesEmail && !matchesReg) return false;
+      }
+
+      // Department filter
+      if (department && department !== 'all') {
+        if ((aInfo.department || '').toLowerCase() !== department.toLowerCase()) return false;
+      }
+
+      // Programme Level filter (UG / PG / PhD)
+      if (programmeLevel && programmeLevel !== 'all') {
+        if ((aInfo.programmeLevel || '').toUpperCase() !== programmeLevel.toUpperCase()) return false;
+      }
+
+      // Status filter
+      if (status && status !== 'all') {
+        if (p.profileStatus !== status) return false;
+      }
+
+      // Category filter (student / patient)
+      if (category && category !== 'all') {
+        if (p.category !== category) return false;
+      }
+
+      return true;
+    });
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let valA = a[sortBy] || a.personalInfo?.[sortBy] || a.createdAt;
+      let valB = b[sortBy] || b.personalInfo?.[sortBy] || b.createdAt;
+      if (valA instanceof Date) valA = valA.getTime();
+      if (valB instanceof Date) valB = valB.getTime();
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    const total = filtered.length;
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedItems = filtered.slice(startIndex, startIndex + limitNum).map(p => {
+      // In listings, sanitize to avoid exposing confidential clinical notes
+      const clean = p.toObject ? p.toObject() : { ...p };
+      delete clean.clinicalInfo;
+      return clean;
+    });
+
+    res.json({
+      profiles: paginatedItems,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum) || 1
+      }
+    });
+  } catch (error) {
+    console.error('Failed to retrieve patient profiles:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. GET /api/profiles/stats - Dashboard statistics computed from authorized records
+app.get('/api/profiles/stats', requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor', 'provider']), async (req, res) => {
+  try {
+    const list = await PatientProfile.find();
+    const profiles = Array.isArray(list) ? list : [];
+
+    const stats = {
+      total: profiles.length,
+      totalProfiles: profiles.length,
+      active: profiles.filter(p => p.profileStatus === 'active').length,
+      activeProfiles: profiles.filter(p => p.profileStatus === 'active').length,
+      pendingVerification: profiles.filter(p => p.profileStatus === 'pending_verification').length,
+      inactive: profiles.filter(p => p.profileStatus === 'inactive').length,
+      archived: profiles.filter(p => p.profileStatus === 'archived').length,
+      students: profiles.filter(p => p.category === 'student').length,
+      studentCount: profiles.filter(p => p.category === 'student').length,
+      patients: profiles.filter(p => p.category === 'patient').length,
+      byDepartment: {},
+      byProgrammeLevel: {
+        UG: profiles.filter(p => p.academicInfo?.programmeLevel === 'UG').length,
+        PG: profiles.filter(p => p.academicInfo?.programmeLevel === 'PG').length,
+        PhD: profiles.filter(p => p.academicInfo?.programmeLevel === 'PhD').length,
+        Other: profiles.filter(p => !['UG', 'PG', 'PhD'].includes(p.academicInfo?.programmeLevel)).length
+      }
+    };
+
+    profiles.forEach(p => {
+      const dept = p.academicInfo?.department?.trim();
+      if (dept) {
+        stats.byDepartment[dept] = (stats.byDepartment[dept] || 0) + 1;
+      }
+    });
+
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3. GET /api/profiles/me - Student accesses their own personal profile
+app.get('/api/profiles/me', requireAuth, async (req, res) => {
+  try {
+    const userEmail = (req.session.user.email || '').toLowerCase().trim();
+    if (!userEmail) {
+      return res.status(401).json({ error: 'Session email not found.' });
+    }
+
+    let profile = await PatientProfile.findOne({ 'personalInfo.email': userEmail });
+    if (!profile) {
+      // Auto-provision initial draft profile linked to this student/client
+      const newProfileId = await generateUniqueProfileId();
+      profile = await PatientProfile.create({
+        profileId: newProfileId,
+        userId: req.session.user.id || '',
+        category: 'student',
+        personalInfo: {
+          fullName: req.session.user.name || 'Student / Patient',
+          email: userEmail,
+          phone: req.session.user.phone || '',
+          preferredLanguage: 'English'
+        },
+        academicInfo: {
+          isStudent: true,
+          programmeLevel: 'UG',
+          enrollmentStatus: 'Active'
+        },
+        profileStatus: 'pending_verification',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    res.json(sanitizeProfileForRole(profile, req.session.user.role));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 4. GET /api/profiles/:id - View individual detailed profile
+app.get('/api/profiles/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const user = req.session.user;
+  const role = user.role === 'provider' ? 'Super Admin' : user.role;
+
+  try {
+    let profile = await PatientProfile.findOne({ profileId: id.toUpperCase() });
+    if (!profile) {
+      profile = await PatientProfile.findById(id);
+    }
+    if (!profile) {
+      return res.status(404).json({ error: 'Patient / Student profile not found.' });
+    }
+
+    // Role-based authorization
+    if (role === 'client') {
+      const pEmail = (profile.personalInfo?.email || '').toLowerCase().trim();
+      const userEmail = (user.email || '').toLowerCase().trim();
+      if (pEmail !== userEmail) {
+        return res.status(403).json({ error: 'Access denied: You are not authorized to view another user’s profile.' });
+      }
+      return res.json(sanitizeProfileForRole(profile, 'client'));
+    }
+
+    if (role === 'Counsellor' || role === 'Viewer') {
+      const pEmail = profile.personalInfo?.email;
+      if (!canAccessClientRecord(user, pEmail)) {
+        return res.status(403).json({ error: 'Access denied: Profile outside your assigned clinical caseload.' });
+      }
+    }
+
+    res.json(profile);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 5. POST /api/profiles - Create new patient/student profile
+app.post('/api/profiles', requireAuth, async (req, res) => {
+  const user = req.session.user;
+  const role = user.role === 'provider' ? 'Super Admin' : user.role;
+  const { category = 'student', personalInfo = {}, academicInfo = {}, emergencyContact = {} } = req.body;
+
+  try {
+    const email = (personalInfo.email || (role === 'client' ? user.email : '')).toLowerCase().trim();
+    const fullName = (personalInfo.fullName || (role === 'client' ? user.name : '')).trim();
+
+    if (!email || !fullName) {
+      return res.status(400).json({ error: 'Full name and email address are required to create a profile.' });
+    }
+
+    // Check duplicate
+    const existing = await PatientProfile.findOne({ 'personalInfo.email': email });
+    if (existing) {
+      return res.status(409).json({ 
+        error: `A profile already exists for email address: ${email}`,
+        profileId: existing.profileId 
+      });
+    }
+
+    const profileId = await generateUniqueProfileId();
+    const age = calculateAgeFromDob(personalInfo.dateOfBirth);
+
+    const initialStatus = (role === 'Super Admin' || role === 'Administrator') && req.body.profileStatus
+      ? req.body.profileStatus
+      : 'pending_verification';
+
+    const newProfile = await PatientProfile.create({
+      profileId,
+      userId: role === 'client' ? user.id : undefined,
+      category,
+      personalInfo: {
+        fullName,
+        photoUrl: personalInfo.photoUrl || '',
+        dateOfBirth: personalInfo.dateOfBirth || '',
+        age: age || undefined,
+        gender: personalInfo.gender || 'Self-described',
+        selfDescribedGender: personalInfo.selfDescribedGender || '',
+        email,
+        phone: (personalInfo.phone || '').trim(),
+        address: personalInfo.address || '',
+        city: personalInfo.city || '',
+        state: personalInfo.state || '',
+        postalCode: personalInfo.postalCode || '',
+        preferredLanguage: personalInfo.preferredLanguage || 'English'
+      },
+      academicInfo: {
+        isStudent: category === 'student',
+        registrationNumber: (academicInfo.registrationNumber || '').trim(),
+        department: (academicInfo.department || '').trim(),
+        schoolFaculty: (academicInfo.schoolFaculty || '').trim(),
+        programme: (academicInfo.programme || '').trim(),
+        programmeLevel: academicInfo.programmeLevel || 'UG',
+        currentSemester: academicInfo.currentSemester || '',
+        academicSession: academicInfo.academicSession || '',
+        enrollmentStatus: academicInfo.enrollmentStatus || 'Active'
+      },
+      emergencyContact: {
+        name: (emergencyContact.name || '').trim(),
+        relationship: (emergencyContact.relationship || '').trim(),
+        phone: (emergencyContact.phone || '').trim(),
+        altPhone: (emergencyContact.altPhone || '').trim(),
+        authorizedForClinicalDisclosure: false
+      },
+      profileStatus: initialStatus,
+      statusHistory: [{
+        status: initialStatus,
+        changedAt: new Date(),
+        changedBy: user.email,
+        reason: 'Initial profile registration'
+      }],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'PROFILE_CREATED',
+      targetResource: profileId,
+      details: { email, category, status: initialStatus },
+      req
+    });
+
+    res.status(201).json(sanitizeProfileForRole(newProfile, role));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6. PUT /api/profiles/:id - Update permitted fields with role-based segregation
+app.put('/api/profiles/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const user = req.session.user;
+  const role = user.role === 'provider' ? 'Super Admin' : user.role;
+  const updates = req.body;
+
+  try {
+    let profile = await PatientProfile.findOne({ profileId: id.toUpperCase() });
+    if (!profile) profile = await PatientProfile.findById(id);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+    // Client permissions check
+    if (role === 'client') {
+      const pEmail = (profile.personalInfo?.email || '').toLowerCase().trim();
+      const userEmail = (user.email || '').toLowerCase().trim();
+      if (pEmail !== userEmail) {
+        return res.status(403).json({ error: 'Access denied: You cannot edit another user’s profile.' });
+      }
+
+      // Allowed fields for client
+      if (updates.personalInfo) {
+        profile.personalInfo.phone = (updates.personalInfo.phone !== undefined ? updates.personalInfo.phone : profile.personalInfo.phone);
+        profile.personalInfo.address = (updates.personalInfo.address !== undefined ? updates.personalInfo.address : profile.personalInfo.address);
+        profile.personalInfo.city = (updates.personalInfo.city !== undefined ? updates.personalInfo.city : profile.personalInfo.city);
+        profile.personalInfo.state = (updates.personalInfo.state !== undefined ? updates.personalInfo.state : profile.personalInfo.state);
+        profile.personalInfo.postalCode = (updates.personalInfo.postalCode !== undefined ? updates.personalInfo.postalCode : profile.personalInfo.postalCode);
+        profile.personalInfo.preferredLanguage = (updates.personalInfo.preferredLanguage !== undefined ? updates.personalInfo.preferredLanguage : profile.personalInfo.preferredLanguage);
+        profile.personalInfo.gender = (updates.personalInfo.gender !== undefined ? updates.personalInfo.gender : profile.personalInfo.gender);
+        profile.personalInfo.selfDescribedGender = (updates.personalInfo.selfDescribedGender !== undefined ? updates.personalInfo.selfDescribedGender : profile.personalInfo.selfDescribedGender);
+        if (updates.personalInfo.dateOfBirth) {
+          profile.personalInfo.dateOfBirth = updates.personalInfo.dateOfBirth;
+          profile.personalInfo.age = calculateAgeFromDob(updates.personalInfo.dateOfBirth) || profile.personalInfo.age;
+        }
+      }
+
+      if (updates.academicInfo) {
+        profile.academicInfo = {
+          ...profile.academicInfo,
+          ...updates.academicInfo
+        };
+      }
+
+      if (updates.emergencyContact) {
+        profile.emergencyContact = {
+          ...profile.emergencyContact,
+          ...updates.emergencyContact,
+          authorizedForClinicalDisclosure: false // Clients cannot unilaterally toggle clinical disclosure authorization
+        };
+      }
+    } else if (role === 'Counsellor') {
+      // Counsellor can update clinical notes and follow-up
+      if (!canAccessClientRecord(user, profile.personalInfo?.email)) {
+        return res.status(403).json({ error: 'Access denied: Profile outside your assigned caseload.' });
+      }
+
+      if (updates.clinicalInfo) {
+        profile.clinicalInfo = {
+          ...profile.clinicalInfo,
+          ...updates.clinicalInfo,
+          lastClinicalReviewDate: new Date(),
+          lastReviewedBy: user.email
+        };
+      }
+      if (updates.personalInfo?.phone) profile.personalInfo.phone = updates.personalInfo.phone;
+      if (updates.academicInfo) profile.academicInfo = { ...profile.academicInfo, ...updates.academicInfo };
+    } else {
+      // Admin / Super Admin
+      if (updates.personalInfo) {
+        profile.personalInfo = { ...profile.personalInfo, ...updates.personalInfo };
+        if (updates.personalInfo.dateOfBirth) {
+          profile.personalInfo.age = calculateAgeFromDob(updates.personalInfo.dateOfBirth) || profile.personalInfo.age;
+        }
+      }
+      if (updates.academicInfo) profile.academicInfo = { ...profile.academicInfo, ...updates.academicInfo };
+      if (updates.emergencyContact) profile.emergencyContact = { ...profile.emergencyContact, ...updates.emergencyContact };
+      if (updates.category) profile.category = updates.category;
+      if (updates.clinicalInfo) {
+        profile.clinicalInfo = {
+          ...profile.clinicalInfo,
+          ...updates.clinicalInfo,
+          lastClinicalReviewDate: new Date(),
+          lastReviewedBy: user.email
+        };
+      }
+    }
+
+    profile.updatedAt = new Date();
+    await profile.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'PROFILE_UPDATED',
+      targetResource: profile.profileId,
+      details: { role },
+      req
+    });
+
+    res.json(sanitizeProfileForRole(profile, role));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 7. PATCH /api/profiles/:id/status - Change profile status (Admin / Provider)
+app.patch('/api/profiles/:id/status', requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor', 'provider']), async (req, res) => {
+  const { id } = req.params;
+  const { status, reason = '' } = req.body;
+  const user = req.session.user;
+
+  const validStatuses = ['pending_verification', 'active', 'inactive', 'archived'];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+  }
+
+  try {
+    let profile = await PatientProfile.findOne({ profileId: id.toUpperCase() });
+    if (!profile) profile = await PatientProfile.findById(id);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+    profile.profileStatus = status;
+    profile.statusHistory = profile.statusHistory || [];
+    profile.statusHistory.push({
+      status,
+      changedAt: new Date(),
+      changedBy: user.email,
+      reason: reason || 'Status modified by authorized staff'
+    });
+    profile.updatedAt = new Date();
+    await profile.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'PROFILE_STATUS_CHANGED',
+      targetResource: profile.profileId,
+      details: { newStatus: status, reason },
+      req
+    });
+
+    res.json({ 
+      success: true, 
+      profileId: profile.profileId, 
+      status: profile.profileStatus,
+      profileStatus: profile.profileStatus,
+      statusHistory: profile.statusHistory 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8. PATCH /api/profiles/:id/assign-provider - Assign Provider (Admin only)
+app.patch('/api/profiles/:id/assign-provider', requireAuth, requireRole(['Super Admin', 'Administrator', 'provider']), async (req, res) => {
+  const { id } = req.params;
+  const { providerId, providerName, providerEmail, reason = '' } = req.body;
+  const user = req.session.user;
+
+  if (!providerEmail || !providerName) {
+    return res.status(400).json({ error: 'Provider name and email are required for assignment.' });
+  }
+
+  try {
+    let profile = await PatientProfile.findOne({ profileId: id.toUpperCase() });
+    if (!profile) profile = await PatientProfile.findById(id);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+    profile.assignedProvider = {
+      providerId: providerId || '',
+      providerName,
+      providerEmail: providerEmail.toLowerCase().trim(),
+      assignedAt: new Date(),
+      assignedBy: user.email
+    };
+
+    profile.assignmentHistory = profile.assignmentHistory || [];
+    profile.assignmentHistory.push({
+      providerId: providerId || '',
+      providerName,
+      providerEmail: providerEmail.toLowerCase().trim(),
+      assignedAt: new Date(),
+      assignedBy: user.email,
+      reason
+    });
+    profile.updatedAt = new Date();
+    await profile.save();
+
+    // Also sync with User document if counsellor exists
+    try {
+      const counsellorUser = await User.findOne({ email: providerEmail.toLowerCase().trim() });
+      if (counsellorUser) {
+        counsellorUser.assignedClients = counsellorUser.assignedClients || [];
+        if (!counsellorUser.assignedClients.includes(profile.personalInfo.email)) {
+          counsellorUser.assignedClients.push(profile.personalInfo.email);
+          await counsellorUser.save();
+        }
+      }
+    } catch (syncErr) {
+      console.warn('Counsellor assignedClients sync alert:', syncErr.message);
+    }
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'PROVIDER_ASSIGNED',
+      targetResource: profile.profileId,
+      details: { providerEmail, providerName, reason },
+      req
+    });
+
+    res.json({
+      success: true,
+      profileId: profile.profileId,
+      assignedProvider: profile.assignedProvider,
+      assignmentHistory: profile.assignmentHistory,
+      providerHistory: profile.assignmentHistory
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 9. POST /api/profiles/:id/consent - Record or withdraw consent
+app.post('/api/profiles/:id/consent', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const user = req.session.user;
+  const role = user.role === 'provider' ? 'Super Admin' : user.role;
+  const {
+    privacyNoticeAcknowledged,
+    counsellingConsent,
+    assessmentConsent,
+    audioRecordingConsent,
+    consentVersion = '1.0',
+    withdrawConsent = false,
+    withdrawnReason = ''
+  } = req.body;
+
+  try {
+    let profile = await PatientProfile.findOne({ profileId: id.toUpperCase() });
+    if (!profile) profile = await PatientProfile.findById(id);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+    // Client authorization
+    if (role === 'client') {
+      const pEmail = (profile.personalInfo?.email || '').toLowerCase().trim();
+      if (pEmail !== user.email.toLowerCase().trim()) {
+        return res.status(403).json({ error: 'Access denied: You cannot modify consent for another user.' });
+      }
+    }
+
+    profile.consentAndPrivacy = profile.consentAndPrivacy || {};
+
+    if (withdrawConsent) {
+      profile.consentAndPrivacy.consentWithdrawn = true;
+      profile.consentAndPrivacy.withdrawnTimestamp = new Date();
+      profile.consentAndPrivacy.withdrawnReason = withdrawnReason || 'Patient requested consent revocation';
+      profile.consentAndPrivacy.counsellingConsent = false;
+      profile.consentAndPrivacy.assessmentConsent = false;
+      profile.consentAndPrivacy.audioRecordingConsent = false;
+    } else {
+      profile.consentAndPrivacy.privacyNoticeAcknowledged = !!privacyNoticeAcknowledged;
+      profile.consentAndPrivacy.counsellingConsent = !!counsellingConsent;
+      profile.consentAndPrivacy.assessmentConsent = !!assessmentConsent;
+      profile.consentAndPrivacy.audioRecordingConsent = !!audioRecordingConsent;
+      profile.consentAndPrivacy.consentVersion = consentVersion;
+      profile.consentAndPrivacy.consentTimestamp = new Date();
+      profile.consentAndPrivacy.consentWithdrawn = false;
+      profile.consentAndPrivacy.withdrawnTimestamp = undefined;
+      profile.consentAndPrivacy.withdrawnReason = '';
+    }
+
+    profile.updatedAt = new Date();
+    await profile.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: withdrawConsent ? 'CONSENT_WITHDRAWN' : 'CONSENT_UPDATED',
+      targetResource: profile.profileId,
+      details: { withdrawConsent, consentVersion },
+      req
+    });
+
+    res.json({ success: true, consentAndPrivacy: profile.consentAndPrivacy });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 10. GET /api/profiles/:id/appointments - Fetch appointment history linked to this profile
+app.get('/api/profiles/:id/appointments', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const user = req.session.user;
+  const role = user.role === 'provider' ? 'Super Admin' : user.role;
+
+  try {
+    let profile = await PatientProfile.findOne({ profileId: id.toUpperCase() });
+    if (!profile) profile = await PatientProfile.findById(id);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+    const pEmail = (profile.personalInfo?.email || '').toLowerCase().trim();
+    if (role === 'client' && pEmail !== user.email.toLowerCase().trim()) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    const appointments = await Appointment.find({ clientEmail: pEmail });
+    res.json(Array.isArray(appointments) ? appointments : []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 11. GET /api/profiles/:id/clinical-records - Confidential clinical history & MSE (Restricted)
+app.get('/api/profiles/:id/clinical-records', requireAuth, requireRole(['Super Admin', 'Administrator', 'Counsellor', 'provider']), async (req, res) => {
+  const { id } = req.params;
+  const user = req.session.user;
+
+  try {
+    let profile = await PatientProfile.findOne({ profileId: id.toUpperCase() });
+    if (!profile) profile = await PatientProfile.findById(id);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+    const pEmail = (profile.personalInfo?.email || '').toLowerCase().trim();
+    if (!canAccessClientRecord(user, pEmail)) {
+      return res.status(403).json({ error: 'Access denied: Profile outside your assigned clinical caseload.' });
+    }
+
+    const [caseHistories, mseRecords] = await Promise.all([
+      ClinicalCaseHistory.find({ clientEmail: pEmail }),
+      MentalStatusExam.find({ clientEmail: pEmail })
+    ]);
+
+    res.json({
+      profileId: profile.profileId,
+      clientEmail: pEmail,
+      clinicalInfo: profile.clinicalInfo || {},
+      caseHistories: Array.isArray(caseHistories) ? caseHistories : [],
+      mseRecords: Array.isArray(mseRecords) ? mseRecords : []
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 12. POST /api/profiles/:id/documents - Attach document metadata
+app.post('/api/profiles/:id/documents', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const user = req.session.user;
+  const { title, category = 'Other', fileUrl = '', fileSize = 0, mimeType = '' } = req.body;
+
+  if (!title) return res.status(400).json({ error: 'Document title is required.' });
+
+  try {
+    let profile = await PatientProfile.findOne({ profileId: id.toUpperCase() });
+    if (!profile) profile = await PatientProfile.findById(id);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+    const docEntry = {
+      docId: 'doc_' + Math.random().toString(36).substr(2, 9),
+      title: title.trim(),
+      category,
+      fileUrl,
+      fileSize,
+      mimeType,
+      uploadedAt: new Date(),
+      uploadedBy: user.email
+    };
+
+    profile.documents = profile.documents || [];
+    profile.documents.push(docEntry);
+    profile.updatedAt = new Date();
+    await profile.save();
+
+    await logAuditEvent({
+      actorEmail: user.email,
+      actorRole: user.role,
+      action: 'DOCUMENT_ATTACHED',
+      targetResource: profile.profileId,
+      details: { title, category },
+      req
+    });
+
+    res.status(201).json({ success: true, document: docEntry });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // =========================================================================
 // PRESERVED CLIENT AUTHENTICATION & PORTAL ENDPOINTS
@@ -4109,4 +5022,4 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-export { app, serverInstance, User, Client, hashPassword, verifyPassword };
+export { app, serverInstance, User, Client, PatientProfile, hashPassword, verifyPassword };

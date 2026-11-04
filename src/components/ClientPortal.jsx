@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { 
   Calendar, Clock, FileText, Receipt, Send, Inbox, 
-  MessageSquare, CheckCircle2, Eye, Printer, X
+  MessageSquare, CheckCircle2, Eye, Printer, X, User
 } from 'lucide-react';
+import PatientProfileManager from './PatientProfileManager.jsx';
 import { 
   formatISTDate, 
   formatISTTime, 
@@ -17,7 +18,7 @@ export default function ClientPortal({
   onSendMessage, 
   onCancelAppointment 
 }) {
-  const [activeTab, setActiveTab] = useState('sessions'); // 'sessions' | 'documents' | 'messages'
+  const [activeTab, setActiveTab] = useState('sessions'); // 'sessions' | 'documents' | 'messages' | 'profile'
   const [selectedDoc, setSelectedDoc] = useState(null); // For detailed document viewer modal
   
   // Message composition states
@@ -115,6 +116,13 @@ export default function ClientPortal({
             onClick={() => setActiveTab('messages')}
           >
             Message Inbox
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            <User size={15} style={{ marginRight: '0.35rem', verticalAlign: 'middle' }} />
+            My Profile
           </button>
         </div>
       </div>
@@ -590,6 +598,11 @@ export default function ClientPortal({
 
           </div>
         </div>
+      )}
+
+      {/* 4. STUDENT / PATIENT PROFILE TAB */}
+      {activeTab === 'profile' && (
+        <PatientProfileManager currentUser={currentUser} mode="self" />
       )}
 
     </div>
