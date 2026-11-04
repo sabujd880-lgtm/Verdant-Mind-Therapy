@@ -2169,6 +2169,184 @@ async function run() {
     assert.strictEqual(existingClient.googleId, 'mock_google_id_linked_99');
   });
 
+  // Test 61: Redesigned Patient / Service User Registration & Clinical History (Sections A - H)
+  await test('PatientProfile: Public Patient Registration with Sections A-H (No University Fields Required)', async () => {
+    const publicPatientEmail = `general_patient_${Date.now()}@example.org`;
+
+    // Re-authenticate admin session
+    const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'sabujd880@gmail.com', password: 'SabujCare#2026!' })
+    });
+    const sessionCookie = loginRes.headers.get('set-cookie').split(';')[0];
+
+    const createRes = await fetch(`${BASE_URL}/api/profiles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': sessionCookie
+      },
+      body: JSON.stringify({
+        category: 'General Patient',
+        profileStatus: 'active',
+        personalInfo: {
+          fullName: 'Priyanshu Sen',
+          email: publicPatientEmail,
+          phone: '+91 98765 11111',
+          alternatePhone: '+91 98765 22222',
+          dateOfBirth: '1995-08-20',
+          gender: 'Male',
+          occupation: 'Senior Software Engineer',
+          address: '42 Lake Gardens, South Avenue',
+          city: 'Kolkata',
+          state: 'West Bengal',
+          pinCode: '700045',
+          preferredLanguage: 'Bengali'
+        },
+        emergencyContact: {
+          contactPersonName: 'Debarati Sen',
+          relationship: 'Spouse',
+          phone: '+91 98765 33333',
+          altPhone: '+91 98765 44444',
+          address: '42 Lake Gardens, Kolkata'
+        },
+        pastMedicalPsychiatricHistory: {
+          assessmentStatus: 'Reported',
+          previousMedicalIllnesses: 'Mild asthma managed with inhaler',
+          previousPsychiatricHistory: 'Generalized anxiety symptoms during high stress',
+          previousPsychologicalCounselling: 'Attended 4 sessions of CBT in 2022',
+          currentMedications: 'Salbutamol inhaler as needed',
+          knownAllergies: 'Sulfa drugs',
+          substanceUseHistory: 'Social alcohol once monthly, non-smoker',
+          relevantMedicalNotes: 'Annual health checkup clear in Jan 2026',
+          structuredConditions: [
+            {
+              condition: 'Bronchial Asthma',
+              approximateYear: '2018',
+              treatmentReceived: 'Inhaler',
+              currentStatus: 'Resolved',
+              notes: 'Triggered by seasonal cold air'
+            }
+          ]
+        },
+        familyHistory: {
+          familyMedicalHistory: 'Father has hypertension',
+          familyPsychiatricHistory: 'None reported',
+          hereditaryConditions: 'None reported',
+          historyOfSubstanceUseInFamily: 'None reported',
+          relevantFamilyStressors: 'Caregiver responsibility for aging parents',
+          familyStructure: 'Nuclear family',
+          familySupportSystem: 'Strong emotional support from spouse',
+          additionalFamilyNotes: 'Good family communication'
+        },
+        birthDevelopmentalHistory: {
+          status: 'Assessed',
+          birthType: 'Normal Vaginal Delivery',
+          gestationalAge: '39 weeks',
+          prematureBirth: 'No',
+          developmentalMilestones: 'All early motor and language milestones achieved on time',
+          relevantAdditionalNotes: 'No childhood developmental issues'
+        },
+        personalSocialHistory: {
+          educationalBackground: 'Bachelor of Technology in Information Technology',
+          employmentStatus: 'Employed Full-Time',
+          maritalStatus: 'Married',
+          livingArrangements: 'Lives with spouse',
+          socialSupport: 'Supportive friend circle and workplace peers',
+          sleepPattern: '6-7 hours nightly, occasional sleep onset delay',
+          appetite: 'Normal, balanced diet',
+          lifestyleInformation: 'Swims twice weekly, enjoys photography'
+        },
+        clinicalInfo: {
+          presentingConcerns: 'Workplace burnout, persistent fatigue and performance anxiety',
+          durationOfConcerns: '4 months',
+          onsetAndCourse: 'Insidious onset following promotion to engineering leadership',
+          relevantClinicalObservations: 'Well-groomed, coherent, articulate, visibly tense posture',
+          initialClinicalImpression: 'Adjustment disorder with anxious mood vs moderate occupational burnout',
+          currentCareStatus: 'Intake',
+          followUpRecommendations: 'Weekly psychotherapy focusing on boundary setting and stress coping'
+        },
+        consentAndPrivacy: {
+          patientConsentStatus: 'Granted',
+          privacyNoticeAcknowledged: true,
+          counsellingConsent: true,
+          assessmentConsent: true,
+          audioRecordingConsent: false,
+          consentVersion: '2.0'
+        }
+      })
+    });
+
+    assert.strictEqual(createRes.status, 201, 'Should create general patient profile successfully');
+    const profile = await createRes.json();
+
+    assert.ok(profile.profileId.startsWith('VM-'), 'Profile ID starts with VM-');
+    assert.strictEqual(profile.category, 'General Patient');
+    assert.strictEqual(profile.personalInfo.fullName, 'Priyanshu Sen');
+    assert.strictEqual(profile.personalInfo.occupation, 'Senior Software Engineer');
+    assert.strictEqual(profile.personalInfo.pinCode, '700045');
+    assert.ok(profile.personalInfo.age >= 30, 'Age accurately calculated from 1995-08-20');
+    assert.strictEqual(profile.emergencyContact.contactPersonName, 'Debarati Sen');
+    assert.strictEqual(profile.pastMedicalPsychiatricHistory.assessmentStatus, 'Reported');
+    assert.strictEqual(profile.pastMedicalPsychiatricHistory.knownAllergies, 'Sulfa drugs');
+    assert.strictEqual(profile.familyHistory.familyStructure, 'Nuclear family');
+    assert.strictEqual(profile.birthDevelopmentalHistory.status, 'Assessed');
+    assert.strictEqual(profile.personalSocialHistory.educationalBackground, 'Bachelor of Technology in Information Technology');
+    assert.strictEqual(profile.clinicalInfo.durationOfConcerns, '4 months');
+    assert.strictEqual(profile.consentAndPrivacy.patientConsentStatus, 'Granted');
+
+    // Query stats to confirm general patient count includes new registration
+    const statsRes = await fetch(`${BASE_URL}/api/profiles/stats`, {
+      headers: { 'Cookie': sessionCookie }
+    });
+    assert.strictEqual(statsRes.status, 200);
+    const statsData = await statsRes.json();
+    assert.ok(statsData.generalPatients >= 1, 'General patients stat updated');
+
+    // Query list to test searching by occupation
+    const listRes = await fetch(`${BASE_URL}/api/profiles?search=Software+Engineer`, {
+      headers: { 'Cookie': sessionCookie }
+    });
+    assert.strictEqual(listRes.status, 200);
+    const listData = await listRes.json();
+    assert.ok(listData.profiles.some(p => p.profileId === profile.profileId), 'Profile searchable by occupation');
+  });
+
+  // Test 62: Prohibit Future Dates of Birth
+  await test('PatientProfile: Rejects impossible future date of birth with 400 Bad Request', async () => {
+    // Re-authenticate admin session
+    const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'sabujd880@gmail.com', password: 'SabujCare#2026!' })
+    });
+    const sessionCookie = loginRes.headers.get('set-cookie').split(';')[0];
+
+    const futureYear = new Date().getFullYear() + 2;
+    const futureDob = `${futureYear}-01-15`;
+
+    const badDobRes = await fetch(`${BASE_URL}/api/profiles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': sessionCookie
+      },
+      body: JSON.stringify({
+        category: 'General Patient',
+        personalInfo: {
+          fullName: 'Future Time Traveller',
+          email: `future_${Date.now()}@test.org`,
+          dateOfBirth: futureDob
+        }
+      })
+    });
+
+    assert.strictEqual(badDobRes.status, 400, 'Should return 400 for future date of birth');
+    const errBody = await badDobRes.json();
+    assert.strictEqual(errBody.error, 'Date of birth cannot be in the future.');
+  });
+
   console.log('\n===========================================================');
   console.log(`TEST SUMMARY: ${passedCount} PASSED, ${failedCount} FAILED`);
   console.log('===========================================================');

@@ -772,14 +772,17 @@ const themeConfigSchema = new mongoose.Schema({
 });
 let ThemeConfig = mongoose.model('ThemeConfig', themeConfigSchema);
 
-// 12. PatientProfile Schema (for Comprehensive Student / Patient Profile Management)
+// 12. PatientProfile Schema (for Comprehensive Patient / Service User & Clinical History Management)
 const patientProfileSchema = new mongoose.Schema({
   profileId: { type: String, required: true, unique: true, uppercase: true, index: true },
   userId: { type: String, sparse: true, index: true },
   category: { 
     type: String, 
-    enum: ['student', 'patient', 'staff_referral', 'other'], 
-    default: 'student',
+    enum: [
+      'General Patient', 'Staff Referral', 'Self-Referral', 'Professional Referral', 'Other',
+      'student', 'patient', 'staff_referral', 'other' // legacy backward compatibility
+    ], 
+    default: 'General Patient',
     index: true
   },
   personalInfo: {
@@ -789,20 +792,137 @@ const patientProfileSchema = new mongoose.Schema({
     age: { type: Number },
     gender: { 
       type: String, 
-      enum: ['Male', 'Female', 'Non-Binary', 'Prefer not to say', 'Self-described', 'Other', ''], 
-      default: 'Self-described' 
+      enum: ['Female', 'Male', 'Non-Binary', 'Other', 'Prefer not to say', 'Self-described', 'Unknown / Not Available', ''], 
+      default: 'Unknown / Not Available' 
     },
     selfDescribedGender: { type: String, default: '' },
     email: { type: String, required: true, lowercase: true, trim: true, index: true },
     phone: { type: String, trim: true, default: '' },
+    alternatePhone: { type: String, trim: true, default: '' },
+    occupation: { type: String, trim: true, default: '' },
     address: { type: String, default: '' },
     city: { type: String, default: '' },
     state: { type: String, default: '' },
     postalCode: { type: String, default: '' },
+    pinCode: { type: String, default: '' },
     preferredLanguage: { type: String, default: 'English' }
   },
+  emergencyContact: {
+    name: { type: String, trim: true, default: '' },
+    contactPersonName: { type: String, trim: true, default: '' },
+    relationship: { type: String, trim: true, default: '' },
+    phone: { type: String, trim: true, default: '' },
+    altPhone: { type: String, trim: true, default: '' },
+    address: { type: String, default: '' },
+    authorizedForClinicalDisclosure: { type: Boolean, default: false }
+  },
+  pastMedicalPsychiatricHistory: {
+    assessmentStatus: { 
+      type: String, 
+      enum: ['Not assessed', 'Not known', 'None reported', 'Reported', ''], 
+      default: 'None reported' 
+    },
+    previousMedicalIllnesses: { type: String, default: '' },
+    previousPsychiatricHistory: { type: String, default: '' },
+    previousPsychologicalCounselling: { type: String, default: '' },
+    previousPsychiatricConsultation: { type: String, default: '' },
+    previousHospitalisation: { type: String, default: '' },
+    previousSurgeries: { type: String, default: '' },
+    previousTreatments: { type: String, default: '' },
+    currentMedications: { type: String, default: '' },
+    previousMedications: { type: String, default: '' },
+    knownAllergies: { type: String, default: '' },
+    substanceUseHistory: { type: String, default: '' },
+    relevantMedicalNotes: { type: String, default: '' },
+    structuredConditions: [{
+      condition: String,
+      approximateYear: String,
+      treatmentReceived: String,
+      currentStatus: String,
+      notes: String
+    }]
+  },
+  familyHistory: {
+    familyMedicalHistory: { type: String, default: '' },
+    familyPsychiatricHistory: { type: String, default: '' },
+    hereditaryConditions: { type: String, default: '' },
+    historyOfSubstanceUseInFamily: { type: String, default: '' },
+    relevantFamilyStressors: { type: String, default: '' },
+    familyStructure: { type: String, default: '' },
+    familySupportSystem: { type: String, default: '' },
+    additionalFamilyNotes: { type: String, default: '' },
+    structuredMembers: [{
+      relationship: String,
+      condition: String,
+      clinicalDetails: String
+    }]
+  },
+  birthDevelopmentalHistory: {
+    status: { 
+      type: String, 
+      enum: ['Not Applicable', 'Not Assessed', 'Unknown', 'Assessed', ''], 
+      default: 'Not Applicable' 
+    },
+    pregnancyHistory: { type: String, default: '' },
+    maternalPregnancyComplications: { type: String, default: '' },
+    birthType: { 
+      type: String, 
+      enum: ['Normal Vaginal Delivery', 'Caesarean Section', 'Assisted Delivery', 'Unknown', 'Not Applicable', ''], 
+      default: 'Unknown' 
+    },
+    gestationalAge: { type: String, default: '' },
+    prematureBirth: { 
+      type: String, 
+      enum: ['Yes', 'No', 'Unknown', 'Not Applicable', ''], 
+      default: 'Unknown' 
+    },
+    birthComplications: { type: String, default: '' },
+    birthWeight: { type: String, default: '' },
+    neonatalComplications: { type: String, default: '' },
+    developmentalMilestones: { type: String, default: '' },
+    speechLanguageDevelopment: { type: String, default: '' },
+    motorDevelopment: { type: String, default: '' },
+    cognitiveLearningDevelopment: { type: String, default: '' },
+    childhoodDevelopmentalConcerns: { type: String, default: '' },
+    relevantAdditionalNotes: { type: String, default: '' }
+  },
+  personalSocialHistory: {
+    educationalBackground: { type: String, default: '' },
+    occupationalHistory: { type: String, default: '' },
+    employmentStatus: { type: String, default: '' },
+    maritalStatus: { type: String, default: '' },
+    livingArrangements: { type: String, default: '' },
+    socialSupport: { type: String, default: '' },
+    sleepPattern: { type: String, default: '' },
+    appetite: { type: String, default: '' },
+    lifestyleInformation: { type: String, default: '' },
+    relevantPersonalHistory: { type: String, default: '' },
+    additionalNotes: { type: String, default: '' }
+  },
+  clinicalInfo: {
+    presentingConcerns: { type: String, default: '' },
+    durationOfConcerns: { type: String, default: '' },
+    onsetAndCourse: { type: String, default: '' },
+    previousCounsellingExperience: { type: String, default: '' },
+    previousMentalHealthTreatment: { type: String, default: '' },
+    relevantClinicalObservations: { type: String, default: '' },
+    initialClinicalImpression: { type: String, default: '' },
+    additionalClinicalNotes: { type: String, default: '' },
+    relevantClinicalHistory: { type: String, default: '' },
+    previousCounsellingHistory: { type: String, default: '' },
+    referralInformation: { type: String, default: '' },
+    assessmentReferences: { type: [String], default: [] },
+    currentCareStatus: { 
+      type: String, 
+      enum: ['Intake', 'Active Therapy', 'On Hold', 'Maintenance', 'Completed', 'Referred Out', 'Discharged'], 
+      default: 'Intake' 
+    },
+    followUpRecommendations: { type: String, default: '' },
+    lastClinicalReviewDate: { type: Date },
+    lastReviewedBy: { type: String, default: '' }
+  },
   academicInfo: {
-    isStudent: { type: Boolean, default: true },
+    isStudent: { type: Boolean, default: false },
     registrationNumber: { type: String, trim: true, default: '', index: true },
     department: { type: String, trim: true, default: '', index: true },
     schoolFaculty: { type: String, trim: true, default: '' },
@@ -821,28 +941,6 @@ const patientProfileSchema = new mongoose.Schema({
       default: 'Active' 
     }
   },
-  emergencyContact: {
-    name: { type: String, trim: true, default: '' },
-    relationship: { type: String, trim: true, default: '' },
-    phone: { type: String, trim: true, default: '' },
-    altPhone: { type: String, trim: true, default: '' },
-    authorizedForClinicalDisclosure: { type: Boolean, default: false }
-  },
-  clinicalInfo: {
-    presentingConcerns: { type: String, default: '' },
-    relevantClinicalHistory: { type: String, default: '' },
-    previousCounsellingHistory: { type: String, default: '' },
-    referralInformation: { type: String, default: '' },
-    assessmentReferences: { type: [String], default: [] },
-    currentCareStatus: { 
-      type: String, 
-      enum: ['Intake', 'Active Therapy', 'On Hold', 'Maintenance', 'Completed', 'Referred Out', 'Discharged'], 
-      default: 'Intake' 
-    },
-    followUpRecommendations: { type: String, default: '' },
-    lastClinicalReviewDate: { type: Date },
-    lastReviewedBy: { type: String, default: '' }
-  },
   assignedProvider: {
     providerId: { type: String, default: '' },
     providerName: { type: String, default: '' },
@@ -859,11 +957,26 @@ const patientProfileSchema = new mongoose.Schema({
     reason: String
   }],
   consentAndPrivacy: {
+    patientConsentStatus: { 
+      type: String, 
+      enum: ['Granted', 'Pending', 'Refused', 'Withdrawn', ''], 
+      default: 'Pending' 
+    },
+    consentDateTime: { type: Date },
+    consentRecordedBy: { type: String, default: '' },
+    guardianDetails: {
+      hasGuardian: { type: Boolean, default: false },
+      guardianName: { type: String, default: '' },
+      guardianRelationship: { type: String, default: '' },
+      guardianPhone: { type: String, default: '' },
+      guardianEmail: { type: String, default: '' },
+      guardianConsentStatus: { type: String, enum: ['Granted', 'Pending', 'Not Applicable', ''], default: 'Not Applicable' }
+    },
     privacyNoticeAcknowledged: { type: Boolean, default: false },
     counsellingConsent: { type: Boolean, default: false },
     assessmentConsent: { type: Boolean, default: false },
     audioRecordingConsent: { type: Boolean, default: false },
-    consentVersion: { type: String, default: '1.0' },
+    consentVersion: { type: String, default: '2.0' },
     consentTimestamp: { type: Date },
     consentWithdrawn: { type: Boolean, default: false },
     withdrawnTimestamp: { type: Date },
@@ -913,6 +1026,7 @@ function calculateAgeFromDob(dob) {
   }
   if (isNaN(d.getTime())) return null;
   const today = new Date();
+  if (d > today) return null; // Prohibit future dates of birth
   let age = today.getFullYear() - d.getFullYear();
   const m = today.getMonth() - d.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < d.getDate())) {
@@ -3827,14 +3941,17 @@ app.get('/api/profiles', requireAuth, requireRole(['Super Admin', 'Administrator
       const pInfo = p.personalInfo || {};
       const aInfo = p.academicInfo || {};
 
-      // Search matching name, ID, email, or registration number
+      // Search matching name, ID, email, phone, occupation, or registration number
       if (search) {
         const s = search.toLowerCase().trim();
         const matchesName = (pInfo.fullName || '').toLowerCase().includes(s);
         const matchesId = (p.profileId || '').toLowerCase().includes(s);
         const matchesEmail = (pInfo.email || '').toLowerCase().includes(s);
+        const matchesPhone = (pInfo.phone || '').toLowerCase().includes(s);
+        const matchesAltPhone = (pInfo.alternatePhone || '').toLowerCase().includes(s);
+        const matchesOccupation = (pInfo.occupation || '').toLowerCase().includes(s);
         const matchesReg = (aInfo.registrationNumber || '').toLowerCase().includes(s);
-        if (!matchesName && !matchesId && !matchesEmail && !matchesReg) return false;
+        if (!matchesName && !matchesId && !matchesEmail && !matchesPhone && !matchesAltPhone && !matchesOccupation && !matchesReg) return false;
       }
 
       // Department filter
@@ -3852,9 +3969,19 @@ app.get('/api/profiles', requireAuth, requireRole(['Super Admin', 'Administrator
         if (p.profileStatus !== status) return false;
       }
 
-      // Category filter (student / patient)
+      // Category filter (support new and legacy categories)
       if (category && category !== 'all') {
-        if (p.category !== category) return false;
+        const catLower = category.toLowerCase().trim();
+        const pCatLower = (p.category || '').toLowerCase().trim();
+        if (catLower === 'general patient' || catLower === 'patient') {
+          if (pCatLower !== 'general patient' && pCatLower !== 'patient') return false;
+        } else if (catLower === 'staff referral' || catLower === 'staff_referral') {
+          if (pCatLower !== 'staff referral' && pCatLower !== 'staff_referral') return false;
+        } else if (catLower === 'other') {
+          if (pCatLower !== 'other') return false;
+        } else {
+          if (pCatLower !== catLower) return false;
+        }
       }
 
       return true;
@@ -3914,7 +4041,20 @@ app.get('/api/profiles/stats', requireAuth, requireRole(['Super Admin', 'Adminis
       archived: profiles.filter(p => p.profileStatus === 'archived').length,
       students: profiles.filter(p => p.category === 'student').length,
       studentCount: profiles.filter(p => p.category === 'student').length,
-      patients: profiles.filter(p => p.category === 'patient').length,
+      patients: profiles.filter(p => p.category === 'patient' || p.category === 'General Patient').length,
+      generalPatients: profiles.filter(p => p.category === 'General Patient' || p.category === 'patient').length,
+      staffReferrals: profiles.filter(p => p.category === 'Staff Referral' || p.category === 'staff_referral').length,
+      selfReferrals: profiles.filter(p => p.category === 'Self-Referral').length,
+      professionalReferrals: profiles.filter(p => p.category === 'Professional Referral').length,
+      otherReferrals: profiles.filter(p => p.category === 'Other' || p.category === 'other').length,
+      byCategory: {
+        generalPatient: profiles.filter(p => p.category === 'General Patient' || p.category === 'patient').length,
+        staffReferral: profiles.filter(p => p.category === 'Staff Referral' || p.category === 'staff_referral').length,
+        selfReferral: profiles.filter(p => p.category === 'Self-Referral').length,
+        professionalReferral: profiles.filter(p => p.category === 'Professional Referral').length,
+        other: profiles.filter(p => p.category === 'Other' || p.category === 'other').length,
+        student: profiles.filter(p => p.category === 'student').length
+      },
       byDepartment: {},
       byProgrammeLevel: {
         UG: profiles.filter(p => p.academicInfo?.programmeLevel === 'UG').length,
@@ -4018,7 +4158,18 @@ app.get('/api/profiles/:id', requireAuth, async (req, res) => {
 app.post('/api/profiles', requireAuth, async (req, res) => {
   const user = req.session.user;
   const role = user.role === 'provider' ? 'Super Admin' : user.role;
-  const { category = 'student', personalInfo = {}, academicInfo = {}, emergencyContact = {} } = req.body;
+  const { 
+    category = 'General Patient', 
+    personalInfo = {}, 
+    academicInfo = {}, 
+    emergencyContact = {},
+    pastMedicalPsychiatricHistory = {},
+    familyHistory = {},
+    birthDevelopmentalHistory = {},
+    personalSocialHistory = {},
+    clinicalInfo = {},
+    consentAndPrivacy = {}
+  } = req.body;
 
   try {
     const email = (personalInfo.email || (role === 'client' ? user.email : '')).toLowerCase().trim();
@@ -4026,6 +4177,20 @@ app.post('/api/profiles', requireAuth, async (req, res) => {
 
     if (!email || !fullName) {
       return res.status(400).json({ error: 'Full name and email address are required to create a profile.' });
+    }
+
+    // Prohibit future date of birth
+    if (personalInfo.dateOfBirth) {
+      let dobDate = null;
+      if (typeof personalInfo.dateOfBirth === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(personalInfo.dateOfBirth)) {
+        const parts = personalInfo.dateOfBirth.split('-');
+        dobDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+      } else {
+        dobDate = new Date(personalInfo.dateOfBirth);
+      }
+      if (!isNaN(dobDate.getTime()) && dobDate > new Date()) {
+        return res.status(400).json({ error: 'Date of birth cannot be in the future.' });
+      }
     }
 
     // Check duplicate
@@ -4052,19 +4217,22 @@ app.post('/api/profiles', requireAuth, async (req, res) => {
         fullName,
         photoUrl: personalInfo.photoUrl || '',
         dateOfBirth: personalInfo.dateOfBirth || '',
-        age: age || undefined,
-        gender: personalInfo.gender || 'Self-described',
+        age: (typeof age === 'number' && !isNaN(age)) ? age : (typeof personalInfo.age === 'number' ? personalInfo.age : undefined),
+        gender: personalInfo.gender || 'Unknown / Not Available',
         selfDescribedGender: personalInfo.selfDescribedGender || '',
         email,
         phone: (personalInfo.phone || '').trim(),
+        alternatePhone: (personalInfo.alternatePhone || personalInfo.altPhone || '').trim(),
+        occupation: (personalInfo.occupation || '').trim(),
         address: personalInfo.address || '',
         city: personalInfo.city || '',
         state: personalInfo.state || '',
-        postalCode: personalInfo.postalCode || '',
+        postalCode: (personalInfo.postalCode || personalInfo.pinCode || '').trim(),
+        pinCode: (personalInfo.pinCode || personalInfo.postalCode || '').trim(),
         preferredLanguage: personalInfo.preferredLanguage || 'English'
       },
       academicInfo: {
-        isStudent: category === 'student',
+        isStudent: academicInfo.isStudent ?? (category === 'student'),
         registrationNumber: (academicInfo.registrationNumber || '').trim(),
         department: (academicInfo.department || '').trim(),
         schoolFaculty: (academicInfo.schoolFaculty || '').trim(),
@@ -4075,11 +4243,108 @@ app.post('/api/profiles', requireAuth, async (req, res) => {
         enrollmentStatus: academicInfo.enrollmentStatus || 'Active'
       },
       emergencyContact: {
-        name: (emergencyContact.name || '').trim(),
+        name: (emergencyContact.contactPersonName || emergencyContact.contactName || emergencyContact.name || '').trim(),
+        contactPersonName: (emergencyContact.contactPersonName || emergencyContact.contactName || emergencyContact.name || '').trim(),
         relationship: (emergencyContact.relationship || '').trim(),
-        phone: (emergencyContact.phone || '').trim(),
-        altPhone: (emergencyContact.altPhone || '').trim(),
+        phone: (emergencyContact.primaryPhone || emergencyContact.phone || '').trim(),
+        altPhone: (emergencyContact.alternatePhone || emergencyContact.altPhone || '').trim(),
+        address: emergencyContact.address || emergencyContact.emergencyContactAddress || '',
         authorizedForClinicalDisclosure: false
+      },
+      pastMedicalPsychiatricHistory: {
+        assessmentStatus: pastMedicalPsychiatricHistory.assessmentStatus || 'None reported',
+        previousMedicalIllnesses: pastMedicalPsychiatricHistory.previousMedicalIllnesses || '',
+        previousPsychiatricHistory: pastMedicalPsychiatricHistory.previousPsychiatricHistory || '',
+        previousPsychologicalCounselling: pastMedicalPsychiatricHistory.previousPsychologicalCounselling || '',
+        previousPsychiatricConsultation: pastMedicalPsychiatricHistory.previousPsychiatricConsultation || '',
+        previousHospitalisation: pastMedicalPsychiatricHistory.previousHospitalisation || '',
+        previousSurgeries: pastMedicalPsychiatricHistory.previousSurgeries || '',
+        previousTreatments: pastMedicalPsychiatricHistory.previousTreatments || '',
+        currentMedications: pastMedicalPsychiatricHistory.currentMedications || '',
+        previousMedications: pastMedicalPsychiatricHistory.previousMedications || '',
+        knownAllergies: pastMedicalPsychiatricHistory.knownAllergies || '',
+        substanceUseHistory: pastMedicalPsychiatricHistory.substanceUseHistory || '',
+        relevantMedicalNotes: pastMedicalPsychiatricHistory.relevantMedicalNotes || '',
+        structuredConditions: Array.isArray(pastMedicalPsychiatricHistory.structuredConditions) ? pastMedicalPsychiatricHistory.structuredConditions : []
+      },
+      familyHistory: {
+        familyMedicalHistory: familyHistory.familyMedicalHistory || '',
+        familyPsychiatricHistory: familyHistory.familyPsychiatricHistory || '',
+        hereditaryConditions: familyHistory.hereditaryConditions || '',
+        historyOfSubstanceUseInFamily: familyHistory.historyOfSubstanceUseInFamily || '',
+        relevantFamilyStressors: familyHistory.relevantFamilyStressors || '',
+        familyStructure: familyHistory.familyStructure || '',
+        familySupportSystem: familyHistory.familySupportSystem || '',
+        additionalFamilyNotes: familyHistory.additionalFamilyNotes || '',
+        structuredMembers: Array.isArray(familyHistory.structuredMembers) ? familyHistory.structuredMembers : []
+      },
+      birthDevelopmentalHistory: {
+        status: birthDevelopmentalHistory.status || 'Not Applicable',
+        pregnancyHistory: birthDevelopmentalHistory.pregnancyHistory || '',
+        maternalPregnancyComplications: birthDevelopmentalHistory.maternalPregnancyComplications || '',
+        birthType: birthDevelopmentalHistory.birthType || 'Unknown',
+        gestationalAge: birthDevelopmentalHistory.gestationalAge || '',
+        prematureBirth: birthDevelopmentalHistory.prematureBirth || 'Unknown',
+        birthComplications: birthDevelopmentalHistory.birthComplications || '',
+        birthWeight: birthDevelopmentalHistory.birthWeight || '',
+        neonatalComplications: birthDevelopmentalHistory.neonatalComplications || '',
+        developmentalMilestones: birthDevelopmentalHistory.developmentalMilestones || '',
+        speechLanguageDevelopment: birthDevelopmentalHistory.speechLanguageDevelopment || '',
+        motorDevelopment: birthDevelopmentalHistory.motorDevelopment || '',
+        cognitiveLearningDevelopment: birthDevelopmentalHistory.cognitiveLearningDevelopment || '',
+        childhoodDevelopmentalConcerns: birthDevelopmentalHistory.childhoodDevelopmentalConcerns || '',
+        relevantAdditionalNotes: birthDevelopmentalHistory.relevantAdditionalNotes || ''
+      },
+      personalSocialHistory: {
+        educationalBackground: personalSocialHistory.educationalBackground || '',
+        occupationalHistory: personalSocialHistory.occupationalHistory || '',
+        employmentStatus: personalSocialHistory.employmentStatus || '',
+        maritalStatus: personalSocialHistory.maritalStatus || '',
+        livingArrangements: personalSocialHistory.livingArrangements || '',
+        socialSupport: personalSocialHistory.socialSupport || '',
+        sleepPattern: personalSocialHistory.sleepPattern || '',
+        appetite: personalSocialHistory.appetite || '',
+        lifestyleInformation: personalSocialHistory.lifestyleInformation || '',
+        relevantPersonalHistory: personalSocialHistory.relevantPersonalHistory || '',
+        additionalNotes: personalSocialHistory.additionalNotes || ''
+      },
+      clinicalInfo: role === 'client' ? {} : {
+        presentingConcerns: clinicalInfo.presentingConcerns || '',
+        durationOfConcerns: clinicalInfo.durationOfConcerns || '',
+        onsetAndCourse: clinicalInfo.onsetAndCourse || '',
+        previousCounsellingExperience: clinicalInfo.previousCounsellingExperience || '',
+        previousMentalHealthTreatment: clinicalInfo.previousMentalHealthTreatment || '',
+        relevantClinicalObservations: clinicalInfo.relevantClinicalObservations || '',
+        initialClinicalImpression: clinicalInfo.initialClinicalImpression || '',
+        additionalClinicalNotes: clinicalInfo.additionalClinicalNotes || '',
+        relevantClinicalHistory: clinicalInfo.relevantClinicalHistory || '',
+        previousCounsellingHistory: clinicalInfo.previousCounsellingHistory || '',
+        referralInformation: clinicalInfo.referralInformation || '',
+        assessmentReferences: Array.isArray(clinicalInfo.assessmentReferences) ? clinicalInfo.assessmentReferences : [],
+        currentCareStatus: clinicalInfo.currentCareStatus || 'Intake',
+        followUpRecommendations: clinicalInfo.followUpRecommendations || '',
+        lastClinicalReviewDate: (clinicalInfo.presentingConcerns || clinicalInfo.initialClinicalImpression) ? new Date() : undefined,
+        lastReviewedBy: (clinicalInfo.presentingConcerns || clinicalInfo.initialClinicalImpression) ? user.email : ''
+      },
+      consentAndPrivacy: {
+        patientConsentStatus: consentAndPrivacy.patientConsentStatus || 'Pending',
+        consentDateTime: consentAndPrivacy.consentDateTime ? new Date(consentAndPrivacy.consentDateTime) : new Date(),
+        consentRecordedBy: consentAndPrivacy.consentRecordedBy || user.email,
+        guardianDetails: {
+          hasGuardian: !!(consentAndPrivacy.guardianDetails && consentAndPrivacy.guardianDetails.hasGuardian),
+          guardianName: consentAndPrivacy.guardianDetails?.guardianName || '',
+          guardianRelationship: consentAndPrivacy.guardianDetails?.guardianRelationship || '',
+          guardianPhone: consentAndPrivacy.guardianDetails?.guardianPhone || '',
+          guardianEmail: consentAndPrivacy.guardianDetails?.guardianEmail || '',
+          guardianConsentStatus: consentAndPrivacy.guardianDetails?.guardianConsentStatus || 'Not Applicable'
+        },
+        privacyNoticeAcknowledged: !!consentAndPrivacy.privacyNoticeAcknowledged,
+        counsellingConsent: !!consentAndPrivacy.counsellingConsent,
+        assessmentConsent: !!consentAndPrivacy.assessmentConsent,
+        audioRecordingConsent: !!consentAndPrivacy.audioRecordingConsent,
+        consentVersion: consentAndPrivacy.consentVersion || '2.0',
+        consentTimestamp: new Date(),
+        consentWithdrawn: false
       },
       profileStatus: initialStatus,
       statusHistory: [{
@@ -4119,6 +4384,20 @@ app.put('/api/profiles/:id', requireAuth, async (req, res) => {
     if (!profile) profile = await PatientProfile.findById(id);
     if (!profile) return res.status(404).json({ error: 'Profile not found.' });
 
+    // Validate dateOfBirth cannot be future if updated
+    if (updates.personalInfo?.dateOfBirth) {
+      let dobDate = null;
+      if (typeof updates.personalInfo.dateOfBirth === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(updates.personalInfo.dateOfBirth)) {
+        const parts = updates.personalInfo.dateOfBirth.split('-');
+        dobDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+      } else {
+        dobDate = new Date(updates.personalInfo.dateOfBirth);
+      }
+      if (!isNaN(dobDate.getTime()) && dobDate > new Date()) {
+        return res.status(400).json({ error: 'Date of birth cannot be in the future.' });
+      }
+    }
+
     // Client permissions check
     if (role === 'client') {
       const pEmail = (profile.personalInfo?.email || '').toLowerCase().trim();
@@ -4130,17 +4409,41 @@ app.put('/api/profiles/:id', requireAuth, async (req, res) => {
       // Allowed fields for client
       if (updates.personalInfo) {
         profile.personalInfo.phone = (updates.personalInfo.phone !== undefined ? updates.personalInfo.phone : profile.personalInfo.phone);
+        profile.personalInfo.alternatePhone = (updates.personalInfo.alternatePhone !== undefined ? updates.personalInfo.alternatePhone : profile.personalInfo.alternatePhone);
+        profile.personalInfo.occupation = (updates.personalInfo.occupation !== undefined ? updates.personalInfo.occupation : profile.personalInfo.occupation);
         profile.personalInfo.address = (updates.personalInfo.address !== undefined ? updates.personalInfo.address : profile.personalInfo.address);
         profile.personalInfo.city = (updates.personalInfo.city !== undefined ? updates.personalInfo.city : profile.personalInfo.city);
         profile.personalInfo.state = (updates.personalInfo.state !== undefined ? updates.personalInfo.state : profile.personalInfo.state);
         profile.personalInfo.postalCode = (updates.personalInfo.postalCode !== undefined ? updates.personalInfo.postalCode : profile.personalInfo.postalCode);
+        profile.personalInfo.pinCode = (updates.personalInfo.pinCode !== undefined ? updates.personalInfo.pinCode : profile.personalInfo.pinCode);
         profile.personalInfo.preferredLanguage = (updates.personalInfo.preferredLanguage !== undefined ? updates.personalInfo.preferredLanguage : profile.personalInfo.preferredLanguage);
         profile.personalInfo.gender = (updates.personalInfo.gender !== undefined ? updates.personalInfo.gender : profile.personalInfo.gender);
         profile.personalInfo.selfDescribedGender = (updates.personalInfo.selfDescribedGender !== undefined ? updates.personalInfo.selfDescribedGender : profile.personalInfo.selfDescribedGender);
         if (updates.personalInfo.dateOfBirth) {
           profile.personalInfo.dateOfBirth = updates.personalInfo.dateOfBirth;
-          profile.personalInfo.age = calculateAgeFromDob(updates.personalInfo.dateOfBirth) || profile.personalInfo.age;
+          profile.personalInfo.age = calculateAgeFromDob(updates.personalInfo.dateOfBirth) ?? profile.personalInfo.age;
         }
+      }
+
+      if (updates.personalSocialHistory) {
+        profile.personalSocialHistory = {
+          ...profile.personalSocialHistory,
+          ...updates.personalSocialHistory
+        };
+      }
+
+      if (updates.pastMedicalPsychiatricHistory) {
+        profile.pastMedicalPsychiatricHistory = {
+          ...profile.pastMedicalPsychiatricHistory,
+          ...updates.pastMedicalPsychiatricHistory
+        };
+      }
+
+      if (updates.birthDevelopmentalHistory) {
+        profile.birthDevelopmentalHistory = {
+          ...profile.birthDevelopmentalHistory,
+          ...updates.birthDevelopmentalHistory
+        };
       }
 
       if (updates.academicInfo) {
@@ -4171,18 +4474,33 @@ app.put('/api/profiles/:id', requireAuth, async (req, res) => {
           lastReviewedBy: user.email
         };
       }
-      if (updates.personalInfo?.phone) profile.personalInfo.phone = updates.personalInfo.phone;
+      if (updates.personalInfo) {
+        profile.personalInfo = { ...profile.personalInfo, ...updates.personalInfo };
+        if (updates.personalInfo.dateOfBirth) {
+          profile.personalInfo.age = calculateAgeFromDob(updates.personalInfo.dateOfBirth) ?? profile.personalInfo.age;
+        }
+      }
+      if (updates.pastMedicalPsychiatricHistory) profile.pastMedicalPsychiatricHistory = { ...profile.pastMedicalPsychiatricHistory, ...updates.pastMedicalPsychiatricHistory };
+      if (updates.familyHistory) profile.familyHistory = { ...profile.familyHistory, ...updates.familyHistory };
+      if (updates.birthDevelopmentalHistory) profile.birthDevelopmentalHistory = { ...profile.birthDevelopmentalHistory, ...updates.birthDevelopmentalHistory };
+      if (updates.personalSocialHistory) profile.personalSocialHistory = { ...profile.personalSocialHistory, ...updates.personalSocialHistory };
+      if (updates.emergencyContact) profile.emergencyContact = { ...profile.emergencyContact, ...updates.emergencyContact };
       if (updates.academicInfo) profile.academicInfo = { ...profile.academicInfo, ...updates.academicInfo };
     } else {
       // Admin / Super Admin
       if (updates.personalInfo) {
         profile.personalInfo = { ...profile.personalInfo, ...updates.personalInfo };
         if (updates.personalInfo.dateOfBirth) {
-          profile.personalInfo.age = calculateAgeFromDob(updates.personalInfo.dateOfBirth) || profile.personalInfo.age;
+          profile.personalInfo.age = calculateAgeFromDob(updates.personalInfo.dateOfBirth) ?? profile.personalInfo.age;
         }
       }
       if (updates.academicInfo) profile.academicInfo = { ...profile.academicInfo, ...updates.academicInfo };
       if (updates.emergencyContact) profile.emergencyContact = { ...profile.emergencyContact, ...updates.emergencyContact };
+      if (updates.pastMedicalPsychiatricHistory) profile.pastMedicalPsychiatricHistory = { ...profile.pastMedicalPsychiatricHistory, ...updates.pastMedicalPsychiatricHistory };
+      if (updates.familyHistory) profile.familyHistory = { ...profile.familyHistory, ...updates.familyHistory };
+      if (updates.birthDevelopmentalHistory) profile.birthDevelopmentalHistory = { ...profile.birthDevelopmentalHistory, ...updates.birthDevelopmentalHistory };
+      if (updates.personalSocialHistory) profile.personalSocialHistory = { ...profile.personalSocialHistory, ...updates.personalSocialHistory };
+      if (updates.consentAndPrivacy) profile.consentAndPrivacy = { ...profile.consentAndPrivacy, ...updates.consentAndPrivacy };
       if (updates.category) profile.category = updates.category;
       if (updates.clinicalInfo) {
         profile.clinicalInfo = {
