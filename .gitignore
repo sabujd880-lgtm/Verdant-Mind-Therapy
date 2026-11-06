@@ -34,3 +34,9 @@ backups/
 *.sln
 *.sw?
 _backup_debug_phase/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example

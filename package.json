@@ -14,7 +14,8 @@
     "build": "vite build",
     "lint": "oxlint",
     "generate:favicons": "node scripts/generate-favicons.cjs",
-    "preview": "vite preview"
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",
@@ -43,12 +44,14 @@
     "deepmerge": "4.1.2"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.67.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "concurrently": "^10.0.3",
     "nodemon": "^3.1.14",
     "oxlint": "^1.71.0",
     "png-to-ico": "^3.0.2",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "wrangler": "^4.158.0"
   }
 }

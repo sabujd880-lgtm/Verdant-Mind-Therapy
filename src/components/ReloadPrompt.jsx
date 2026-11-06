@@ -123,7 +123,7 @@ function ReloadPrompt() {
           </span>
           <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: '1.4' }}>
             {offlineReady
-              ? 'The psychology portfolio has been cached for offline use. You can access it anytime without internet.'
+              ? 'Verdant Mind has been cached for offline use. You can access it anytime without internet.'
               : 'A new version of the app is available with latest updates and features.'}
           </span>
         </div>
