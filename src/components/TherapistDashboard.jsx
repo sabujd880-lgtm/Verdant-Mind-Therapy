@@ -63,7 +63,15 @@ export default function TherapistDashboard({
   const [composeSuccess, setComposeSuccess] = useState(false);
 
   // Document Center States
-  const [selectedAptIdForDoc, setSelectedAptIdForDoc] = useState(appointments[0]?.id || '');
+  const [selectedAptIdForDoc, setSelectedAptIdForDoc] = useState(appointments[0]?.id || appointments[0]?._id || '');
+  const [docClientSource, setDocClientSource] = useState('auto'); // 'auto' | 'appointment' | 'manual'
+  const [customDocClientName, setCustomDocClientName] = useState('Walk-in Consultation Client');
+  const [customDocClientEmail, setCustomDocClientEmail] = useState('client@example.com');
+  const [customDocClientPhone, setCustomDocClientPhone] = useState('+91 98765 43210');
+  const [customDocAgeGroup, setCustomDocAgeGroup] = useState('Adult (18-64)');
+  const [customDocSessionMode, setCustomDocSessionMode] = useState('In-Person Consultation');
+  const [customDocDate, setCustomDocDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [customDocTime, setCustomDocTime] = useState('11:00 AM');
   const [docType, setDocType] = useState('receipt'); // 'receipt' | 'prescription' | 'report'
   
   // Doc fields: Receipt
@@ -376,8 +384,23 @@ export default function TherapistDashboard({
     setPrescItems(prescItems.filter((_, idx) => idx !== index));
   };
 
-  // Find currently selected appointment object for Document Generation
-  const selectedAptForDoc = appointments.find(a => a._id === selectedAptIdForDoc || a.id === selectedAptIdForDoc) || appointments[0];
+  // Active client object for Document Generation (Guaranteed non-null)
+  const isDocManualMode = docClientSource === 'manual' || appointments.length === 0;
+  const matchedAptForDoc = appointments.find(a => a._id === selectedAptIdForDoc || a.id === selectedAptIdForDoc) || appointments[0];
+  const activeDocClient = (!isDocManualMode && matchedAptForDoc)
+    ? matchedAptForDoc
+    : {
+        _id: 'manual-doc-client',
+        id: 'manual-doc-client',
+        clientName: customDocClientName || 'Walk-in Consultation Client',
+        clientEmail: customDocClientEmail || 'client@example.com',
+        clientPhone: customDocClientPhone || '+91 98765 43210',
+        clientAgeGroup: customDocAgeGroup || 'Adult (18-64)',
+        sessionMode: customDocSessionMode || 'In-Person Consultation',
+        date: customDocDate || new Date().toISOString().split('T')[0],
+        time: customDocTime || '11:00 AM'
+      };
+  const selectedAptForDoc = activeDocClient;
 
   // Document Simulation Trigger
   const handleSendToClientEmail = () => {
@@ -399,13 +422,13 @@ export default function TherapistDashboard({
       setSendingProgress(100);
 
       // Securely store care document for client access
-      if (onAddCareDocument && selectedAptForDoc) {
+      if (onAddCareDocument && activeDocClient) {
         onAddCareDocument({
           id: 'doc-' + Date.now(),
-          clientEmail: selectedAptForDoc.clientEmail,
-          clientName: selectedAptForDoc.clientName,
+          clientEmail: activeDocClient.clientEmail || 'client@example.com',
+          clientName: activeDocClient.clientName || 'Consultation Client',
           type: docType,
-          date: new Date().toISOString().split('T')[0],
+          date: activeDocClient.date || new Date().toISOString().split('T')[0],
           data: docType === 'receipt' ? {
             invoiceNo,
             receiptAmount,
@@ -461,15 +484,15 @@ export default function TherapistDashboard({
     <div className="container dashboard-container">
       
       {/* 1. Header Title Row */}
-      <div className="dashboard-title-row" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid rgba(42, 71, 62, 0.15)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <div className="dashboard-title-row" style={{ marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', width: '100%' }}>
+          <div style={{ width: '42px', height: '42px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid rgba(42, 71, 62, 0.15)', boxShadow: '0 2px 6px rgba(0,0,0,0.06)' }}>
             <img src="/pwa-192x192.png" alt="Verdant Mind Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ margin: 0, fontSize: '1.9rem', color: 'var(--color-slate-dark)' }}>Therapist Control Panel</h2>
-            <p style={{ color: 'var(--color-slate-light)', margin: '0.25rem 0 0', lineHeight: 1.45, fontSize: '0.95rem' }}>
-              Welcome back, Sabuj Das. Manage your schedule, view inbox messages, compile clinical reports, and manage shift hours.
+            <h2 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 700, color: 'var(--color-slate-dark)' }}>Therapist Control Panel</h2>
+            <p style={{ color: 'var(--color-slate-light)', margin: '0.15rem 0 0', lineHeight: 1.35, fontSize: '0.84rem' }}>
+              Sabuj Das • Clinical Practice, EMR & Consultations Management
             </p>
           </div>
         </div>
@@ -1342,23 +1365,113 @@ export default function TherapistDashboard({
               1. Document Composer
             </h3>
 
-            {/* Select Client Dropdown */}
-            <div className="settings-group" style={{ marginBottom: '1rem', width: '100%', boxSizing: 'border-box' }}>
-              <label htmlFor="doc-client" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem' }}>Select Target Consultation Client:</label>
-              <select
-                id="doc-client"
-                value={selectedAptIdForDoc}
-                onChange={(e) => setSelectedAptIdForDoc(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)', outline: 'none' }}
-              >
-                {appointments.length === 0 ? (
-                  <option value="">No clients available</option>
-                ) : (
-                  appointments.map(apt => (
-                    <option key={apt._id || apt.id} value={apt._id || apt.id}>{apt.clientName} ({formatISTDate(apt.date)} @ {formatISTTime(apt.time)})</option>
-                  ))
+            {/* Select Client Dropdown or Walk-in Direct Entry */}
+            <div className="settings-group" style={{ marginBottom: '1.25rem', width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                <label htmlFor="doc-client" style={{ fontSize: '0.85rem', fontWeight: 600, margin: 0 }}>Target Consultation Client:</label>
+                {appointments.length > 0 && (
+                  <div style={{ display: 'inline-flex', background: '#F1F5F9', padding: '2px', borderRadius: '4px', border: '1px solid #E2E8F0' }}>
+                    <button
+                      type="button"
+                      onClick={() => setDocClientSource('appointment')}
+                      style={{
+                        padding: '0.2rem 0.55rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        background: !isDocManualMode ? 'var(--color-primary, #0F383D)' : 'transparent',
+                        color: !isDocManualMode ? '#FFF' : 'var(--color-slate-dark)'
+                      }}
+                    >
+                      Booked ({appointments.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDocClientSource('manual')}
+                      style={{
+                        padding: '0.2rem 0.55rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        background: isDocManualMode ? 'var(--color-primary, #0F383D)' : 'transparent',
+                        color: isDocManualMode ? '#FFF' : 'var(--color-slate-dark)'
+                      }}
+                    >
+                      Walk-in / Direct
+                    </button>
+                  </div>
                 )}
-              </select>
+              </div>
+
+              {!isDocManualMode && appointments.length > 0 ? (
+                <select
+                  id="doc-client"
+                  value={selectedAptIdForDoc || (matchedAptForDoc?._id || matchedAptForDoc?.id || '')}
+                  onChange={(e) => setSelectedAptIdForDoc(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.65rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)', outline: 'none' }}
+                >
+                  {appointments.map(apt => (
+                    <option key={apt._id || apt.id} value={apt._id || apt.id}>{apt.clientName} ({formatISTDate(apt.date)} @ {formatISTTime(apt.time)})</option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', background: '#F8FAFC', padding: '0.85rem', borderRadius: 'var(--radius-sm)', border: '1px solid #E2E8F0', boxSizing: 'border-box', width: '100%' }}>
+                  {appointments.length === 0 && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-slate)', fontStyle: 'italic' }}>
+                      No calendar appointments found. Enter consultation client details directly:
+                    </div>
+                  )}
+                  <div className="doc-form-row-2col">
+                    <div style={{ minWidth: 0 }}>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-slate-dark)', display: 'block', marginBottom: '0.2rem' }}>Client Full Name</label>
+                      <input 
+                        type="text" 
+                        value={customDocClientName}
+                        onChange={e => setCustomDocClientName(e.target.value)}
+                        placeholder="e.g. John Doe / Walk-in Client"
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', background: '#FFF' }}
+                      />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-slate-dark)', display: 'block', marginBottom: '0.2rem' }}>Contact Email</label>
+                      <input 
+                        type="email" 
+                        value={customDocClientEmail}
+                        onChange={e => setCustomDocClientEmail(e.target.value)}
+                        placeholder="client@example.com"
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', background: '#FFF' }}
+                      />
+                    </div>
+                  </div>
+                  <div className="doc-form-row-2col">
+                    <div style={{ minWidth: 0 }}>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-slate-dark)', display: 'block', marginBottom: '0.2rem' }}>Session Mode</label>
+                      <select 
+                        value={customDocSessionMode}
+                        onChange={e => setCustomDocSessionMode(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.55rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', background: '#FFF' }}
+                      >
+                        <option value="In-Person Consultation">In-Person Consultation</option>
+                        <option value="Online Video Consultation">Online Video Consultation</option>
+                        <option value="Tele-Counselling">Tele-Counselling</option>
+                      </select>
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--color-slate-dark)', display: 'block', marginBottom: '0.2rem' }}>Consultation Date</label>
+                      <input 
+                        type="date" 
+                        value={customDocDate}
+                        onChange={e => setCustomDocDate(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', minWidth: 0, padding: '0.5rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', background: '#FFF' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Document Type Selector */}
@@ -1482,7 +1595,7 @@ export default function TherapistDashboard({
                     <strong style={{ color: receiptVerified ? 'var(--color-confirmed)' : 'var(--color-terracotta)', display: 'block', marginBottom: '0.15rem' }}>
                       {receiptVerified ? '✓ Details Verified' : '⚠️ Verification Required'}
                     </strong>
-                    I confirm that the invoice details, including the charged amount of <strong>₹{receiptAmount}</strong>, are correct for <strong>{selectedAptForDoc ? selectedAptForDoc.clientName : 'the client'}</strong>.
+                    I confirm that the invoice details, including the charged amount of <strong>₹{receiptAmount}</strong>, are correct for <strong>{activeDocClient.clientName}</strong>.
                   </label>
                 </div>
               </div>
@@ -1677,11 +1790,11 @@ export default function TherapistDashboard({
                 style={{ 
                   padding: '0.7rem 0.5rem', 
                   fontSize: '0.85rem',
-                  opacity: (!selectedAptForDoc || (docType === 'receipt' && !receiptVerified)) ? 0.5 : 1,
-                  cursor: (!selectedAptForDoc || (docType === 'receipt' && !receiptVerified)) ? 'not-allowed' : 'pointer'
+                  opacity: (docType === 'receipt' && !receiptVerified) ? 0.5 : 1,
+                  cursor: (docType === 'receipt' && !receiptVerified) ? 'not-allowed' : 'pointer'
                 }}
                 onClick={handleSendToClientEmail}
-                disabled={!selectedAptForDoc || (docType === 'receipt' && !receiptVerified)}
+                disabled={docType === 'receipt' && !receiptVerified}
               >
                 <Mail size={14} style={{ marginRight: '0.35rem' }} /> Send to Client
               </button>
@@ -2028,7 +2141,13 @@ export default function TherapistDashboard({
 
       {/* Student / Patient Profiles Directory */}
       {activeTab === 'profiles' && (
-        <PatientProfileManager currentUser={currentUser} mode="directory" />
+        <PatientProfileManager 
+          currentUser={currentUser} 
+          mode="directory" 
+          onOpenClinicalRecord={(profile) => {
+            setActiveTab('clinical-records');
+          }}
+        />
       )}
 
       {/* Clinical Records: Case History & Mental Status Examination */}
@@ -2120,6 +2239,7 @@ export default function TherapistDashboard({
                 title="Open Document Center with this client pre-selected"
                 onClick={() => {
                   setSelectedAptIdForDoc(selectedApt._id || selectedApt.id);
+                  setDocClientSource('appointment');
                   setActiveTab('documents');
                   setSelectedApt(null);
                 }}

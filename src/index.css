@@ -1248,13 +1248,14 @@ button {
   display: flex;
   align-items: center;
   width: 100%;
-  margin-bottom: 2rem;
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(8px);
+  margin-bottom: 1.5rem;
+  background: #FFFFFF;
   border-radius: var(--radius-sm);
   padding: 0.25rem 0.35rem;
-  border: 1px solid rgba(42, 71, 62, 0.08);
+  border: 1px solid rgba(42, 71, 62, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   box-sizing: border-box;
+  z-index: 5;
 }
 
 .dashboard-tabs {
@@ -1369,8 +1370,28 @@ button {
 
 .doc-form-row-2col > div {
   min-width: 0;
+  width: 100%;
   overflow: hidden;
   box-sizing: border-box;
+}
+
+.doc-form-row-2col input,
+.doc-form-row-2col select,
+.doc-form-row-2col textarea {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Remove spin-button overflow on number inputs in Chrome/Edge/Firefox */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 @media (max-width: 480px) {
@@ -1401,11 +1422,12 @@ button {
 .tab-btn.active::after {
   content: '';
   position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
+  bottom: 0;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 3px;
   background-color: var(--color-terracotta);
+  border-radius: 3px 3px 0 0;
 }
 
 /* Appointments Table & Manager */
@@ -2699,6 +2721,183 @@ button {
 .client-tabs-nav-wrapper::-webkit-scrollbar-thumb {
   background: rgba(42, 71, 62, 0.2);
   border-radius: 3px;
+}
+
+/* =========================================================================
+   CLEAN HEALTHCARE APPLICATION DESIGN SYSTEM & CLINICAL HISTORY
+   ========================================================================= */
+
+/* Two-Column Dashboard Layout */
+.dashboard-two-column-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 968px) {
+  .dashboard-two-column-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}
+
+/* Collapsible Clinical History Architecture */
+.clinical-history-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.clinical-history-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.clinical-history-section {
+  border: 1px solid var(--color-slate-10);
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.clinical-history-section:hover {
+  border-color: rgba(15, 56, 61, 0.2);
+}
+
+.clinical-history-header {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: #FAFCFB;
+  border: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.clinical-history-header:hover {
+  background: #F2F8F6;
+}
+
+.clinical-history-header.open {
+  background: #EBF5F2;
+  border-bottom: 1px solid rgba(15, 56, 61, 0.08);
+}
+
+.clinical-history-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.clinical-history-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-slate-dark);
+}
+
+.clinical-history-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.clinical-history-body {
+  padding: 1.15rem 1.25rem;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+@media (max-width: 480px) {
+  .clinical-history-header {
+    padding: 0.65rem 0.75rem;
+  }
+  .clinical-history-title {
+    font-size: 0.82rem;
+  }
+  .clinical-history-body {
+    padding: 0.85rem 0.75rem;
+    gap: 0.65rem;
+  }
+}
+
+/* Urgent Clinical Risk Alert Banner */
+.urgent-clinical-alert-banner {
+  margin: 0 0 1.25rem 0;
+  padding: 0.85rem 1rem;
+  background: #FFF5F5;
+  border: 1.5px solid #FCA5A5;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08);
+}
+
+/* Patient Action Buttons */
+.patient-action-btn {
+  padding: 0.35rem 0.65rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border: 1px solid var(--color-slate-20);
+  background: var(--color-slate-05);
+  color: var(--color-slate-dark);
+  transition: all 0.15s ease;
+}
+
+.patient-action-btn:hover {
+  background: var(--color-slate-10);
+  border-color: var(--color-slate);
+}
+
+.patient-action-btn.record {
+  background: #F0FDF4;
+  border-color: #BBF7D0;
+  color: #166534;
+}
+
+.patient-action-btn.record:hover {
+  background: #DCFCE7;
+  border-color: #86EFAC;
+}
+
+.patient-action-btn.edit {
+  background: #F8FAFC;
+  border-color: #E2E8F0;
+  color: var(--color-slate-dark);
+}
+
+.patient-action-btn.edit:hover {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
 }
 
 /* =========================================================================

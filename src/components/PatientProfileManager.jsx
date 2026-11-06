@@ -3,7 +3,8 @@ import {
   Users, User, Search, Filter, Plus, Eye, Edit3, Shield, CheckCircle2, 
   AlertCircle, Clock, HeartHandshake, ChevronLeft, ChevronRight, Lock, 
   Save, X, RefreshCw, FilePlus, ChevronDown, ChevronUp, Calendar, 
-  Phone, Mail, MapPin, Activity, Baby, BookOpen, FileText, Check, AlertTriangle
+  Phone, Mail, MapPin, Activity, Baby, BookOpen, FileText, Check, AlertTriangle,
+  Brain, HeartPulse, FileCheck
 } from 'lucide-react';
 import { formatISTDate } from '../utils/dateTime.js';
 import { safeJson, getResponseError } from '../utils/api.js';
@@ -150,7 +151,7 @@ const getBlankFormData = (userEmail = '') => ({
   }
 });
 
-export default function PatientProfileManager({ currentUser, mode = 'directory', onProfileSelect }) {
+export default function PatientProfileManager({ currentUser, mode = 'directory', onProfileSelect, onOpenClinicalRecord }) {
   const isClientUser = currentUser?.role === 'client';
   const isAdmin = currentUser && ['Super Admin', 'Administrator', 'provider'].includes(currentUser.role);
   const isClinician = currentUser && ['Counsellor', 'Super Admin', 'Administrator', 'provider'].includes(currentUser.role);
@@ -176,6 +177,115 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
   const [profileAppointments, setProfileAppointments] = useState([]);
   const [profileClinicalRecords, setProfileClinicalRecords] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Accordion State for Profile Viewing (Collapsible Clinical History)
+  const [viewAccordionOpen, setViewAccordionOpen] = useState({
+    personal: true,
+    emergency: false,
+    medical: false,
+    psychiatric: false,
+    family: false,
+    developmental: false,
+    social: false,
+    clinical: false,
+    consent: false
+  });
+
+  const toggleViewSection = (sectionKey) => {
+    setViewAccordionOpen(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
+
+  const toggleAllViewAccordions = (open) => {
+    setViewAccordionOpen({
+      personal: open,
+      emergency: open,
+      medical: open,
+      psychiatric: open,
+      family: open,
+      developmental: open,
+      social: open,
+      clinical: open,
+      consent: open
+    });
+  };
+
+  // Helper: Format clinical text distinguishing None Reported, Not Known, and Not Assessed
+  const formatClinicalValue = (val, type = 'not_assessed') => {
+    if (val === undefined || val === null || val === '' || val === '—') {
+      if (type === 'none_reported') {
+        return <span style={{ color: 'var(--color-slate-light)', fontStyle: 'italic' }}>None reported</span>;
+      }
+      if (type === 'not_known') {
+        return <span style={{ color: '#B45309', fontStyle: 'italic' }}>Not known</span>;
+      }
+      return <span style={{ color: 'var(--color-slate-light)', fontStyle: 'italic' }}>Not assessed</span>;
+    }
+    const lower = String(val).trim().toLowerCase();
+    if (lower === 'none reported' || lower === 'none' || lower === 'no') {
+      return <span style={{ color: 'var(--color-slate-light)', fontStyle: 'italic' }}>None reported</span>;
+    }
+    if (lower === 'not known' || lower === 'unknown') {
+      return <span style={{ color: '#B45309', fontStyle: 'italic' }}>Not known</span>;
+    }
+    if (lower === 'not assessed' || lower === 'pending assessment') {
+      return <span style={{ color: 'var(--color-slate-light)', fontStyle: 'italic' }}>Not assessed</span>;
+    }
+    return <span>{val}</span>;
+  };
+
+  // Helper: Format section status badge
+  const getSectionStatusBadge = (statusType) => {
+    switch (statusType) {
+      case 'complete':
+      case 'reported':
+        return (
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.12rem 0.5rem', borderRadius: '10px', background: '#E8F5E9', color: '#2E7D32', border: '1px solid #C8E6C9' }}>
+            Documented
+          </span>
+        );
+      case 'none_reported':
+        return (
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.12rem 0.5rem', borderRadius: '10px', background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0' }}>
+            None Reported
+          </span>
+        );
+      case 'not_known':
+        return (
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.12rem 0.5rem', borderRadius: '10px', background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}>
+            Not Known
+          </span>
+        );
+      case 'not_applicable':
+        return (
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.12rem 0.5rem', borderRadius: '10px', background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}>
+            Not Applicable
+          </span>
+        );
+      default:
+        return (
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.12rem 0.5rem', borderRadius: '10px', background: '#F3F4F6', color: '#6B7280', border: '1px solid #E5E7EB' }}>
+            Not Assessed
+          </span>
+        );
+    }
+  };
+
+  // Helper: Urgent Clinical Risk / Medical Alert Evaluator (never collapsed)
+  const getUrgentAlerts = (profile) => {
+    if (!profile) return null;
+    const allergies = profile.pastMedicalPsychiatricHistory?.knownAllergies;
+    const hasAllergies = allergies && !['none', 'none reported', 'not known', 'not assessed', '', '—'].includes(allergies.trim().toLowerCase());
+    
+    const concerns = (profile.clinicalInfo?.presentingConcerns || '').toLowerCase();
+    const careStatus = profile.clinicalInfo?.currentCareStatus;
+    const isHighRisk = careStatus === 'Crisis' || careStatus === 'High Risk' || /suicid|self-harm|intent to harm|crisis|psychosis|emergency/i.test(concerns);
+
+    if (!hasAllergies && !isHighRisk) return null;
+    return { hasAllergies, allergies, isHighRisk, careStatus };
+  };
 
   // Edit / Create Modal State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -745,6 +855,432 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
     ? calculateAgeClient(editFormData.personalInfo.dateOfBirth) 
     : { age: null, isFuture: false };
 
+  // Helper: Render the 9 Collapsible Clinical History Sections with strict role privacy
+  const renderCollapsibleClinicalHistory = (profile, isClinicianView) => {
+    if (!profile) return null;
+
+    const medStatus = profile.pastMedicalPsychiatricHistory?.assessmentStatus || 'Not assessed';
+    const famStatus = (profile.familyHistory?.familyMedicalHistory || profile.familyHistory?.familyPsychiatricHistory) ? 'reported' : 'none_reported';
+    const devStatus = profile.birthDevelopmentalHistory?.status === 'Not Applicable' ? 'not_applicable' : (profile.birthDevelopmentalHistory?.developmentalMilestones ? 'complete' : 'not_assessed');
+    const socStatus = profile.personalSocialHistory?.educationalBackground || profile.personalSocialHistory?.employmentStatus ? 'complete' : 'not_assessed';
+    const clinStatus = profile.clinicalInfo?.presentingConcerns ? 'complete' : 'not_assessed';
+    const consentStatus = profile.consentAndPrivacy?.patientConsentStatus === 'Granted' ? 'complete' : 'not_assessed';
+
+    return (
+      <div className="clinical-history-container">
+        {/* Controls Row */}
+        <div className="clinical-history-controls">
+          <div style={{ fontSize: '0.82rem', color: 'var(--color-slate-light)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <FileText size={15} />
+            <span>Structured Clinical History • 9 Healthcare Domains</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <button
+              type="button"
+              onClick={() => toggleAllViewAccordions(true)}
+              style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', border: '1px solid var(--color-slate-20)', background: '#FFF', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Expand All
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleAllViewAccordions(false)}
+              style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', border: '1px solid var(--color-slate-20)', background: '#FFF', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Collapse All
+            </button>
+          </div>
+        </div>
+
+        {/* 1. Personal Information */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.personal ? 'open' : ''}`}
+            onClick={() => toggleViewSection('personal')}
+          >
+            <div className="clinical-history-title-group">
+              <User size={16} style={{ color: 'var(--color-primary)' }} />
+              <span className="clinical-history-title">1. Personal Information & Demographics</span>
+              {getSectionStatusBadge(profile.personalInfo?.fullName ? 'complete' : 'not_assessed')}
+            </div>
+            {viewAccordionOpen.personal ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.personal && (
+            <div className="clinical-history-body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Full Legal Name</span><strong>{profile.personalInfo?.fullName || '—'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Email Address</span><strong>{profile.personalInfo?.email || '—'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Mobile Number</span><strong>{formatClinicalValue(profile.personalInfo?.phone)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Alternate Mobile</span><strong>{formatClinicalValue(profile.personalInfo?.alternatePhone)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Date of Birth</span><strong>{formatClinicalValue(profile.personalInfo?.dateOfBirth)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Calculated Age</span><strong>{profile.personalInfo?.age ? `${profile.personalInfo.age} yrs` : formatClinicalValue('')}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Gender Identity</span><strong>{formatClinicalValue(profile.personalInfo?.gender)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Occupation</span><strong>{formatClinicalValue(profile.personalInfo?.occupation)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Preferred Language</span><strong>{profile.personalInfo?.preferredLanguage || 'English'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Category</span><strong>{profile.category || 'General Patient'}</strong></div>
+                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Residential Address</span><strong>{[profile.personalInfo?.address, profile.personalInfo?.city, profile.personalInfo?.state, profile.personalInfo?.pinCode || profile.personalInfo?.postalCode].filter(Boolean).join(', ') || 'Not specified'}</strong></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Emergency Contact */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.emergency ? 'open' : ''}`}
+            onClick={() => toggleViewSection('emergency')}
+          >
+            <div className="clinical-history-title-group">
+              <Phone size={16} style={{ color: 'var(--color-primary)' }} />
+              <span className="clinical-history-title">2. Emergency Contact Information</span>
+              {getSectionStatusBadge(profile.emergencyContact?.contactPersonName ? 'complete' : 'not_assessed')}
+            </div>
+            {viewAccordionOpen.emergency ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.emergency && (
+            <div className="clinical-history-body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Contact Person Name</span><strong>{formatClinicalValue(profile.emergencyContact?.contactPersonName || profile.emergencyContact?.name)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Relationship</span><strong>{formatClinicalValue(profile.emergencyContact?.relationship)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Primary Mobile</span><strong>{formatClinicalValue(profile.emergencyContact?.phone)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Alternate Mobile</span><strong>{formatClinicalValue(profile.emergencyContact?.altPhone)}</strong></div>
+                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Address</span><strong>{formatClinicalValue(profile.emergencyContact?.address)}</strong></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 3. Medical History & Known Allergies */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.medical ? 'open' : ''}`}
+            onClick={() => toggleViewSection('medical')}
+          >
+            <div className="clinical-history-title-group">
+              <Activity size={16} style={{ color: '#0284C7' }} />
+              <span className="clinical-history-title">3. Medical History & Allergies</span>
+              {getSectionStatusBadge(medStatus === 'Reported' ? 'reported' : medStatus === 'None reported' ? 'none_reported' : medStatus === 'Not known' ? 'not_known' : 'not_assessed')}
+            </div>
+            {viewAccordionOpen.medical ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.medical && (
+            <div className="clinical-history-body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Assessment Status</span>
+                  <strong>{formatClinicalValue(profile.pastMedicalPsychiatricHistory?.assessmentStatus)}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Known Allergies</span>
+                  {profile.pastMedicalPsychiatricHistory?.knownAllergies && !['none', 'none reported', 'not known', 'not assessed', '', '—'].includes(profile.pastMedicalPsychiatricHistory.knownAllergies.trim().toLowerCase()) ? (
+                    <span style={{ background: '#FEE2E2', color: '#991B1B', padding: '0.2rem 0.55rem', borderRadius: '4px', fontWeight: 700, fontSize: '0.82rem', display: 'inline-block' }}>
+                      ⚠️ {profile.pastMedicalPsychiatricHistory.knownAllergies}
+                    </span>
+                  ) : (
+                    <strong>{formatClinicalValue(profile.pastMedicalPsychiatricHistory?.knownAllergies, 'none_reported')}</strong>
+                  )}
+                </div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Current Medications</span><strong>{formatClinicalValue(profile.pastMedicalPsychiatricHistory?.currentMedications, 'none_reported')}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Previous Medications</span><strong>{formatClinicalValue(profile.pastMedicalPsychiatricHistory?.previousMedications, 'none_reported')}</strong></div>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Previous Medical Illnesses</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.pastMedicalPsychiatricHistory?.previousMedicalIllnesses, 'none_reported')}
+                </p>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Previous Surgeries & Hospitalisation</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.pastMedicalPsychiatricHistory?.previousHospitalisation || profile.pastMedicalPsychiatricHistory?.previousSurgeries, 'none_reported')}
+                </p>
+              </div>
+              {profile.pastMedicalPsychiatricHistory?.relevantMedicalNotes && (
+                <div>
+                  <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Relevant Medical Notes</span>
+                  <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                    {profile.pastMedicalPsychiatricHistory.relevantMedicalNotes}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 4. Psychiatric & Mental Health History */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.psychiatric ? 'open' : ''}`}
+            onClick={() => toggleViewSection('psychiatric')}
+          >
+            <div className="clinical-history-title-group">
+              <Brain size={16} style={{ color: '#7C3AED' }} />
+              <span className="clinical-history-title">4. Psychiatric & Mental Health History</span>
+              {getSectionStatusBadge(profile.pastMedicalPsychiatricHistory?.previousPsychiatricHistory || profile.pastMedicalPsychiatricHistory?.previousPsychologicalCounselling ? 'reported' : 'none_reported')}
+            </div>
+            {viewAccordionOpen.psychiatric ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.psychiatric && (
+            <div className="clinical-history-body">
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Previous Psychiatric / Mental Health History</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.pastMedicalPsychiatricHistory?.previousPsychiatricHistory, 'none_reported')}
+                </p>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Previous Psychological Counselling & Therapy</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.pastMedicalPsychiatricHistory?.previousPsychologicalCounselling, 'none_reported')}
+                </p>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Previous Psychiatric Consultations & Treatments</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.pastMedicalPsychiatricHistory?.previousPsychiatricConsultation || profile.pastMedicalPsychiatricHistory?.previousTreatments, 'none_reported')}
+                </p>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Substance Use History</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.pastMedicalPsychiatricHistory?.substanceUseHistory, 'none_reported')}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 5. Family History */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.family ? 'open' : ''}`}
+            onClick={() => toggleViewSection('family')}
+          >
+            <div className="clinical-history-title-group">
+              <Users size={16} style={{ color: '#059669' }} />
+              <span className="clinical-history-title">5. Family Medical & Psychiatric History</span>
+              {getSectionStatusBadge(famStatus)}
+            </div>
+            {viewAccordionOpen.family ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.family && (
+            <div className="clinical-history-body">
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Family Medical History</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.familyHistory?.familyMedicalHistory, 'none_reported')}
+                </p>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Family Psychiatric & Mood History</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.familyHistory?.familyPsychiatricHistory, 'none_reported')}
+                </p>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Hereditary & Genetic Conditions</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.familyHistory?.hereditaryConditions, 'none_reported')}
+                </p>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Family Structure & Support System</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue([profile.familyHistory?.familyStructure, profile.familyHistory?.familySupportSystem].filter(Boolean).join(' • '))}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 6. Birth & Developmental History */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.developmental ? 'open' : ''}`}
+            onClick={() => toggleViewSection('developmental')}
+          >
+            <div className="clinical-history-title-group">
+              <Baby size={16} style={{ color: '#D97706' }} />
+              <span className="clinical-history-title">6. Birth & Developmental History</span>
+              {getSectionStatusBadge(devStatus)}
+            </div>
+            {viewAccordionOpen.developmental ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.developmental && (
+            <div className="clinical-history-body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Section Status</span><strong>{profile.birthDevelopmentalHistory?.status || 'Not Applicable'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Birth Type</span><strong>{formatClinicalValue(profile.birthDevelopmentalHistory?.birthType)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Premature Birth</span><strong>{formatClinicalValue(profile.birthDevelopmentalHistory?.prematureBirth)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Gestational Age</span><strong>{formatClinicalValue(profile.birthDevelopmentalHistory?.gestationalAge)}</strong></div>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Developmental Milestones</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.birthDevelopmentalHistory?.developmentalMilestones)}
+                </p>
+              </div>
+              <div>
+                <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Childhood Concerns & Additional Notes</span>
+                <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                  {formatClinicalValue(profile.birthDevelopmentalHistory?.childhoodDevelopmentalConcerns || profile.birthDevelopmentalHistory?.relevantAdditionalNotes)}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 7. Personal & Social History */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.social ? 'open' : ''}`}
+            onClick={() => toggleViewSection('social')}
+          >
+            <div className="clinical-history-title-group">
+              <BookOpen size={16} style={{ color: '#0D9488' }} />
+              <span className="clinical-history-title">7. Personal & Social History</span>
+              {getSectionStatusBadge(socStatus)}
+            </div>
+            {viewAccordionOpen.social ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.social && (
+            <div className="clinical-history-body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Educational Background</span><strong>{formatClinicalValue(profile.personalSocialHistory?.educationalBackground)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Employment Status</span><strong>{formatClinicalValue(profile.personalSocialHistory?.employmentStatus)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Marital Status</span><strong>{formatClinicalValue(profile.personalSocialHistory?.maritalStatus)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Living Arrangements</span><strong>{formatClinicalValue(profile.personalSocialHistory?.livingArrangements)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Sleep Pattern</span><strong>{formatClinicalValue(profile.personalSocialHistory?.sleepPattern)}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Appetite & Nutrition</span><strong>{formatClinicalValue(profile.personalSocialHistory?.appetite)}</strong></div>
+                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Social Support Network</span><strong>{formatClinicalValue(profile.personalSocialHistory?.socialSupport)}</strong></div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Lifestyle & Personal History</span>
+                  <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                    {formatClinicalValue(profile.personalSocialHistory?.lifestyleInformation || profile.personalSocialHistory?.relevantPersonalHistory)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 8. Current Clinical Information (Provider-Only Protected) */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.clinical ? 'open' : ''}`}
+            onClick={() => toggleViewSection('clinical')}
+          >
+            <div className="clinical-history-title-group">
+              <FileText size={16} style={{ color: 'var(--color-primary)' }} />
+              <span className="clinical-history-title">8. Current Clinical Information</span>
+              {isClinicianView ? getSectionStatusBadge(clinStatus) : (
+                <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.12rem 0.5rem', borderRadius: '10px', background: '#FEF3C7', color: '#92400E' }}>
+                  Provider Protected
+                </span>
+              )}
+            </div>
+            {viewAccordionOpen.clinical ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.clinical && (
+            <div className="clinical-history-body">
+              {!isClinicianView ? (
+                <div style={{ background: '#FFFBEB', padding: '0.85rem', borderRadius: '4px', border: '1px solid #FDE68A', color: '#92400E', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Lock size={16} /> Restricted Provider Clinical Information • Confidential notes restricted to authorized mental health clinicians.
+                </div>
+              ) : (
+                <>
+                  <div style={{ background: '#F0F9FF', padding: '0.65rem 0.85rem', borderRadius: '4px', border: '1px solid #BAE6FD', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0369A1', fontSize: '0.8rem' }}>
+                    <Lock size={14} /> <strong>Confidential Clinical Notes</strong> (Restricted to Authorized Mental Health Practitioners)
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Presenting Intake Concerns</span>
+                    <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                      {formatClinicalValue(profile.clinicalInfo?.presentingConcerns)}
+                    </p>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Duration of Concerns</span>
+                      <strong>{formatClinicalValue(profile.clinicalInfo?.durationOfConcerns)}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Onset and Course</span>
+                      <strong>{formatClinicalValue(profile.clinicalInfo?.onsetAndCourse)}</strong>
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Relevant Clinical Observations</span>
+                    <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                      {formatClinicalValue(profile.clinicalInfo?.relevantClinicalObservations)}
+                    </p>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Initial Clinical Impression</span>
+                    <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                      {formatClinicalValue(profile.clinicalInfo?.initialClinicalImpression)}
+                    </p>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block', marginBottom: '0.2rem' }}>Follow-up & Therapeutic Recommendations</span>
+                    <p style={{ margin: 0, background: 'var(--color-slate-05)', padding: '0.55rem 0.75rem', borderRadius: '4px', fontSize: '0.85rem' }}>
+                      {formatClinicalValue(profile.clinicalInfo?.followUpRecommendations || 'Standard ongoing counselling protocol.')}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 9. Consent & Documentation */}
+        <div className="clinical-history-section">
+          <button
+            type="button"
+            className={`clinical-history-header ${viewAccordionOpen.consent ? 'open' : ''}`}
+            onClick={() => toggleViewSection('consent')}
+          >
+            <div className="clinical-history-title-group">
+              <FileCheck size={16} style={{ color: '#059669' }} />
+              <span className="clinical-history-title">9. Consent & Documentation</span>
+              {getSectionStatusBadge(consentStatus)}
+            </div>
+            {viewAccordionOpen.consent ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {viewAccordionOpen.consent && (
+            <div className="clinical-history-body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', fontSize: '0.85rem' }}>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Patient Consent Status</span><strong>{profile.consentAndPrivacy?.patientConsentStatus || 'Pending'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Privacy Notice Acknowledged</span><strong>{profile.consentAndPrivacy?.privacyNoticeAcknowledged ? 'Yes' : 'No'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Counselling Consent Granted</span><strong>{profile.consentAndPrivacy?.counsellingConsent ? 'Yes' : 'No'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Assessment Consent Granted</span><strong>{profile.consentAndPrivacy?.assessmentConsent ? 'Yes' : 'No'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Audio Recording Consent</span><strong>{profile.consentAndPrivacy?.audioRecordingConsent ? 'Yes (Opted In)' : 'No (Default Off)'}</strong></div>
+                <div><span style={{ color: 'var(--color-slate-light)', fontSize: '0.74rem', display: 'block' }}>Consent Timestamp</span><strong>{formatISTDate(profile.consentAndPrivacy?.consentTimestamp)}</strong></div>
+              </div>
+              {profile.consentAndPrivacy?.guardianDetails?.hasGuardian && (
+                <div style={{ background: 'var(--color-slate-05)', padding: '0.65rem 0.85rem', borderRadius: '4px', fontSize: '0.82rem' }}>
+                  <strong>Guardian Details:</strong> {profile.consentAndPrivacy.guardianDetails.guardianName} ({profile.consentAndPrivacy.guardianDetails.guardianRelationship}) • {profile.consentAndPrivacy.guardianDetails.guardianPhone}
+                </div>
+              )}
+              {profile.consentAndPrivacy?.consentWithdrawn && (
+                <div style={{ color: '#C62828', background: '#FEE2E2', padding: '0.5rem 0.75rem', borderRadius: '4px', fontSize: '0.82rem' }}>
+                  <strong>Consent Status:</strong> Withdrawn ({profile.consentAndPrivacy.withdrawnReason})
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="patient-profile-manager" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
@@ -814,38 +1350,66 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
             </div>
           </div>
 
+          {/* Urgent Clinical & Medical Alerts - Never hidden or collapsed */}
+          {(() => {
+            const alerts = getUrgentAlerts(selectedProfile);
+            if (!alerts) return null;
+            return (
+              <div className="urgent-clinical-alert-banner">
+                <AlertTriangle size={20} style={{ color: '#DC2626', flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ flex: 1, minWidth: 0, fontSize: '0.84rem' }}>
+                  <div style={{ fontWeight: 700, color: '#991B1B', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span>CLINICAL HEALTH & ALLERGY ALERT</span>
+                    <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.45rem', borderRadius: '4px', background: '#DC2626', color: '#FFF', fontWeight: 600 }}>
+                      RECORDED ON FILE
+                    </span>
+                  </div>
+                  <div style={{ color: '#7F1D1D', marginTop: '0.35rem', lineHeight: 1.45 }}>
+                    {alerts.hasAllergies && (
+                      <div><strong>Documented Allergies:</strong> {alerts.allergies}</div>
+                    )}
+                    {alerts.isHighRisk && (
+                      <div><strong>Active Clinical Attention:</strong> Clinical care status is flagged for priority monitoring ({alerts.careStatus || 'Priority Review'}).</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Sub Navigation Tabs */}
-          <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-slate-20)', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--color-slate-20)', paddingBottom: '0.5rem', overflowX: 'auto', alignItems: 'center' }}>
             {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'personal', label: 'Personal Information' },
-              { id: 'emergency', label: 'Emergency Contact' },
-              { id: 'medical', label: 'Medical History' },
-              { id: 'social', label: 'Personal & Social' },
-              { id: 'appointments', label: 'Consultations' },
+              { id: 'overview', label: 'Overview & Summary' },
+              { id: 'clinical_history', label: 'Collapsible Clinical History (9 Domains)' },
+              { id: 'appointments', label: `Consultations (${profileAppointments.length})` },
               { id: 'consent', label: 'Consent & Privacy' },
               ...(selectedProfile.academicInfo?.department || selectedProfile.academicInfo?.registrationNumber 
                 ? [{ id: 'academic', label: 'Academic (Historical)' }] 
                 : [])
-            ].map(tab => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveProfileTab(tab.id)}
-                style={{
-                  padding: '0.45rem 1rem',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: activeProfileTab === tab.id ? 'var(--color-primary, #0F383D)' : 'transparent',
-                  color: activeProfileTab === tab.id ? '#FFF' : 'var(--color-slate-dark)'
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+            ].map(tab => {
+              const isActive = activeProfileTab === tab.id || (tab.id === 'clinical_history' && ['personal', 'emergency', 'medical', 'family', 'developmental', 'social'].includes(activeProfileTab));
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveProfileTab(tab.id)}
+                  style={{
+                    padding: '0.45rem 1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    borderRadius: 'var(--radius-sm)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: isActive ? 'var(--color-primary, #0F383D)' : 'transparent',
+                    color: isActive ? '#FFF' : 'var(--color-slate-dark)',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Tab Content Display */}
@@ -878,73 +1442,23 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                 <p style={{ margin: '0.25rem 0', fontSize: '0.85rem' }}><strong>Relationship:</strong> {selectedProfile.emergencyContact?.relationship || '—'}</p>
                 <p style={{ margin: '0.25rem 0', fontSize: '0.85rem' }}><strong>Mobile:</strong> {selectedProfile.emergencyContact?.phone || '—'}</p>
               </div>
-            </div>
-          )}
 
-          {activeProfileTab === 'personal' && (
-            <div className="card" style={{ padding: '1.5rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)' }}>
-              <h3 style={{ fontSize: '1.05rem', margin: '0 0 1rem 0' }}>Section A — Personal Information</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.88rem' }}>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Full Name</span><strong>{selectedProfile.personalInfo?.fullName}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Email Address</span><strong>{selectedProfile.personalInfo?.email}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Mobile Number</span><strong>{selectedProfile.personalInfo?.phone || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Alternate Mobile</span><strong>{selectedProfile.personalInfo?.alternatePhone || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Date of Birth</span><strong>{selectedProfile.personalInfo?.dateOfBirth || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Age</span><strong>{selectedProfile.personalInfo?.age !== undefined && selectedProfile.personalInfo?.age !== null ? `${selectedProfile.personalInfo.age} years` : '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Gender</span><strong>{selectedProfile.personalInfo?.gender || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Occupation</span><strong>{selectedProfile.personalInfo?.occupation || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Preferred Language</span><strong>{selectedProfile.personalInfo?.preferredLanguage || 'English'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Profile Category</span><strong>{selectedProfile.category || 'General Patient'}</strong></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Residential Address</span><strong>{[selectedProfile.personalInfo?.address, selectedProfile.personalInfo?.city, selectedProfile.personalInfo?.state, selectedProfile.personalInfo?.pinCode || selectedProfile.personalInfo?.postalCode].filter(Boolean).join(', ') || 'Not specified'}</strong></div>
+              <div style={{ gridColumn: '1 / -1', marginTop: '0.25rem' }}>
+                <button
+                  type="button"
+                  className="premium-btn-outline"
+                  onClick={() => setActiveProfileTab('clinical_history')}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem 1rem' }}
+                >
+                  <FileText size={15} /> View Full Collapsible Clinical History (9 Domains) →
+                </button>
               </div>
             </div>
           )}
 
-          {activeProfileTab === 'emergency' && (
-            <div className="card" style={{ padding: '1.5rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)' }}>
-              <h3 style={{ fontSize: '1.05rem', margin: '0 0 0.5rem 0' }}>Section B — Emergency Contact Information</h3>
-              <p style={{ fontSize: '0.82rem', color: 'var(--color-slate)', margin: '0 0 1.25rem 0' }}>
-                Emergency contacts are contacted exclusively in acute clinical or safety emergencies.
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.88rem' }}>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Contact Person Name</span><strong>{selectedProfile.emergencyContact?.contactPersonName || selectedProfile.emergencyContact?.name || 'Not provided'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Relationship</span><strong>{selectedProfile.emergencyContact?.relationship || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Mobile Number</span><strong>{selectedProfile.emergencyContact?.phone || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Alternate Contact Number</span><strong>{selectedProfile.emergencyContact?.altPhone || '—'}</strong></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Address</span><strong>{selectedProfile.emergencyContact?.address || '—'}</strong></div>
-              </div>
-            </div>
-          )}
-
-          {activeProfileTab === 'medical' && (
-            <div className="card" style={{ padding: '1.5rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)' }}>
-              <h3 style={{ fontSize: '1.05rem', margin: '0 0 1rem 0' }}>Section C — Past Medical & Psychiatric History</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.88rem' }}>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Assessment Status</span><strong>{selectedProfile.pastMedicalPsychiatricHistory?.assessmentStatus || 'None reported'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Known Allergies</span><strong>{selectedProfile.pastMedicalPsychiatricHistory?.knownAllergies || 'None reported'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Current Medications</span><strong>{selectedProfile.pastMedicalPsychiatricHistory?.currentMedications || 'None reported'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Previous Medications</span><strong>{selectedProfile.pastMedicalPsychiatricHistory?.previousMedications || 'None reported'}</strong></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Previous Medical Illnesses</span><p style={{ margin: '0.2rem 0' }}>{selectedProfile.pastMedicalPsychiatricHistory?.previousMedicalIllnesses || 'None reported'}</p></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Previous Psychiatric / Mental Health History</span><p style={{ margin: '0.2rem 0' }}>{selectedProfile.pastMedicalPsychiatricHistory?.previousPsychiatricHistory || 'None reported'}</p></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Previous Psychological Counselling</span><p style={{ margin: '0.2rem 0' }}>{selectedProfile.pastMedicalPsychiatricHistory?.previousPsychologicalCounselling || 'None reported'}</p></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Hospitalisation & Surgeries</span><p style={{ margin: '0.2rem 0' }}>{selectedProfile.pastMedicalPsychiatricHistory?.previousHospitalisation || selectedProfile.pastMedicalPsychiatricHistory?.previousSurgeries || 'None reported'}</p></div>
-              </div>
-            </div>
-          )}
-
-          {activeProfileTab === 'social' && (
-            <div className="card" style={{ padding: '1.5rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)' }}>
-              <h3 style={{ fontSize: '1.05rem', margin: '0 0 1rem 0' }}>Section F — Personal & Social History</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.88rem' }}>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Educational Background</span><strong>{selectedProfile.personalSocialHistory?.educationalBackground || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Employment Status</span><strong>{selectedProfile.personalSocialHistory?.employmentStatus || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Marital Status</span><strong>{selectedProfile.personalSocialHistory?.maritalStatus || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Living Arrangements</span><strong>{selectedProfile.personalSocialHistory?.livingArrangements || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Sleep Pattern</span><strong>{selectedProfile.personalSocialHistory?.sleepPattern || '—'}</strong></div>
-                <div><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Appetite & Nutrition</span><strong>{selectedProfile.personalSocialHistory?.appetite || '—'}</strong></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Social Support Network</span><strong>{selectedProfile.personalSocialHistory?.socialSupport || '—'}</strong></div>
-                <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', display: 'block', fontSize: '0.78rem' }}>Lifestyle & Personal History</span><p style={{ margin: '0.2rem 0' }}>{selectedProfile.personalSocialHistory?.lifestyleInformation || selectedProfile.personalSocialHistory?.relevantPersonalHistory || '—'}</p></div>
-              </div>
+          {['clinical_history', 'personal', 'emergency', 'medical', 'family', 'developmental', 'social'].includes(activeProfileTab) && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)' }}>
+              {renderCollapsibleClinicalHistory(selectedProfile, false)}
             </div>
           )}
 
@@ -1265,16 +1779,32 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                             type="button" 
                             onClick={() => handleOpenProfileDetails(p)}
                             title="View Clinical Profile"
-                            style={{ padding: '0.35rem 0.65rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.76rem' }}
+                            className="patient-action-btn"
                           >
                             <Eye size={13} /> View
                           </button>
 
                           <button 
                             type="button" 
+                            onClick={() => {
+                              if (onOpenClinicalRecord) {
+                                onOpenClinicalRecord(p);
+                              } else {
+                                handleOpenProfileDetails(p);
+                                setActiveProfileTab('clinical_history');
+                              }
+                            }}
+                            title="Open Clinical EMR Record"
+                            className="patient-action-btn record"
+                          >
+                            <FileText size={13} /> Open Record
+                          </button>
+
+                          <button 
+                            type="button" 
                             onClick={() => handleOpenEditModal(p)}
                             title="Edit Record"
-                            style={{ padding: '0.35rem 0.65rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.76rem' }}
+                            className="patient-action-btn edit"
                           >
                             <Edit3 size={13} /> Edit
                           </button>
@@ -1361,18 +1891,34 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                                 type="button" 
                                 onClick={() => handleOpenProfileDetails(p)}
                                 title="View Clinical Profile"
-                                style={{ padding: '0.35rem 0.6rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem' }}
+                                className="patient-action-btn"
                               >
                                 <Eye size={13} /> View
                               </button>
 
                               <button 
                                 type="button" 
+                                onClick={() => {
+                                  if (onOpenClinicalRecord) {
+                                    onOpenClinicalRecord(p);
+                                  } else {
+                                    handleOpenProfileDetails(p);
+                                    setActiveProfileTab('clinical_history');
+                                  }
+                                }}
+                                title="Open Clinical EMR Record"
+                                className="patient-action-btn record"
+                              >
+                                <FileText size={13} /> Record
+                              </button>
+
+                              <button 
+                                type="button" 
                                 onClick={() => handleOpenEditModal(p)}
                                 title="Edit Record"
-                                style={{ padding: '0.35rem 0.6rem', background: 'var(--color-slate-05)', border: '1px solid var(--color-slate-20)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.78rem' }}
+                                className="patient-action-btn edit"
                               >
-                                <Edit3 size={13} />
+                                <Edit3 size={13} /> Edit
                               </button>
 
                               {isAdmin && (
@@ -1460,206 +2006,110 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
               </button>
             </div>
 
+            {/* Urgent Clinical Alert Banner (Life-Safety & Critical Allergies) */}
+            {getUrgentAlerts(selectedProfile).length > 0 && (
+              <div style={{ padding: '0.75rem 1.5rem 0' }}>
+                <div className="urgent-clinical-alert-banner">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: '#991B1B', fontSize: '0.88rem', marginBottom: '0.35rem' }}>
+                    <AlertTriangle size={18} />
+                    URGENT CLINICAL & SAFETY ALERTS
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    {getUrgentAlerts(selectedProfile).map((alert, idx) => (
+                      <div key={idx} style={{ fontSize: '0.82rem', color: '#7F1D1D', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#DC2626' }}></span>
+                        <strong>{alert.title}:</strong> {alert.desc}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Modal Tabs Navigation */}
             <div style={{ display: 'flex', gap: '0.4rem', padding: '0.75rem 1.5rem', borderBottom: '1px solid var(--color-slate-10)', background: 'var(--color-slate-05)', overflowX: 'auto' }}>
               {[
-                { id: 'overview', label: 'Overview' },
-                { id: 'personal', label: 'Personal (A)' },
-                { id: 'emergency', label: 'Emergency (B)' },
-                { id: 'medical', label: 'Medical History (C)' },
-                { id: 'family', label: 'Family History (D)' },
-                { id: 'developmental', label: 'Developmental (E)' },
-                { id: 'social', label: 'Personal & Social (F)' },
-                ...(isClinician ? [{ id: 'clinical', label: 'Clinical (G)' }] : []),
-                { id: 'consent', label: 'Consent (H)' },
-                { id: 'appointments', label: 'Appointments' },
+                { id: 'overview', label: 'Overview & Summary' },
+                { id: 'clinical_history', label: 'Clinical History (9 Domains)' },
+                { id: 'appointments', label: 'Consultations' },
                 { id: 'documents', label: 'Documents' },
                 ...(selectedProfile.academicInfo?.department || selectedProfile.academicInfo?.registrationNumber 
                   ? [{ id: 'academic', label: 'Historical Student' }] 
                   : [])
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveProfileTab(tab.id)}
-                  style={{
-                    padding: '0.4rem 0.75rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    borderRadius: 'var(--radius-sm)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    background: activeProfileTab === tab.id ? 'var(--color-primary, #0F383D)' : '#FFF',
-                    color: activeProfileTab === tab.id ? '#FFF' : 'var(--color-slate-dark)',
-                    boxShadow: activeProfileTab === tab.id ? 'none' : '0 1px 2px rgba(0,0,0,0.05)'
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              ].map(tab => {
+                const isActive = activeProfileTab === tab.id || 
+                  (tab.id === 'clinical_history' && ['personal', 'emergency', 'medical', 'psychiatric', 'family', 'developmental', 'social', 'clinical', 'consent'].includes(activeProfileTab));
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveProfileTab(tab.id)}
+                    style={{
+                      padding: '0.4rem 0.75rem',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      borderRadius: 'var(--radius-sm)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: isActive ? 'var(--color-primary, #0F383D)' : '#FFF',
+                      color: isActive ? '#FFF' : 'var(--color-slate-dark)',
+                      boxShadow: isActive ? 'none' : '0 1px 2px rgba(0,0,0,0.05)'
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Modal Scrollable Body */}
             <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
               {activeProfileTab === 'overview' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
-                  <div style={{ padding: '1rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-slate)' }}>Demographics</h4>
-                    <p style={{ margin: '0.2rem 0' }}><strong>DOB:</strong> {selectedProfile.personalInfo?.dateOfBirth || '—'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Age:</strong> {selectedProfile.personalInfo?.age ? `${selectedProfile.personalInfo.age} yrs` : '—'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Gender:</strong> {selectedProfile.personalInfo?.gender || '—'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Occupation:</strong> {selectedProfile.personalInfo?.occupation || '—'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Category:</strong> {selectedProfile.category || 'General Patient'}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
+                    <div style={{ padding: '1rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-slate)' }}>Demographics</h4>
+                      <p style={{ margin: '0.2rem 0' }}><strong>DOB:</strong> {selectedProfile.personalInfo?.dateOfBirth || '—'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Age:</strong> {selectedProfile.personalInfo?.age ? `${selectedProfile.personalInfo.age} yrs` : '—'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Gender:</strong> {selectedProfile.personalInfo?.gender || '—'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Occupation:</strong> {selectedProfile.personalInfo?.occupation || '—'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Category:</strong> {selectedProfile.category || 'General Patient'}</p>
+                    </div>
+                    <div style={{ padding: '1rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-slate)' }}>Care Allocation</h4>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Provider:</strong> {selectedProfile.assignedProvider?.providerName || 'Unassigned'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Care Status:</strong> {selectedProfile.clinicalInfo?.currentCareStatus || 'Intake'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Consent:</strong> {selectedProfile.consentAndPrivacy?.patientConsentStatus || 'Pending'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Version:</strong> {selectedProfile.consentAndPrivacy?.consentVersion || '2.0'}</p>
+                    </div>
+                    <div style={{ padding: '1rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-slate)' }}>Emergency Contact</h4>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Name:</strong> {selectedProfile.emergencyContact?.contactPersonName || selectedProfile.emergencyContact?.name || '—'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Relation:</strong> {selectedProfile.emergencyContact?.relationship || '—'}</p>
+                      <p style={{ margin: '0.2rem 0' }}><strong>Phone:</strong> {selectedProfile.emergencyContact?.phone || '—'}</p>
+                    </div>
                   </div>
-                  <div style={{ padding: '1rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-slate)' }}>Care Allocation</h4>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Provider:</strong> {selectedProfile.assignedProvider?.providerName || 'Unassigned'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Care Status:</strong> {selectedProfile.clinicalInfo?.currentCareStatus || 'Intake'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Consent:</strong> {selectedProfile.consentAndPrivacy?.patientConsentStatus || 'Pending'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Version:</strong> {selectedProfile.consentAndPrivacy?.consentVersion || '2.0'}</p>
-                  </div>
-                  <div style={{ padding: '1rem', border: '1px solid var(--color-slate-10)', borderRadius: 'var(--radius-sm)' }}>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-slate)' }}>Emergency Contact</h4>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Name:</strong> {selectedProfile.emergencyContact?.contactPersonName || selectedProfile.emergencyContact?.name || '—'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Relation:</strong> {selectedProfile.emergencyContact?.relationship || '—'}</p>
-                    <p style={{ margin: '0.2rem 0' }}><strong>Phone:</strong> {selectedProfile.emergencyContact?.phone || '—'}</p>
-                  </div>
-                </div>
-              )}
 
-              {activeProfileTab === 'personal' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Full Name</span><strong>{selectedProfile.personalInfo?.fullName}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Email</span><strong>{selectedProfile.personalInfo?.email}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Mobile Number</span><strong>{selectedProfile.personalInfo?.phone || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Alternate Mobile</span><strong>{selectedProfile.personalInfo?.alternatePhone || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Date of Birth</span><strong>{selectedProfile.personalInfo?.dateOfBirth || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Calculated Age</span><strong>{selectedProfile.personalInfo?.age ? `${selectedProfile.personalInfo.age} yrs` : '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Gender</span><strong>{selectedProfile.personalInfo?.gender || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Occupation</span><strong>{selectedProfile.personalInfo?.occupation || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Preferred Language</span><strong>{selectedProfile.personalInfo?.preferredLanguage || 'English'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Category</span><strong>{selectedProfile.category || 'General Patient'}</strong></div>
-                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Residential Address</span><strong>{[selectedProfile.personalInfo?.address, selectedProfile.personalInfo?.city, selectedProfile.personalInfo?.state, selectedProfile.personalInfo?.pinCode || selectedProfile.personalInfo?.postalCode].filter(Boolean).join(', ') || 'Not specified'}</strong></div>
-                </div>
-              )}
-
-              {activeProfileTab === 'emergency' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Contact Person Name</span><strong>{selectedProfile.emergencyContact?.contactPersonName || selectedProfile.emergencyContact?.name || 'Not provided'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Relationship</span><strong>{selectedProfile.emergencyContact?.relationship || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Mobile Number</span><strong>{selectedProfile.emergencyContact?.phone || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Alternate Contact Number</span><strong>{selectedProfile.emergencyContact?.altPhone || '—'}</strong></div>
-                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Address</span><strong>{selectedProfile.emergencyContact?.address || '—'}</strong></div>
-                </div>
-              )}
-
-              {activeProfileTab === 'medical' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-                    <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Status</span><strong>{selectedProfile.pastMedicalPsychiatricHistory?.assessmentStatus || 'None reported'}</strong></div>
-                    <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Known Allergies</span><strong>{selectedProfile.pastMedicalPsychiatricHistory?.knownAllergies || 'None reported'}</strong></div>
-                    <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Current Medications</span><strong>{selectedProfile.pastMedicalPsychiatricHistory?.currentMedications || 'None reported'}</strong></div>
-                    <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Previous Medications</span><strong>{selectedProfile.pastMedicalPsychiatricHistory?.previousMedications || 'None reported'}</strong></div>
-                  </div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Previous Medical Illnesses</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.pastMedicalPsychiatricHistory?.previousMedicalIllnesses || 'None reported'}</p></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Previous Psychiatric / Mental Health History</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.pastMedicalPsychiatricHistory?.previousPsychiatricHistory || 'None reported'}</p></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Previous Psychological Counselling</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.pastMedicalPsychiatricHistory?.previousPsychologicalCounselling || 'None reported'}</p></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Previous Surgeries & Hospitalisation</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.pastMedicalPsychiatricHistory?.previousHospitalisation || selectedProfile.pastMedicalPsychiatricHistory?.previousSurgeries || 'None reported'}</p></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Substance Use History</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.pastMedicalPsychiatricHistory?.substanceUseHistory || 'None reported'}</p></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Relevant Medical Notes</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.pastMedicalPsychiatricHistory?.relevantMedicalNotes || '—'}</p></div>
-                </div>
-              )}
-
-              {activeProfileTab === 'family' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Family Medical History</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.familyHistory?.familyMedicalHistory || 'None reported'}</p></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Family Psychiatric History</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.familyHistory?.familyPsychiatricHistory || 'None reported'}</p></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Hereditary Conditions</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{selectedProfile.familyHistory?.hereditaryConditions || 'None reported'}</p></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Family Structure & Support System</span><p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.5rem', borderRadius: '4px' }}>{[selectedProfile.familyHistory?.familyStructure, selectedProfile.familyHistory?.familySupportSystem].filter(Boolean).join(' • ') || '—'}</p></div>
-                </div>
-              )}
-
-              {activeProfileTab === 'developmental' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', fontSize: '0.85rem' }}>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Section Status</span><strong>{selectedProfile.birthDevelopmentalHistory?.status || 'Not Applicable'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Birth Type</span><strong>{selectedProfile.birthDevelopmentalHistory?.birthType || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Premature Birth</span><strong>{selectedProfile.birthDevelopmentalHistory?.prematureBirth || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Gestational Age</span><strong>{selectedProfile.birthDevelopmentalHistory?.gestationalAge || '—'}</strong></div>
-                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Developmental Milestones</span><p style={{ margin: '0.2rem 0' }}>{selectedProfile.birthDevelopmentalHistory?.developmentalMilestones || '—'}</p></div>
-                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Childhood Concerns & Additional Notes</span><p style={{ margin: '0.2rem 0' }}>{selectedProfile.birthDevelopmentalHistory?.childhoodDevelopmentalConcerns || selectedProfile.birthDevelopmentalHistory?.relevantAdditionalNotes || '—'}</p></div>
-                </div>
-              )}
-
-              {activeProfileTab === 'social' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', fontSize: '0.85rem' }}>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Educational Background</span><strong>{selectedProfile.personalSocialHistory?.educationalBackground || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Employment Status</span><strong>{selectedProfile.personalSocialHistory?.employmentStatus || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Marital Status</span><strong>{selectedProfile.personalSocialHistory?.maritalStatus || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Living Arrangements</span><strong>{selectedProfile.personalSocialHistory?.livingArrangements || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Sleep Pattern</span><strong>{selectedProfile.personalSocialHistory?.sleepPattern || '—'}</strong></div>
-                  <div><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Appetite</span><strong>{selectedProfile.personalSocialHistory?.appetite || '—'}</strong></div>
-                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--color-slate)', fontSize: '0.75rem', display: 'block' }}>Lifestyle & Personal History</span><p style={{ margin: '0.2rem 0' }}>{selectedProfile.personalSocialHistory?.lifestyleInformation || selectedProfile.personalSocialHistory?.relevantPersonalHistory || '—'}</p></div>
-                </div>
-              )}
-
-              {activeProfileTab === 'clinical' && isClinician && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.85rem' }}>
-                  <div style={{ background: '#FFF8E1', padding: '0.75rem', borderRadius: '4px', border: '1px solid #FFE082', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#B78103' }}>
-                    <Lock size={16} /> <strong>Confidential Clinical Notes</strong> (Restricted to Authorized Mental Health Practitioners)
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--color-slate)', fontSize: '0.78rem', display: 'block' }}>Presenting Concerns</span>
-                    <p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.6rem', borderRadius: '4px' }}>
-                      {selectedProfile.clinicalInfo?.presentingConcerns || 'No intake concerns documented.'}
-                    </p>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                  <div style={{ padding: '1rem', background: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                     <div>
-                      <span style={{ color: 'var(--color-slate)', fontSize: '0.78rem', display: 'block' }}>Duration of Concerns</span>
-                      <strong>{selectedProfile.clinicalInfo?.durationOfConcerns || '—'}</strong>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-slate-dark)' }}>Comprehensive Collapsible Clinical History</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--color-slate)' }}>Organized across 9 healthcare domains with individual section tracking and role-protected clinical notes.</div>
                     </div>
-                    <div>
-                      <span style={{ color: 'var(--color-slate)', fontSize: '0.78rem', display: 'block' }}>Onset and Course</span>
-                      <strong>{selectedProfile.clinicalInfo?.onsetAndCourse || '—'}</strong>
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--color-slate)', fontSize: '0.78rem', display: 'block' }}>Relevant Clinical Observations</span>
-                    <p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.6rem', borderRadius: '4px' }}>
-                      {selectedProfile.clinicalInfo?.relevantClinicalObservations || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--color-slate)', fontSize: '0.78rem', display: 'block' }}>Initial Clinical Impression</span>
-                    <p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.6rem', borderRadius: '4px' }}>
-                      {selectedProfile.clinicalInfo?.initialClinicalImpression || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--color-slate)', fontSize: '0.78rem', display: 'block' }}>Follow-up & Therapeutic Recommendations</span>
-                    <p style={{ margin: '0.2rem 0', background: 'var(--color-slate-05)', padding: '0.6rem', borderRadius: '4px' }}>
-                      {selectedProfile.clinicalInfo?.followUpRecommendations || 'Standard ongoing counselling protocol.'}
-                    </p>
+                    <button 
+                      type="button" 
+                      className="premium-btn" 
+                      style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem' }}
+                      onClick={() => setActiveProfileTab('clinical_history')}
+                    >
+                      Open Full Clinical History (9 Domains) &rarr;
+                    </button>
                   </div>
                 </div>
               )}
 
-              {activeProfileTab === 'consent' && (
-                <div style={{ fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div><strong>Patient Consent Status:</strong> {selectedProfile.consentAndPrivacy?.patientConsentStatus || 'Pending'}</div>
-                  <div><strong>Privacy Notice Acknowledged:</strong> {selectedProfile.consentAndPrivacy?.privacyNoticeAcknowledged ? 'Yes' : 'No'}</div>
-                  <div><strong>Counselling Consent Granted:</strong> {selectedProfile.consentAndPrivacy?.counsellingConsent ? 'Yes' : 'No'}</div>
-                  <div><strong>Assessment Consent Granted:</strong> {selectedProfile.consentAndPrivacy?.assessmentConsent ? 'Yes' : 'No'}</div>
-                  <div><strong>Audio Recording Consent Granted:</strong> {selectedProfile.consentAndPrivacy?.audioRecordingConsent ? 'Yes (Opted In)' : 'No (Default Off)'}</div>
-                  <div><strong>Consent Timestamp:</strong> {formatISTDate(selectedProfile.consentAndPrivacy?.consentTimestamp)}</div>
-                  {selectedProfile.consentAndPrivacy?.guardianDetails?.hasGuardian && (
-                    <div style={{ background: '#F8F9FA', padding: '0.75rem', borderRadius: '4px' }}>
-                      <strong>Guardian Details:</strong> {selectedProfile.consentAndPrivacy.guardianDetails.guardianName} ({selectedProfile.consentAndPrivacy.guardianDetails.guardianRelationship}) • {selectedProfile.consentAndPrivacy.guardianDetails.guardianPhone}
-                    </div>
-                  )}
-                  {selectedProfile.consentAndPrivacy?.consentWithdrawn && (
-                    <div style={{ color: '#C62828' }}><strong>Consent Status:</strong> Withdrawn ({selectedProfile.consentAndPrivacy.withdrawnReason})</div>
-                  )}
+              {['clinical_history', 'personal', 'emergency', 'medical', 'psychiatric', 'family', 'developmental', 'social', 'clinical', 'consent'].includes(activeProfileTab) && (
+                <div>
+                  {renderCollapsibleClinicalHistory(selectedProfile, isClinician)}
                 </div>
               )}
 
