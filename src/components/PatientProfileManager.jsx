@@ -2450,7 +2450,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {editFormData.pastMedicalPsychiatricHistory.structuredConditions.map((cond, idx) => (
-                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 2fr 1fr auto', gap: '0.4rem', alignItems: 'center', background: '#FFF', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--color-slate-10)' }}>
+                            <div key={idx} className="condition-row-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 2fr 1fr auto', gap: '0.4rem', alignItems: 'center', background: '#FFF', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--color-slate-10)' }}>
                               <input 
                                 type="text"
                                 placeholder="Condition (e.g. Asthma)"
@@ -2639,7 +2639,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                           {editFormData.familyHistory.structuredMembers.map((mem, idx) => (
-                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.5fr 2fr 3fr auto', gap: '0.4rem', alignItems: 'center', background: '#FFF', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--color-slate-10)' }}>
+                            <div key={idx} className="family-row-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 2fr 3fr auto', gap: '0.4rem', alignItems: 'center', background: '#FFF', padding: '0.4rem', borderRadius: '4px', border: '1px solid var(--color-slate-10)' }}>
                               <input 
                                 type="text"
                                 placeholder="Relation (e.g. Maternal Uncle)"

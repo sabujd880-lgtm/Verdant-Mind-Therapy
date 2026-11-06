@@ -355,82 +355,84 @@ export default function AdminManagement({ currentUser }) {
 
   return (
     <div className="admin-management-module">
-      {/* Subtab Navigation */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-slate-10)', paddingBottom: '0.75rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className={`tab-btn ${activeSubTab === 'users' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('users')}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-          >
-            <Users size={15} style={{ marginRight: '0.35rem' }} /> Registered Users ({users.length})
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeSubTab === 'profiles' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('profiles')}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-          >
-            <Contact size={15} style={{ marginRight: '0.35rem' }} /> Student & Patient Profiles
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeSubTab === 'security' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('security')}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-          >
-            <Shield size={15} style={{ marginRight: '0.35rem' }} /> Security Operations & Telemetry
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeSubTab === 'audit' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('audit')}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-          >
-            <Clock size={15} style={{ marginRight: '0.35rem' }} /> Tamper-Resistant Audit Trail
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeSubTab === 'privacy' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('privacy')}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-          >
-            <Lock size={15} style={{ marginRight: '0.35rem' }} /> Privacy & Data Rights (DSAR)
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeSubTab === 'assignments' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('assignments')}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-          >
-            <Shield size={15} style={{ marginRight: '0.35rem' }} /> Counsellor Assignments
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeSubTab === 'scheduling' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('scheduling')}
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-          >
-            <CalendarDays size={15} style={{ marginRight: '0.35rem' }} /> Practice Scheduling & IST
-          </button>
-          {canManageTheme && (
+      {/* Subtab Navigation with mobile horizontal scroll */}
+      <div className="admin-subtabs-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--color-slate-10)', paddingBottom: '0.65rem', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="admin-subtabs-nav-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%', flex: 1, minWidth: 0, paddingBottom: '2px' }}>
+          <div className="admin-subtabs-nav" style={{ display: 'flex', gap: '0.45rem', width: 'max-content' }}>
             <button
               type="button"
-              className={`tab-btn ${activeSubTab === 'appearance' ? 'active' : ''}`}
-              onClick={() => setActiveSubTab('appearance')}
-              style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+              className={`tab-btn ${activeSubTab === 'users' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('users')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem' }}
             >
-              <Palette size={15} style={{ marginRight: '0.35rem' }} /> Brand Theme & Appearance
+              <Users size={14} style={{ marginRight: '0.35rem' }} /> Registered Users ({users.length})
             </button>
-          )}
+            <button
+              type="button"
+              className={`tab-btn ${activeSubTab === 'profiles' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('profiles')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem' }}
+            >
+              <Contact size={14} style={{ marginRight: '0.35rem' }} /> Student & Patient Profiles
+            </button>
+            <button
+              type="button"
+              className={`tab-btn ${activeSubTab === 'security' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('security')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem' }}
+            >
+              <Shield size={14} style={{ marginRight: '0.35rem' }} /> Security Operations & Telemetry
+            </button>
+            <button
+              type="button"
+              className={`tab-btn ${activeSubTab === 'audit' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('audit')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem' }}
+            >
+              <Clock size={14} style={{ marginRight: '0.35rem' }} /> Tamper-Resistant Audit Trail
+            </button>
+            <button
+              type="button"
+              className={`tab-btn ${activeSubTab === 'privacy' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('privacy')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem' }}
+            >
+              <Lock size={14} style={{ marginRight: '0.35rem' }} /> Privacy & Data Rights (DSAR)
+            </button>
+            <button
+              type="button"
+              className={`tab-btn ${activeSubTab === 'assignments' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('assignments')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem' }}
+            >
+              <Shield size={14} style={{ marginRight: '0.35rem' }} /> Counsellor Assignments
+            </button>
+            <button
+              type="button"
+              className={`tab-btn ${activeSubTab === 'scheduling' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('scheduling')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem' }}
+            >
+              <CalendarDays size={14} style={{ marginRight: '0.35rem' }} /> Practice Scheduling & IST
+            </button>
+            {canManageTheme && (
+              <button
+                type="button"
+                className={`tab-btn ${activeSubTab === 'appearance' ? 'active' : ''}`}
+                onClick={() => setActiveSubTab('appearance')}
+                style={{ fontSize: '0.84rem', padding: '0.45rem 0.85rem' }}
+              >
+                <Palette size={14} style={{ marginRight: '0.35rem' }} /> Brand Theme & Appearance
+              </button>
+            )}
+          </div>
         </div>
 
         {activeSubTab === 'users' && (
           <button
             type="button"
             className="premium-btn"
-            style={{ padding: '0.45rem 1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            style={{ padding: '0.45rem 0.95rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
             onClick={() => setShowAddModal(true)}
           >
             <UserPlus size={14} /> Add / Pre-Approve User

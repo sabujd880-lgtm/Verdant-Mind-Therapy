@@ -395,7 +395,7 @@ export default function SecurityDashboard({ currentUser }) {
       {activeTab === 'overview' && (
         <div>
           {/* Key Metric Counters */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+          <div className="security-metrics-grid" style={{ marginBottom: '2rem' }}>
             <div className="card" style={{ padding: '1.25rem', background: '#FFF', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-slate-10)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-slate-light)', fontSize: '0.8rem', fontWeight: 600 }}>
                 <span>REGISTERED USERS</span>
