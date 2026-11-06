@@ -2000,8 +2000,26 @@ export function resolveGoogleCallbackUrl(req) {
     }
   }
 
-  // 2. Check explicit BACKEND_URL, API_URL, or RENDER_EXTERNAL_URL
-  const envBackend = (process.env.BACKEND_URL || process.env.API_URL || process.env.RENDER_EXTERNAL_URL || '').trim();
+  // 2. Dynamic resolution from incoming HTTP request headers
+  if (req) {
+    const rawHost = req.get('x-forwarded-host') || req.get('host') || '';
+    if (rawHost) {
+      const host = rawHost.split(',')[0].trim().replace(/^127\.0\.0\.1/, 'localhost');
+      const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+
+      let protocol = 'https';
+      if (isLocalhost && !isCloudOrProd) {
+        protocol = (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
+      } else {
+        protocol = 'https';
+      }
+
+      return `${protocol}://${host}/api/auth/google/callback`;
+    }
+  }
+
+  // 3. Check explicit RENDER_EXTERNAL_URL, BACKEND_URL, or API_URL
+  const envBackend = (process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || process.env.API_URL || '').trim();
   if (envBackend) {
     let clean = envBackend.replace(/\/+$/, '');
     if (isCloudOrProd && clean.startsWith('http://') && !clean.includes('localhost') && !clean.includes('127.0.0.1')) {
@@ -2013,25 +2031,9 @@ export function resolveGoogleCallbackUrl(req) {
     return clean;
   }
 
-  // 3. Dynamic resolution from incoming HTTP request headers
-  if (req) {
-    const rawHost = req.get('x-forwarded-host') || req.get('host') || 'localhost:5000';
-    const host = rawHost.split(',')[0].trim().replace(/^127\.0\.0\.1/, 'localhost');
-    const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
-
-    let protocol = 'https';
-    if (isLocalhost && !isCloudOrProd) {
-      protocol = (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim();
-    } else {
-      protocol = 'https';
-    }
-
-    return `${protocol}://${host}/api/auth/google/callback`;
-  }
-
   // 4. Default fallback
   return isCloudOrProd 
-    ? 'https://verdant-mind.onrender.com/api/auth/google/callback'
+    ? 'https://verdant-mind-therapy-ys6i.onrender.com/api/auth/google/callback'
     : 'http://localhost:5000/api/auth/google/callback';
 }
 
@@ -2051,21 +2053,23 @@ export function resolveFrontendUrl(req) {
     }
   }
 
+  if (req) {
+    const rawHost = req.get('x-forwarded-host') || req.get('host') || '';
+    if (rawHost) {
+      const host = rawHost.split(',')[0].trim().replace(/^127\.0\.0\.1/, 'localhost');
+      const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+      const protocol = isLocalhost && !isCloudOrProd 
+        ? (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim() 
+        : 'https';
+      return `${protocol}://${host}`;
+    }
+  }
+
   if (process.env.RENDER_EXTERNAL_URL) {
     return process.env.RENDER_EXTERNAL_URL.trim().replace(/\/+$/, '');
   }
 
-  if (req) {
-    const rawHost = req.get('x-forwarded-host') || req.get('host') || 'localhost:5000';
-    const host = rawHost.split(',')[0].trim().replace(/^127\.0\.0\.1/, 'localhost');
-    const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
-    const protocol = isLocalhost && !isCloudOrProd 
-      ? (req.get('x-forwarded-proto') || req.protocol || 'http').split(',')[0].trim() 
-      : 'https';
-    return `${protocol}://${host}`;
-  }
-
-  return isCloudOrProd ? 'https://verdant-mind.onrender.com' : 'http://localhost:5173';
+  return isCloudOrProd ? 'https://verdant-mind-therapy-ys6i.onrender.com' : 'http://localhost:5173';
 }
 
 // 1. Initiate Google OAuth 2.0 Server-Side Flow
