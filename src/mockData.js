@@ -18,11 +18,4 @@ export const INITIAL_PROFILE = {
   ]
 };
 
-export const INITIAL_AVAILABILITY = {
-  workingDays: [1, 2, 3, 4, 5], // Monday (1) to Friday (5)
-  startHour: "09:00",
-  endHour: "17:00",
-  blockedDates: []
-};
-
 

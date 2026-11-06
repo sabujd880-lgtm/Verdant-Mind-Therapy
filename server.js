@@ -11,7 +11,6 @@ process.on('uncaughtException', (err) => {
 
 import express from 'express';
 import mongoose from 'mongoose';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -26,8 +25,7 @@ import crypto from 'crypto';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { loadSecrets } from './src/config/secrets.js';
-import { 
-  TIMEZONE,
+import {
   normalizeToISTDate, 
   normalizeTo12HourTime, 
   parseISTDateTimeToUTC, 
@@ -2074,7 +2072,6 @@ export function resolveFrontendUrl(req) {
 
 // 1. Initiate Google OAuth 2.0 Server-Side Flow
 app.get('/api/auth/google', (req, res) => {
-  const frontendUrl = resolveFrontendUrl(req);
   const callbackUrl = resolveGoogleCallbackUrl(req);
   console.log(`[GOOGLE OAUTH INITIATE] Using redirect_uri: ${callbackUrl}`);
 

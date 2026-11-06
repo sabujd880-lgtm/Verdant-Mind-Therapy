@@ -68,10 +68,10 @@ export default function TherapistDashboard({
   const [customDocClientName, setCustomDocClientName] = useState('Walk-in Consultation Client');
   const [customDocClientEmail, setCustomDocClientEmail] = useState('client@example.com');
   const [customDocClientPhone, setCustomDocClientPhone] = useState('+91 98765 43210');
-  const [customDocAgeGroup, setCustomDocAgeGroup] = useState('Adult (18-64)');
+  const customDocAgeGroup = 'Adult (18-64)';
   const [customDocSessionMode, setCustomDocSessionMode] = useState('In-Person Consultation');
   const [customDocDate, setCustomDocDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [customDocTime, setCustomDocTime] = useState('11:00 AM');
+  const customDocTime = '11:00 AM';
   const [docType, setDocType] = useState('receipt'); // 'receipt' | 'prescription' | 'report'
   
   // Doc fields: Receipt
@@ -2144,7 +2144,7 @@ export default function TherapistDashboard({
         <PatientProfileManager 
           currentUser={currentUser} 
           mode="directory" 
-          onOpenClinicalRecord={(profile) => {
+          onOpenClinicalRecord={() => {
             setActiveTab('clinical-records');
           }}
         />

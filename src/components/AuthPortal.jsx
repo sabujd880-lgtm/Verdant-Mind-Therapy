@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, ShieldAlert, LogIn, Mail, Lock, UserPlus, Phone, KeyRound, ArrowLeft, AlertCircle, Clock, ShieldX } from 'lucide-react';
+import { User, ShieldAlert, LogIn, Mail, Lock, UserPlus, KeyRound, ArrowLeft, AlertCircle, Clock, ShieldX } from 'lucide-react';
 
 export default function AuthPortal({ 
   onLogin, 

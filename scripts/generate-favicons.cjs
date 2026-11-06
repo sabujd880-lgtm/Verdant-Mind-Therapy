@@ -5,7 +5,7 @@ const pngToIco = (require('png-to-ico').default || require('png-to-ico'));
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const SOURCE_IMAGE = path.join(PUBLIC_DIR, 'favicon.png');
-const BACKUP_IMAGE = path.join(PUBLIC_DIR, 'favicon-original-backup.png');
+const BACKUP_IMAGE = path.join(__dirname, 'favicon-original-backup.png');
 
 async function processFavicon() {
   console.log('--- Step 1: Backup Source Logo ---');

@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, User, Search, Filter, Plus, Eye, Edit3, Shield, CheckCircle2, 
   AlertCircle, Clock, HeartHandshake, ChevronLeft, ChevronRight, Lock, 
-  Save, X, RefreshCw, FilePlus, ChevronDown, ChevronUp, Calendar, 
-  Phone, Mail, MapPin, Activity, Baby, BookOpen, FileText, Check, AlertTriangle,
-  Brain, HeartPulse, FileCheck
+  Save, X, RefreshCw, FilePlus, ChevronDown, ChevronUp, 
+  Phone, Activity, Baby, BookOpen, FileText, Check, AlertTriangle,
+  Brain, FileCheck
 } from 'lucide-react';
 import { formatISTDate } from '../utils/dateTime.js';
 import { safeJson, getResponseError } from '../utils/api.js';
@@ -175,7 +175,7 @@ export default function PatientProfileManager({ currentUser, mode = 'directory',
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [activeProfileTab, setActiveProfileTab] = useState('overview');
   const [profileAppointments, setProfileAppointments] = useState([]);
-  const [profileClinicalRecords, setProfileClinicalRecords] = useState(null);
+  // clinical records state handled via active tab
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Accordion State for Profile Viewing (Collapsible Clinical History)

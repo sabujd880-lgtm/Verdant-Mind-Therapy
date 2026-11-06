@@ -19,7 +19,7 @@ import {
 } from '../src/utils/dateTime.js';
 
 // Dynamically import server after NODE_ENV=test is set
-const { app, getClientIp, User, Client, PatientProfile, AuditLog, SecurityEvent, UserSession, ConsentRecord, PrivacyRequest, SecuritySettings, hashPassword, verifyPassword, recordSecurityEvent, logAuditEvent, resolveGoogleCallbackUrl, resolveFrontendUrl } = await import('../server.js');
+const { app, getClientIp, User, Client, AuditLog, UserSession, hashPassword, recordSecurityEvent, resolveGoogleCallbackUrl, resolveFrontendUrl } = await import('../server.js');
 
 let server = null;
 const TEST_PORT = 5099;

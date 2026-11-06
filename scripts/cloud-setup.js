@@ -16,13 +16,11 @@ import {
   PutPublicAccessBlockCommand, 
   HeadBucketCommand 
 } from '@aws-sdk/client-s3';
-import { 
-  SecretsManagerClient, 
-  DescribeSecretCommand, 
-  CreateSecretCommand, 
-  GetSecretValueCommand 
+import {
+  SecretsManagerClient,
+  DescribeSecretCommand,
+  CreateSecretCommand
 } from '@aws-sdk/client-secrets-manager';
-import dns from 'dns';
 import dotenv from 'dotenv';
 
 dotenv.config();
