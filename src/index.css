@@ -62,6 +62,7 @@ button, input, select, textarea {
   font-family: inherit;
   font-size: inherit;
   color: inherit;
+  touch-action: manipulation;
 }
 
 button {
@@ -82,6 +83,11 @@ button {
 @media (max-width: 768px) {
   .container {
     padding: 0 1rem;
+  }
+  
+  /* Prevent mobile browser input auto-zoom on iOS Safari */
+  input, select, textarea {
+    font-size: 16px !important;
   }
 }
 
@@ -1096,6 +1102,8 @@ button {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
@@ -1260,6 +1268,8 @@ button {
 
 .dashboard-tabs {
   display: flex;
+  flex: 1;
+  min-width: 0;
   gap: 1.25rem;
   overflow-x: auto;
   overflow-y: hidden;
@@ -1409,6 +1419,7 @@ input[type="number"] {
   position: relative;
   white-space: nowrap;
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .tab-btn:hover {
@@ -2371,66 +2382,6 @@ input[type="number"] {
   letter-spacing: 0.02em;
 }
 
-/* Print Media Stylesheet */
-@media print {
-  html, body {
-    background-color: #FFF !important;
-    color: #000 !important;
-  }
-  
-  /* Hide page navigation headers, footers, overlay modals */
-  header, footer, .auth-overlay, .modal-overlay, .ai-bot-bubble, .ai-chat-panel, .ai-bot-ping-ring {
-    display: none !important;
-  }
-  
-  /* Hide dashboard navigation, header banner, statistics, and other grids */
-  .dashboard-header, .dashboard-nav, .dashboard-stats, .appointments-tab-grid, .messages-tab-grid, .settings-grid {
-    display: none !important;
-  }
-  
-  /* Hide form controls in document tab builder */
-  .doc-form-panel {
-    display: none !important;
-  }
-  
-  /* Hide review cards, validation notices, and buttons in the preview pane */
-  .doc-preview-panel-wrapper > *:not(#clinical-printable-document) {
-    display: none !important;
-  }
-
-  /* Expand parent layouts to standard printable blocks */
-  .app-layout, main, .dashboard-container, .document-tab-grid, .doc-preview-panel-wrapper {
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-  }
-
-  /* Make sure the target preview document is visible and sized perfectly */
-  #clinical-printable-document {
-    position: relative !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: auto !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: #FFF !important;
-    color: #000 !important;
-    visibility: visible !important;
-  }
-  
-  #clinical-printable-document * {
-    visibility: visible !important;
-  }
-}
-
 /* Clinical Self-Assessment and Floating AI Bot Styles */
 .assessment-container {
   margin-top: 4rem !important;
@@ -2713,6 +2664,12 @@ input[type="number"] {
 }
 
 /* 5. Subtab navigation bar touch scroll styling */
+.admin-subtabs-nav-wrapper,
+.client-tabs-nav-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(42, 71, 62, 0.2) transparent;
+  scroll-behavior: smooth;
+}
 .admin-subtabs-nav-wrapper::-webkit-scrollbar,
 .client-tabs-nav-wrapper::-webkit-scrollbar {
   height: 3px;
@@ -2852,9 +2809,63 @@ input[type="number"] {
   border: 1.5px solid #FCA5A5;
   border-radius: var(--radius-sm);
   display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.5rem;
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Clinical History Domain Status Badges */
+.badge-complete,
+.badge-reported {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 10px;
+  background: #E8F5E9;
+  color: #2E7D32;
+  border: 1px solid #C8E6C9;
+}
+
+.badge-none-reported {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 10px;
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+}
+
+.badge-not-known {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 10px;
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.badge-not-applicable {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 10px;
+  background: #EDE9FE;
+  color: #6D28D9;
+  border: 1px solid #DDD6FE;
+}
+
+.badge-not-assessed {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 10px;
+  background: #F8FAFC;
+  color: #94A3B8;
+  border: 1px solid #E2E8F0;
 }
 
 /* Patient Action Buttons */
@@ -2905,18 +2916,31 @@ input[type="number"] {
    ========================================================================= */
 @media print {
   /* 1. Hide all non-printable interface components & no-print helpers */
+  header,
+  footer,
   .header-wrapper,
   .app-footer,
+  .auth-overlay,
+  .modal-overlay,
+  .ai-bot-wrapper,
+  .ai-bot-bubble,
+  .ai-chat-panel,
+  .ai-bot-ping-ring,
+  .dashboard-header,
+  .dashboard-nav,
+  .dashboard-stats,
   .dashboard-title-row,
   .dashboard-tabs-wrapper,
   .dashboard-tabs,
   .metrics-row,
   .doc-form-panel,
-  .ai-bot-wrapper,
   .reload-prompt-overlay,
   .reload-prompt,
   .toast,
   .client-portal-container,
+  .appointments-tab-grid,
+  .messages-tab-grid,
+  .settings-grid,
   .no-print,
   button,
   input,
