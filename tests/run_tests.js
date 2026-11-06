@@ -678,10 +678,12 @@ async function run() {
   // Test 28C: Appointment Booking & Slot Conflict Prevention
   let createdAptId = '';
   await test('Client can book appointment and duplicate slot is rejected (409)', async () => {
-    const validDay = String((Date.now() % 20) + 1).padStart(2, '0');
-    const testYear = 2030 + (Math.floor(Date.now() / 1000) % 50);
-    const testDate = `${testYear}-11-${validDay}`;
-    const testTime = `${(Date.now() % 4) + 1}:30 PM`;
+    const uniqueNonce = Date.now() + Math.floor(Math.random() * 100000);
+    const testYear = 2150 + (uniqueNonce % 300);
+    const testMonth = String((uniqueNonce % 12) + 1).padStart(2, '0');
+    const testDay = String((uniqueNonce % 25) + 1).padStart(2, '0');
+    const testDate = `${testYear}-${testMonth}-${testDay}`;
+    const testTime = `02:30 PM`;
     
     // 1. Initial Booking
     const bookRes = await fetch(`${BASE_URL}/api/appointments`, {
