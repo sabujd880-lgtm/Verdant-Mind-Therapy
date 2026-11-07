@@ -1,7 +1,7 @@
 # Deleted & Relocated Files Report — Verdant Mind
 
 **Platform:** Verdant Mind — Public Mental Health & Clinical Services Portal  
-**Date:** November 6, 2026  
+**Date:** November 7, 2026  
 **Auditor:** Antigravity Autonomous Pair Programmer  
 
 ---
@@ -12,15 +12,18 @@ This report details every file that was permanently removed from the repository 
 
 ---
 
-## 2. Permanently Removed Files
+## 2. Permanently Removed Files & Artifacts
 
-| File Path | Original Size | Category | Justification & Reference Check | Safety Assessment |
+| File Path / Pattern | Original Size | Category | Justification & Reference Check | Safety Assessment |
 | :--- | :--- | :--- | :--- | :--- |
 | `src/App.css` | 184 lines (~3.8 KB) | Boilerplate CSS | Starter template styles for Vite (`.counter`, `#next-steps`, `.hero`). Checked all files in `src/`—never imported by `App.jsx`, `main.jsx`, or `index.html`. All portal styles live in `src/index.css` and `src/styles/`. | **Zero Impact.** Zero broken styles. |
 | `src/assets/hero.png` | 13.0 KB | Obsolete Asset | Prototype hero image from early development. Checked whole repository via `git grep "hero.png"`—zero references. Public hero section utilizes custom CSS gradients and responsive typographic layouts. | **Zero Impact.** Image was dead weight. |
 | `src/assets/react.svg` | 4.1 KB | Boilerplate Asset | Default React starter icon from Vite scaffolding. Zero references in any JSX or CSS file. | **Zero Impact.** Unused template file. |
 | `src/assets/vite.svg` | 8.7 KB | Boilerplate Asset | Default Vite starter icon from Vite scaffolding. Zero references in any JSX or CSS file. | **Zero Impact.** Unused template file. |
 | `src/styles/themes/botanical-theme.css` | 124 lines (~3.9 KB) | Abandoned Theme | Exploratory green/purple theme from early design phase. Unlisted in `src/styles/theme-config.js` (`THEMES = { CLASSIC: 'classic', LAVENDER_ROSE: 'lavender-rose' }`) and unimported in `src/index.css`. | **Zero Impact.** Application uses lavender-rose as authoritative theme with classic as backup. |
+| `uploads/tmp/*.bin` (66 files) | ~0 KB | Test Artifacts | Accumulated temporary buffer scratch files generated during automated test runs (`node tests/run_tests.js`). | **Zero Impact.** Leftover test scratch files safely purged. |
+| `uploads/recordings/*.webm` (66 files) | ~0 KB | Test Artifacts | Accumulated test audio recordings created during test suite execution. | **Zero Impact.** Leftover test recordings safely purged. |
+| `local_db.json` test residue | ~2.94 MB | Mock Test Records | Accumulated test mock appointments, sessions, and logs generated during local regression runs. Reset to clean empty schema. | **Zero Impact.** Local dev database reset to clean state; strictly disabled in production. |
 
 ---
 
@@ -102,6 +105,7 @@ The following sensitive and mission-critical files were audited and deliberately
 * `Dockerfile` & `docker-compose.yml`: Container definitions.
 * `package.json` & `package-lock.json`: Production dependencies manifest and lockfile.
 * `vite.config.js`: PWA manifest, service worker caching, and local API proxying.
+* `public/_worker.js`: Cloudflare Workers Edge API proxy for `/api/*` requests.
 * `.env.example`: Sanitized environment template for onboarding.
 * `src/assets/sabuj-das.png`: Practitioner official profile portrait.
 * `public/` web assets: `favicon.ico`, `favicon.png`, `apple-touch-icon.png`, `android-chrome-*.png`, `pwa-*.png`, `manifest.webmanifest`.

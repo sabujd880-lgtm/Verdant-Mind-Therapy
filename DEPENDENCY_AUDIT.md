@@ -1,7 +1,7 @@
 # Dependency Audit Report — Verdant Mind
 
 **Platform:** Verdant Mind — Public Mental Health & Clinical Services Portal  
-**Date:** November 6, 2026  
+**Date:** November 7, 2026  
 **Auditor:** Antigravity Autonomous Pair Programmer  
 
 ---
@@ -11,9 +11,10 @@
 A comprehensive dependency audit was performed on `package.json` and `package-lock.json` to ensure the project has no unneeded packages, zero known security vulnerabilities, minimal container build times, and clean separation between production runtime requirements and developer utilities.
 
 ### Audit Actions Taken
-1. **Removed `cors` from `dependencies`:** `server.js` implements its own granular Origin validation, pre-flight header handling, and credentials management natively; `cors` was completely unused.
-2. **Relocated `sharp` from `dependencies` to `devDependencies`:** `sharp` is only used by `scripts/generate-favicons.cjs` for generating PWA icons locally. Moving it to `devDependencies` reduces production container build overhead and eliminates native libvips compilation requirements in container runtimes.
-3. **Preserved Security Overrides:** Maintained transitive package overrides for `proxy-addr`, `glob`, `minimatch`, and `deepmerge` to guarantee zero high/critical CVEs.
+1. **Renamed Package Identity:** Package manifest name updated to `verdant-mind`.
+2. **Removed `cors` from `dependencies`:** `server.js` implements its own granular Origin validation, pre-flight header handling, and credentials management natively; `cors` was completely unused.
+3. **Relocated `sharp` from `dependencies` to `devDependencies`:** `sharp` is only used by `scripts/generate-favicons.cjs` for generating PWA icons locally. Moving it to `devDependencies` reduces production container build overhead and eliminates native libvips compilation requirements in container runtimes.
+4. **Preserved Security Overrides:** Maintained transitive package overrides for `proxy-addr`, `glob`, `minimatch`, and `deepmerge` to guarantee zero high/critical CVEs.
 
 ---
 
@@ -46,6 +47,7 @@ A comprehensive dependency audit was performed on `package.json` and `package-lo
 
 | Package | Version | Usage |
 | :--- | :--- | :--- |
+| `@cloudflare/vite-plugin` | `^1.67.0` | Cloudflare Workers & Pages deployment build integration |
 | `@types/react` | `^19.2.17` | TypeScript definitions for React components and JSX |
 | `@types/react-dom` | `^19.2.3` | TypeScript definitions for React DOM methods |
 | `concurrently` | `^10.0.3` | Runs Vite frontend and Express server concurrently in local development (`npm run dev`) |
@@ -53,6 +55,7 @@ A comprehensive dependency audit was performed on `package.json` and `package-lo
 | `oxlint` | `^1.71.0` | High-speed Rust-based code linter for checking syntax and unused variables (`npm run lint`) |
 | `png-to-ico` | `^3.0.2` | Converts PNG icons to multi-resolution `favicon.ico` in `scripts/generate-favicons.cjs` |
 | `sharp` | `^0.35.5` | High-performance image processing engine used solely for favicon generation |
+| `wrangler` | `^4.158.0` | Cloudflare Workers CLI for deployment and previews |
 
 ---
 
@@ -71,7 +74,7 @@ A comprehensive dependency audit was performed on `package.json` and `package-lo
 
 Running `npm audit` against the synchronized lockfile reports:
 ```
-up to date, audited 511 packages in 2s
+up to date, audited 512 packages in 2s
 found 0 vulnerabilities
 ```
 * **Critical Vulnerabilities:** 0

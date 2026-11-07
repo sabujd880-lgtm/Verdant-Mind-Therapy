@@ -1,16 +1,19 @@
 # Production Readiness Checklist — Verdant Mind
 
 **Platform:** Verdant Mind — Public Mental Health & Clinical Services Portal  
-**Target Environment:** Render Cloud Platform (`https://verdant-mind-therapy-ys6i.onrender.com`)  
-**Audit Date:** November 6, 2026  
+**Target Environments:**
+* **Render Cloud Platform:** `https://verdant-mind-therapy-ys6i.onrender.com`
+* **Cloudflare Workers (Edge):** `https://verdantmind.sabujd880.workers.dev`  
+**Audit Date:** November 7, 2026  
 **Final Verdict:** READY FOR PRODUCTION DEPLOYMENT  
 
 ---
 
 ## 1. Core Architecture & Build Checks
 
-- [x] **Frontend Production Build:** `npm run build` succeeds cleanly in < 1s (compiled in 897ms).
-- [x] **PWA Service Worker Generation:** Service worker generated with 25 precache entries (1,731 KiB), optimized by removing non-public backup images.
+- [x] **Frontend Production Build:** `npm run build` succeeds cleanly in < 1s (compiled in 618ms).
+- [x] **PWA Service Worker Generation:** Service worker generated with 26 precache entries (1,732 KiB), auto-updates in background with `registerType: 'autoUpdate'`.
+- [x] **Cloudflare Workers API Proxy:** `public/_worker.js` proxies all `/api/*` requests from Cloudflare Edge directly to Render Express API.
 - [x] **Static Asset Cross-Origin Serving:** Express mounts `/assets` at root with `Access-Control-Allow-Origin: *`, `Cross-Origin-Resource-Policy: cross-origin`, and strict MIME types (`application/javascript`, `text/css`).
 - [x] **Asset 404 Guard:** Missing static assets return `404 text/plain` and do NOT fall through into the SPA catch-all returning `index.html` or JSON.
 - [x] **IPv4 DNS Ordering:** `package.json` start command executes `node --dns-result-order=ipv4first server.js`, preventing IPv6 timeout delays when connecting to MongoDB Atlas replica sets.
@@ -83,20 +86,22 @@ TEST SUMMARY: 85 PASSED, 0 FAILED
 
 ---
 
-## 6. Pre-Flight Deployment Steps for Render
+## 6. Pre-Flight Deployment Steps
 
-When deploying the cleaned repository to Render:
-
+### Render Production (Backend & Full-Stack)
 1. **Push Changes to GitHub:**
    ```bash
    git push origin main
    ```
-2. **MongoDB Atlas Network Access (One-time check):**
-   * Ensure `0.0.0.0/0` (Allow access from anywhere) is configured in MongoDB Atlas Network Access so Render's dynamic outbound IP addresses can reach the cluster.
-3. **Trigger Render Deployment:**
-   * In the Render Dashboard, click **Manual Deploy** → **Clear build cache & deploy**.
-   * Render will automatically execute `npm run build` and launch with `node --dns-result-order=ipv4first server.js`.
-4. **Post-Deployment Verification:**
-   * Visit: `https://verdant-mind-therapy-ys6i.onrender.com/`
-   * Check browser console for HTTP 200 on all `/assets/*.js` and `/assets/*.css` files.
-   * Verify login, consultation booking, Document Composer, and patient directory.
+2. **MongoDB Atlas Network Access:**
+   * Ensure `0.0.0.0/0` is allowed in Atlas IP Access List so Render instances can connect.
+3. **Render Deployment:**
+   * In the Render Dashboard, click **Manual Deploy** → **Deploy latest commit**.
+4. **Live URL:** `https://verdant-mind-therapy-ys6i.onrender.com/`
+
+### Cloudflare Workers (Global CDN Edge)
+1. **Deploy to Cloudflare:**
+   ```bash
+   npm run deploy
+   ```
+2. **Live URL:** `https://verdantmind.sabujd880.workers.dev/`

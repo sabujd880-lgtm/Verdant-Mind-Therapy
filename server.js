@@ -30,7 +30,6 @@ import {
   normalizeTo12HourTime, 
   parseISTDateTimeToUTC, 
   formatISTDate, 
-  formatISTTime, 
   formatISTDateTimeWithZone,
   isSameISTDate,
   doAppointmentsOverlap 
