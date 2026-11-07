@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * THEME CONFIGURATION MANAGER
- * Project: Psychology Portfolio - Verdant Mind
+ * Project: Verdant Mind Mental Health Portal
  * 
  * Centralized Theme Governance
  * - Supported Themes:

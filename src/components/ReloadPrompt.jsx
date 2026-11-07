@@ -20,6 +20,15 @@ function ReloadPrompt() {
     setNeedRefresh(false);
   };
 
+  React.useEffect(() => {
+    if (offlineReady) {
+      const timer = setTimeout(() => {
+        setOfflineReady(false);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [offlineReady]);
+
   if (!offlineReady && !needRefresh) {
     return null;
   }
