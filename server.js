@@ -2086,9 +2086,8 @@ app.get('/api/auth/google', (req, res) => {
       const mockStateUrl = `/api/auth/google/callback?code=dev_mock_code&state=${state}`;
       return req.session.save(() => res.redirect(mockStateUrl));
     }
-    return res.status(500).json({ 
-      error: 'Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.' 
-    });
+    const frontendUrl = resolveFrontendUrl(req);
+    return res.redirect(`${frontendUrl}/?auth_error=google_not_configured`);
   }
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(process.env.GOOGLE_CLIENT_ID)}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&state=${state}&access_type=online&prompt=select_account`;

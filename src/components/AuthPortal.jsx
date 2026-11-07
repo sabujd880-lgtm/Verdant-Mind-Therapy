@@ -52,13 +52,19 @@ export default function AuthPortal({
       setAuthBanner(initialStatus);
     }
     if (initialError) {
-      setErrorMsg(initialError);
+      if (initialError === 'google_not_configured') {
+        setErrorMsg('Google Sign-In is not enabled on this deployment yet. Please sign in using Email & Password, or set GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET in the Render dashboard.');
+      } else {
+        setErrorMsg(initialError);
+      }
     }
   }, [initialStatus, initialError]);
 
   const handleGoogleSignIn = () => {
     // Initiate secure server-side Google OAuth 2.0 authorization-code flow
-    window.location.href = '/api/auth/google';
+    const isCloudflare = typeof window !== 'undefined' && window.location.hostname.includes('workers.dev');
+    const targetUrl = isCloudflare ? 'https://verdant-mind-therapy-ys6i.onrender.com/api/auth/google' : '/api/auth/google';
+    window.location.href = targetUrl;
   };
 
   const handleLoginSubmit = async (e) => {

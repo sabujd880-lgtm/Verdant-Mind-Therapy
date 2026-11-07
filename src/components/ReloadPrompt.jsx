@@ -3,7 +3,6 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 
 function ReloadPrompt() {
   const {
-    offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
@@ -16,20 +15,10 @@ function ReloadPrompt() {
   });
 
   const close = () => {
-    setOfflineReady(false);
     setNeedRefresh(false);
   };
 
-  React.useEffect(() => {
-    if (offlineReady) {
-      const timer = setTimeout(() => {
-        setOfflineReady(false);
-      }, 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [offlineReady]);
-
-  if (!offlineReady && !needRefresh) {
+  if (!needRefresh) {
     return null;
   }
 
@@ -128,12 +117,10 @@ function ReloadPrompt() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <span style={{ fontWeight: 600, fontSize: '15px', letterSpacing: '-0.01em' }}>
-            {offlineReady ? 'App Ready Offline' : 'Update Available'}
+            Update Available
           </span>
           <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: '1.4' }}>
-            {offlineReady
-              ? 'Verdant Mind has been cached for offline use. You can access it anytime without internet.'
-              : 'A new version of the app is available with latest updates and features.'}
+            A new version of Verdant Mind is available with the latest features.
           </span>
         </div>
       </div>

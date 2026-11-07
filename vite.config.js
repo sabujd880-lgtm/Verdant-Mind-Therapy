@@ -7,7 +7,7 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), VitePWA({
-    registerType: 'prompt', // Prompt user to reload on updates
+    registerType: 'autoUpdate', // Automatically update service worker when new version arrives
     includeAssets: [
       'favicon.ico',
       'favicon.png',
