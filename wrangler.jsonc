@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "verdantmind",
+  "account_id": "f3f7dbc7fdbe1a9c080ef434b61bb847",
   "compatibility_date": "2026-11-04",
   "observability": {
     "enabled": true
